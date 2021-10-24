@@ -7,7 +7,7 @@ source code for MidlEO monitoring agents
 
 ```
 cd your-folder
-git remote add origin https://gitlab.com/midleo/midleo-agents.git
+git remote add origin https://github.com/midleo/midleo-agents.git
 git branch -M master
 git pull origin master
 ```
