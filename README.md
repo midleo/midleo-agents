@@ -16,5 +16,7 @@ git pull origin master
 
 - conf folder : configuration about filebeat and logstash module for monitoring purpose
 - getinfo : python agents for getting information from a Windows or Linux server about system resources
+  - check install.sh and install the python modules on windows/linux
+  - start with: python.exe .\midleo_client.py
 - ibmmq.pcfget : MidlEO java module for getting information about current queue depth , max age and uncommited messages via PCF
 - ibmmq.restget : python agent for getting information about IBM MQ queue/channel depth via REST
