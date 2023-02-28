@@ -1,7 +1,8 @@
-import makerequest,classes,platform,json,re,uuid,time
+import makerequest,decrypt,classes,platform,json,re,uuid,time
 import socket
 import sys
 from multiprocessing import Process
+from datetime import datetime
 
 PORT_NUMBER = 5550
 SIZE = 1024
@@ -95,17 +96,21 @@ def listenfordata():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
       config_data = getcfgData()
       uid = config_data['uid']
+      uid = uid+uid+uid+uid
       s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
       s.bind(('', PORT_NUMBER))
       s.listen(5)
       while True:
+        now = datetime.now()
+        current_time = now.strftime("%H:%M:%S")
         conn, addr = s.accept()
         print(f"Connected by {addr}")
         data = conn.recv(1024)
         if not data:
            break
         try:
-            data = data.rstrip().decode('utf-8')
+            data = data.rstrip()
+            data = decrypt.decryptit(data,uid)
             data = json.loads(data)
             if not data["uid"]==uid:
                break
@@ -113,7 +118,7 @@ def listenfordata():
 
 
 
-            conn.sendall(str.encode("Message received"))
+            conn.sendall(str.encode("Message received. "+current_time))
         except Exception:
             conn.sendall(str.encode("Problem decoding the data"))
 
