@@ -1,12 +1,10 @@
-import makerequest
-import classes
-import platform
-import json
-import re
-import uuid
-import time
-import requests
-import json
+import makerequest,classes,platform,json,re,uuid,time
+import socket
+import sys
+from multiprocessing import Process
+
+PORT_NUMBER = 5550
+SIZE = 1024
 
 if platform.system()=="Linux":
     import lin_utils
@@ -88,7 +86,42 @@ def main():
 
 createConfigJson()
 
-while True:
-    getupdint=main()
-    print(json.dumps({"log":"sleep "+getupdint+" minutes"}))
-    time.sleep(int(getupdint)*60)
+def funcgetdata():
+    while True:
+        getupdint=main()
+        time.sleep(int(getupdint)*60)
+
+def listenfordata():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+      config_data = getcfgData()
+      uid = config_data['uid']
+      s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
+      s.bind(('', PORT_NUMBER))
+      s.listen(5)
+      while True:
+        conn, addr = s.accept()
+        print(f"Connected by {addr}")
+        data = conn.recv(1024)
+        if not data:
+           break
+        try:
+            data = data.rstrip().decode('utf-8')
+            data = json.loads(data)
+            if not data["uid"]==uid:
+               break
+
+
+
+
+            conn.sendall(str.encode("Message received"))
+        except Exception:
+            conn.sendall(str.encode("Problem decoding the data"))
+
+if __name__ == '__main__':
+
+    proc1 = Process(target=funcgetdata)
+    proc1.start()
+
+    proc2 = Process(target=listenfordata)
+    proc2.start()
+
