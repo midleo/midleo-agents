@@ -1,0 +1,13 @@
+---
+- name: "Install agent windows"
+  include_tasks:
+    file: install_agent_windows.yaml
+  when: ansible_facts['os_family']=='Windows'
+- name: "Install agent linux"
+  include_tasks:
+    file: install_agent_linux.yaml
+  args:
+    apply:
+      become: true
+  when: ansible_facts['os_family']!='Windows'
+...

@@ -1,0 +1,10 @@
+---
+- name: 'Remove Midleo Agent'
+  become: yes
+  hosts: all
+  tasks:
+    - name: 'Remove Midleo Agent'
+      import_role:
+        name: midleoagent
+        tasks_from: remove_agent
+...

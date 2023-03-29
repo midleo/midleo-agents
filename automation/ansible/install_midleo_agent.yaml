@@ -1,0 +1,8 @@
+---
+- name: 'Install Midleo Agent'
+  hosts: all
+  tasks:
+    - name: 'Install Midleo Agent'
+      import_role:
+        name: midleoagent
+...

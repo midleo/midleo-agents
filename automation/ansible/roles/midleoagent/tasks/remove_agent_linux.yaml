@@ -1,0 +1,21 @@
+---
+- set_fact:
+    agent_install_dir: "/var/midleoagent"
+- name: stop midleoagent
+  service:
+    name: midleoagent
+    state: stopped
+- name: disable service
+  systemd:
+    name: midleoagent
+    enabled: no
+    daemon_reload: yes
+- name: Remove service file
+  file:
+    path: "/etc/systemd/system/midleoagent.service"
+    state: absent
+- name: Remove midleoagent
+  file:
+    path: "{{agent_install_dir}}"
+    state: absent
+...

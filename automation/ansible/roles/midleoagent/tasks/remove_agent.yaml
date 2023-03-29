@@ -1,0 +1,13 @@
+---
+- name: "Remove agent windows"
+  include_tasks:
+    file: remove_agent_windows.yaml
+  when: ansible_facts['os_family']=='Windows'
+- name: "Remove agent linux"
+  include_tasks:
+    file: remove_agent_linux.yaml
+  args:
+    apply:
+      become: true
+  when: ansible_facts['os_family']!='Windows'
+...

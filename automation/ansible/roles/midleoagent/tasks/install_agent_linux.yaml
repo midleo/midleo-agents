@@ -1,0 +1,63 @@
+---
+- set_fact:
+    agent_unique_id: "{{ lookup('password', '/dev/null length=13 chars=ascii_letters') }}{{ 999 | random }}"
+    agent_install_dir: "/var/midleoagent"
+- name: "create midleoagent folder"
+  file:
+    path: "{{agent_install_dir}}"
+    state: directory
+    mode: '0755'
+- name: "creage agentconfig"
+  template:
+    src: templates/agentConfig.json.j2
+    dest: "{{agent_install_dir}}/agentConfig.json"
+    owner: root
+    group: root
+    mode: '0644'
+- name: "upload python scripts"
+  template:
+    src: '{{ item.src }}'
+    dest: "{{agent_install_dir}}/{{ item.path }}"
+    owner: root
+    group: root
+    mode: 'a+x'
+    force: yes
+  with_filetree: templates/python/
+- name: Update apt repo and cache on all Debian/Ubuntu boxes
+  apt: 
+    update_cache: yes 
+    force_apt_get: yes 
+    cache_valid_time: 3600
+  tags: update
+- name: Install required system packages
+  apt:
+    pkg:
+      - gcc
+      - curl
+      - python3-dev
+      - python3-pip
+      - python3-setuptools
+- name: Install python packages
+  pip:
+    name:
+      - psutil
+      - py-cpuinfo
+      - dnspython
+      - requests
+      - pycryptodome
+      - netifaces
+- name: copy agent service
+  template:
+    src: "templates/agent_linux_service.j2"
+    dest: "/etc/systemd/system/midleoagent.service"
+- name: enable service
+  systemd:
+    name: midleoagent
+    enabled: yes
+    daemon_reload: yes
+    masked: no
+- name: start midleoagent
+  service:
+    name: midleoagent
+    state: started
+...
