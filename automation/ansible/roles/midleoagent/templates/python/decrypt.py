@@ -6,8 +6,6 @@ from Crypto import Random
 from Crypto.Cipher import AES
 
 
-PASSPHRASE = b'';
-
 def encrypt(data: dict, passphrase) -> str:
     data_json_64 = base64.b64encode(json.dumps(data).encode('ascii'))
     try:
@@ -23,7 +21,7 @@ def encrypt(data: dict, passphrase) -> str:
     except Exception as e:
         print("Cannot encrypt datas...")
         print(e)
-        exit(1)
+#        exit(1)
 
 def decryptit(data: str, passphrase) -> dict:
     try:
@@ -38,4 +36,4 @@ def decryptit(data: str, passphrase) -> dict:
     except Exception as e:
         print("Cannot decrypt datas...")
         print(e)
-        exit(1)
+#        exit(1)

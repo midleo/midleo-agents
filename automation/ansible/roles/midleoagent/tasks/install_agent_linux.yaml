@@ -1,6 +1,6 @@
 ---
 - set_fact:
-    agent_unique_id: "{{ lookup('password', '/dev/null length=13 chars=ascii_letters') }}{{ 999 | random }}"
+    agent_unique_id: "{{ lookup('password', '/dev/null length=16 chars=hexdigits') }}"
     agent_install_dir: "/var/midleoagent"
 - name: "create midleoagent folder"
   file:

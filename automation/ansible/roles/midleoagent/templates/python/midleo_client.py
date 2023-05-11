@@ -107,18 +107,18 @@ def listenfordata():
         print(f"Connected by {addr}")
         data = conn.recv(1024)
         if not data:
-           break
+           pass
         try:
             data = data.rstrip()
             data = decrypt.decryptit(data,uid)
             data = json.loads(data)
             if not data["uid"]==uid:
-               break
+               pass
 
 
 
 
-            conn.sendall(str.encode("Message received. "+current_time))
+            conn.sendall(str.encode("Message received. "+data["message"]+":"+current_time))
         except Exception:
             conn.sendall(str.encode("Problem decoding the data"))
 
