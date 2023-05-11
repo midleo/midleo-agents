@@ -2,10 +2,8 @@
 windowshost1 midleo_website_base_url="MIDLEO_BASE_URL" midleo_website_base_url_ssl="y" group_id="middleware_team" update_interval_minutes="5"
 
 
-
 [linux]
-host1 midleo_website_base_url="MIDLEO_BASE_URL" midleo_website_base_url_ssl="y" group_id="middleware_team" update_interval_minutes="5"
-
+linuxhost1 midleo_website_base_url="MIDLEO_BASE_URL" midleo_website_base_url_ssl="y" group_id="middleware_team" update_interval_minutes="5"
 
 
 [windows:vars]
@@ -18,9 +16,6 @@ ansible_password='{{win_pass}}'
 
 [linux:vars]
 
-
-
-
-[all]
+[middleware:children]
 linux
 windows

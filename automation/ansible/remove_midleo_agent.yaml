@@ -1,7 +1,7 @@
 ---
 - name: 'Remove Midleo Agent'
   become: yes
-  hosts: all
+  hosts: middleware
   tasks:
     - name: 'Remove Midleo Agent'
       import_role:

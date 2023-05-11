@@ -1,6 +1,6 @@
 ---
 - name: 'Install Midleo Agent'
-  hosts: all
+  hosts: middleware
   tasks:
     - name: 'Install Midleo Agent'
       import_role:
