@@ -1,3 +1,0 @@
-#this file should be encrypted with Ansible Vault
-win_user="WINDOWS_ADMIN_USER"
-win_pass="THE_PASSWORD"
