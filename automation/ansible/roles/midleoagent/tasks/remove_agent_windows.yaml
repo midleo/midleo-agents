@@ -1,0 +1,13 @@
+---
+- set_fact:
+    agent_install_dir: "D:/apps/midleoagent/"
+- name: delete scheduled task to run python agent on boot
+  win_scheduled_task:
+    name: midleoagent
+    description: Run the midleoagent on boot
+    state: absent
+- name: Remove midleoagent
+  win_file:
+    path: "{{agent_install_dir}}"
+    state: absent
+...
