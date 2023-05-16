@@ -4,7 +4,7 @@ After=syslog.target network.target
  
 [Service]
 WorkingDirectory={{agent_install_dir}}
-ExecStart=/usr/bin/python3 {{agent_install_dir}}/midleo_client.py
+ExecStart={{python_install_dir}} {{agent_install_dir}}midleo_client.py
 Restart=always
 RestartSec=120
  

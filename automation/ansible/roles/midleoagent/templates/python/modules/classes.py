@@ -1,3 +1,5 @@
+import platform
+
 class Err:
     def __init__(self, error):
         self.error = error
@@ -11,6 +13,7 @@ class HWConfig:
     def __init__(self, name, os, architecture, machine_type, cpu, memory, disk_partitions, last_boot_time):
         self.name = name
         self.servtype = os
+        self.servos = str(platform.system()).lower()
         self.architecture = architecture
         self.machineType = machine_type
         self.cpu = cpu

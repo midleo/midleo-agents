@@ -193,5 +193,6 @@ def getIFAddresses():
 
 # installed software
 def getSoftware():
-    software_list = getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY) + getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY) + getInstalledSW(winreg.HKEY_CURRENT_USER, 0)
+    #software_list = getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY) + getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY) + getInstalledSW(winreg.HKEY_CURRENT_USER, 0)
+    software_list = getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY) + getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY)
     return software_list

@@ -1,28 +1,41 @@
 ---
 - set_fact:
     agent_unique_id: "{{ lookup('password', '/dev/null length=16 chars=hexdigits') }}"
-    agent_install_dir: "/var/midleoagent"
+    agent_install_dir: "/var/midleoagent/"
+    python_install_dir: "/usr/bin/python3"
 - name: "create midleoagent folder"
   file:
-    path: "{{agent_install_dir}}"
+    path: "{{item}}"
     state: directory
     mode: '0755'
+  loop:
+    - "{{agent_install_dir}}"
+    - "{{agent_install_dir}}modules"
+    - "{{agent_install_dir}}logs"
+    - "{{agent_install_dir}}config"
+- name: "creage agent"
+  template:
+    src: templates/python/midleo_client.py
+    dest: "{{agent_install_dir}}midleo_client.py"
+    owner: root
+    group: root
+    mode: '0644'
 - name: "creage agentconfig"
   template:
     src: templates/agentConfig.json.j2
-    dest: "{{agent_install_dir}}/agentConfig.json"
+    dest: "{{agent_install_dir}}config/agentConfig.json"
     owner: root
     group: root
     mode: '0644'
 - name: "upload python scripts"
   template:
     src: '{{ item.src }}'
-    dest: "{{agent_install_dir}}/{{ item.path }}"
+    dest: "{{agent_install_dir}}modules/{{ item.path }}"
     owner: root
     group: root
     mode: 'a+x'
     force: yes
-  with_filetree: templates/python/
+  with_filetree: templates/python/modules
 - name: Update apt repo and cache on all Debian/Ubuntu boxes
   apt: 
     update_cache: yes 
