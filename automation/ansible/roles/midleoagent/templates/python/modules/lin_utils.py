@@ -1,17 +1,17 @@
-import platform, sys, subprocess, datetime, re, multiprocessing, psutil, netifaces as ni
+import platform, sys, subprocess, datetime, re, multiprocessing, psutil, classes, netifaces as ni
 
 def getName():
     try:
         return platform.node()
     except Exception as err:
-        print(err, '\n > at getName()')
+        classes.Err("Exception:"+str(err)+" at getName()")
         return None
 
 def getArchitecture():
     try:
         return platform.architecture(sys.executable, '', '')[0]
     except Exception as err:
-        print(err, '\n > at getArchitecture()')
+        classes.Err("Exception:"+str(err)+" at getArchitecture()")
         return None
 
 def getCPUName():
@@ -22,28 +22,28 @@ def getCPUName():
             if b"Model name" in line:
                 return re.sub( b".*Model name.*:", "".encode(), line,1).decode("utf-8").replace('  ','')
     except Exception as err:
-        print(err, '\n > at getCPUName()')
+        classes.Err("Exception:"+str(err)+" at getCPUName()")
         return None
 
 def getCPUCoreCount():
     try:
         return multiprocessing.cpu_count()
     except Exception as err:
-        print(err, '\n > at getCPUCoreCount()')
+        classes.Err("Exception:"+str(err)+" at getCPUCoreCount()")
         return 0
 
 def getMachineType():
     try:
         return platform.machine()
     except Exception as err:
-        print(err, '\n > at getCPUCoreCount()')
+        classes.Err("Exception:"+str(err)+" at getCPUCoreCount()")
         return None
 
 def getOS():
     try:
         return platform.system()+ " " +platform.release()
     except Exception as err:
-        print(err, '\n > at getOS()')
+        classes.Err("Exception:"+str(err)+" at getOS()")
         return {}
 
 def getMemory():
@@ -53,7 +53,7 @@ def getMemory():
             memory[field] = getattr(psutil.virtual_memory(), field)
         return memory
     except Exception as err:
-        print(err, '\n > at getMemory()')
+        classes.Err("Exception:"+str(err)+" at getMemory()")
         return {}
 
 def getDiskPartitions():
@@ -70,14 +70,14 @@ def getDiskPartitions():
             partitions.append(partition)
         return partitions
     except Exception as err:
-        print(err, '\n > at getDiskPartitions()')
+        classes.Err("Exception:"+str(err)+" at getDiskPartitions()")
         return []
 
 def getLBTS():
     try:
         return datetime.datetime.fromtimestamp(psutil.boot_time()).strftime("%Y-%m-%d %H:%M:%S")
     except Exception as err:
-        print(err, '\n > at getLBTS()')
+        classes.Err("Exception:"+str(err)+" at getLBTS()")
         return 0
 
 def getIP():
@@ -85,7 +85,7 @@ def getIP():
         ip = ni.ifaddresses('eth0')[ni.AF_INET][0]['addr']
         return ip
     except Exception as err:
-        print(err, '\n > at getIP()')
+        classes.Err("Exception:"+str(err)+" at getIP()")
         return 0
 
 def getConnections():
@@ -118,7 +118,7 @@ def getConnections():
                 connections.append(connection)
         return connections
     except Exception as err:
-        print(err, '\n > at getConnections()')
+        classes.Err("Exception:"+str(err)+" at getConnections()")
         return []
 
 def getIFAddresses():
@@ -154,5 +154,5 @@ def getIFAddresses():
             interfaces.append(interface)
         return interfaces
     except Exception as err:
-        print(err, '\n > at getIFAddresses()')
+        classes.Err("Exception:"+str(err)+" at getIFAddresses()")
         return []

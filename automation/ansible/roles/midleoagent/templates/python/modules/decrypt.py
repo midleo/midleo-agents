@@ -1,6 +1,7 @@
 import base64
 import binascii
 import json
+import classes
 
 from Crypto import Random
 from Crypto.Cipher import AES
@@ -18,10 +19,8 @@ def encrypt(data: dict, passphrase) -> str:
         tag_64 = base64.b64encode(tag).decode('ascii')
         json_data = {'iv': iv_64, 'data': encrypted_64, 'tag': tag_64}
         return base64.b64encode(json.dumps(json_data).encode('ascii')).decode('ascii')
-    except Exception as e:
-        print("Cannot encrypt datas...")
-        print(e)
-#        exit(1)
+    except Exception as ex:
+        classes.Err("Exception:"+str(ex))
 
 def decryptit(data: str, passphrase) -> dict:
     try:
@@ -33,7 +32,5 @@ def decryptit(data: str, passphrase) -> dict:
         cipher = AES.new(key, AES.MODE_GCM, iv)
         decrypted = cipher.decrypt_and_verify(encrypted_data, tag)
         return json.loads(base64.b64decode(decrypted).decode('ascii'))
-    except Exception as e:
-        print("Cannot decrypt datas...")
-        print(e)
-#        exit(1)
+    except Exception as ex:
+        classes.Err("Exception:"+str(ex))

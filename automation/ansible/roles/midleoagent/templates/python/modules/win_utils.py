@@ -1,10 +1,4 @@
-import platform
-import sys
-import os
-import psutil
-import dns.resolver
-import datetime
-import winreg
+import platform, sys, os, psutil, socket, datetime, winreg, classes
 
 def getInstalledSW(hive, flag):
     aReg = winreg.ConnectRegistry(None, hive)
@@ -41,42 +35,42 @@ def getName():
     try:
         return platform.node()
     except Exception as err:
-        print(err, '\n > at getName()')
+        classes.Err("Exception:"+str(err)+" at getName()")
         return None
 
 def getArchitecture():
     try:
         return platform.architecture(sys.executable, '', '')[0]
     except Exception as err:
-        print(err, '\n > at getArchitecture()')
+        classes.Err("Exception:"+str(err)+" at getArchitecture()")
         return None
 
 def getCPUName():
     try:
         return platform.processor()
     except Exception as err:
-        print(err, '\n > at getCPUName()')
+        classes.Err("Exception:"+str(err)+" at getCPUName()")
         return None
 
 def getCPUCoreCount():
     try:
         return psutil.cpu_count()
     except Exception as err:
-        print(err, '\n > at getCPUCoreCount()')
+        classes.Err("Exception:"+str(err)+" at getCPUCoreCount()")
         return 0
 
 def getMachineType():
     try:
         return platform.machine()
     except Exception as err:
-        print(err, '\n > at getCPUCoreCount()')
+        classes.Err("Exception:"+str(err)+" at getCPUCoreCount()")
         return None
 
 def getOS():
     try:
         return platform.system()+ " " +platform.release()+" " +platform.version()
     except Exception as err:
-        print(err, '\n > at getOS()')
+        classes.Err("Exception:"+str(err)+" at getOS()")
         return {}
 
 def getMemory():
@@ -86,7 +80,7 @@ def getMemory():
             memory[field] = getattr(psutil.virtual_memory(), field)
         return memory
     except Exception as err:
-        print(err, '\n > at getMemory()')
+        classes.Err("Exception:"+str(err)+" at getMemory()")
         return {}
 
 def getDiskPartitions():
@@ -103,23 +97,23 @@ def getDiskPartitions():
             partitions.append(partition)
         return partitions
     except Exception as err:
-        print(err, '\n > at getDiskPartitions()')
+        classes.Err("Exception:"+str(err)+" at getDiskPartitions()")
         return []
 
 def getLBTS():
     try:
         return datetime.datetime.fromtimestamp(psutil.boot_time()).strftime("%Y-%m-%d %H:%M:%S")
     except Exception as err:
-        print(err, '\n > at getLBTS()')
+        classes.Err("Exception:"+str(err)+" at getLBTS()")
         return 0
 
 # net functions
 def getIP():
     try:
-        dns_resolver = dns.resolver.Resolver()
-        return dns_resolver.nameservers[0]
+        hostname = socket.gethostname()
+        return socket.gethostbyname(hostname)
     except Exception as err:
-        print(err, '\n > at getIP()')
+        classes.Err("Exception:"+str(err)+" at getIP()")
         return 0
 
 def getConnections():
@@ -152,7 +146,7 @@ def getConnections():
                 connections.append(connection)
         return connections
     except Exception as err:
-        print(err, '\n > at getConnections()')
+        classes.Err("Exception:"+str(err)+" at getConnections()")
         return []
 
 def getIFAddresses():
@@ -188,7 +182,7 @@ def getIFAddresses():
             interfaces.append(interface)
         return interfaces
     except Exception as err:
-        print(err, '\n > at getIFAddresses()')
+        classes.Err("Exception:"+str(err)+" at getIFAddresses()")
         return []
 
 # installed software

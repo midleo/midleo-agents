@@ -7,11 +7,11 @@ PORT_NUMBER = 5550
 SIZE = 1024
 
 if platform.system()=="Linux":
-    from modules import lin_utils,lin_packages
+   from modules import lin_utils,lin_packages
 elif platform.system()=="Windows":
-    from modules import win_utils
+   from modules import win_utils
 else:
-    print('Not supported OS')
+   exit()
 
 def getcfgData():
     with open(os.getcwd()+"/config/agentConfig.json", 'r') as config_file:
@@ -58,17 +58,13 @@ def create():
             net_config = classes.NetConfig(lin_utils.getIP(), lin_utils.getIFAddresses())
             config = classes.Config(uid,groupid,updint, hw_config.__dict__, net_config.__dict__, lin_packages.getSoftware()) 
         else:
-            print("Not supported OS")
+            exit()
 
         return config
     except OSError as err:
-        output=open(os.getcwd()+"/logs/error.log", 'a')
-        output.write(str(err)+ "\n")
-        output.close()
+        classes.Err("Error:"+str(err))
     except Exception as ex:
-        output=open(os.getcwd()+"/logs/error.log", 'a')
-        output.write(str(ex)+ "\n")
-        output.close()
+        classes.Err("Exception:"+str(ex))
 
 def main():
     config = create()
@@ -87,13 +83,9 @@ def main():
         makerequest.postData(webssl,website,json.loads(output))
         return updint
     except OSError as err:
-        output=open(os.getcwd()+"/logs/error.log", 'a')
-        output.write(str(err)+ "\n")
-        output.close()
+        classes.Err("Error:"+str(err))
     except Exception as ex:
-        output=open(os.getcwd()+"/logs/error.log", 'a')
-        output.write(str(ex)+ "\n")
-        output.close()
+        classes.Err("Exception:"+str(ex))
 
 createConfigJson()
 
@@ -114,7 +106,7 @@ def listenfordata():
         now = datetime.now()
         current_time = now.strftime("%H:%M:%S")
         conn, addr = s.accept()
-        print(f"Connected by {addr}")
+        classes.Err("Info:"+"Connected by "+str(addr))
         data = conn.recv(1024)
         if not data:
            pass
@@ -130,8 +122,10 @@ def listenfordata():
                  output = subprocess.check_output(data["command"], shell=True,stderr=subprocess.STDOUT)
                except subprocess.CalledProcessError as e:
                  output=e.output
+               classes.Err("Command:"+data["command"])
                conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:"+data["command"]+"<br>"+"Output:"+str(output.decode('utf-8'))))
             else:
+               classes.Err("Command:empty")
                conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:empty!"))
         except Exception as ex:
             conn.sendall(str.encode("Error:"+str(ex)))

@@ -1,8 +1,12 @@
-import platform
+import platform, os
+from datetime import datetime
 
-class Err:
-    def __init__(self, error):
-        self.error = error
+def Err(logdata):
+    now = datetime.now()
+    current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+    logfile = open(os.getcwd()+"/logs/midleoagent.log", 'a')
+    logfile.write(current_time+":"+logdata+ "\n")
+    logfile.close()
 
 class CPU:
     def __init__(self, name, num_cores):
