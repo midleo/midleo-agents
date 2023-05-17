@@ -1,7 +1,7 @@
 import base64
 import binascii
 import json
-import classes
+from modules import classes
 
 from Crypto import Random
 from Crypto.Cipher import AES

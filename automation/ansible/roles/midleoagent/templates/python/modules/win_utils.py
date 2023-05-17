@@ -1,4 +1,5 @@
-import platform, sys, os, psutil, socket, datetime, winreg, classes
+import platform, sys, psutil, socket, datetime, winreg
+from modules import classes
 
 def getInstalledSW(hive, flag):
     aReg = winreg.ConnectRegistry(None, hive)

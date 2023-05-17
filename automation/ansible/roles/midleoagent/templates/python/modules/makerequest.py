@@ -1,4 +1,5 @@
-import requests, json, os, classes
+import requests, json
+from modules import classes
 
 def postData(webssl,website,data):
     headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}

@@ -1,4 +1,3 @@
-import os
 import subprocess as sp
 from os import path
 import re

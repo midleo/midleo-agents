@@ -1,4 +1,5 @@
-import platform, sys, subprocess, datetime, re, multiprocessing, psutil, classes, netifaces as ni
+import platform, sys, subprocess, datetime, re, multiprocessing, psutil, netifaces as ni
+from modules import classes
 
 def getName():
     try:
