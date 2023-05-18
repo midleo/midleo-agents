@@ -1,4 +1,4 @@
-import platform, sys, subprocess, datetime, re, multiprocessing, psutil, netifaces as ni
+import platform, sys, subprocess, datetime, re, multiprocessing, psutil, socket
 from modules import classes
 
 def getName():
@@ -83,8 +83,8 @@ def getLBTS():
 
 def getIP():
     try:
-        ip = ni.ifaddresses('eth0')[ni.AF_INET][0]['addr']
-        return ip
+        hostname = socket.gethostname()
+        return socket.gethostbyname(hostname)
     except Exception as err:
         classes.Err("Exception:"+str(err)+" at getIP()")
         return 0
