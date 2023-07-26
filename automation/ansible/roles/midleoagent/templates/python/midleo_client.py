@@ -1,7 +1,7 @@
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from multiprocessing import Process
 from datetime import datetime
-from modules import makerequest,decrypt,classes
+from modules import makerequest,decrypt,classes,certcheck
 
 PORT_NUMBER = 5550
 SIZE = 1024
@@ -22,6 +22,7 @@ def getcfgData():
         config_data['webssl']=data['webssl']
         config_data['groupid']=data['groupid']
         config_data['updint']=data['updint']
+        config_data['certs']=data['certs']
         return config_data
 
 def createConfigJson():
@@ -34,7 +35,8 @@ def createConfigJson():
             "website": input("Please provide midleo DNS:"),
             "webssl": input("SSL enabled ? (y/n):"),
             "groupid": input("Please provide responsible GroupID:"),
-            "updint": input("Update interval (in minutes):")
+            "updint": input("Update interval (in minutes):"),
+            "certs": input("*OPTIONAL* list of keystores separated with ; in format keystore#label#password:")
         }
 
         with open(os.getcwd()+"/config/agentConfig.json", 'w+') as config_file:
@@ -46,6 +48,7 @@ def create():
         uid = config_data['uid']
         groupid = config_data['groupid']
         updint = config_data['updint']
+        certs = config_data['certs']
 
         if platform.system()=="Windows":
             cpu = classes.CPU(win_utils.getCPUName(), win_utils.getCPUCoreCount())
@@ -56,7 +59,11 @@ def create():
             cpu = classes.CPU(lin_utils.getCPUName(), lin_utils.getCPUCoreCount())
             hw_config = classes.HWConfig(lin_utils.getName(), lin_utils.getOS(), lin_utils.getArchitecture(), lin_utils.getMachineType(), cpu.__dict__, lin_utils.getMemory(), lin_utils.getDiskPartitions(), lin_utils.getLBTS())
             net_config = classes.NetConfig(lin_utils.getIP(), lin_utils.getIFAddresses())
-            config = classes.Config(uid,groupid,updint, hw_config.__dict__, net_config.__dict__, lin_packages.getSoftware()) 
+            if bool(certs.strip()):
+               cert_check = certcheck.Run(certs)
+            else:
+                cert_check = []
+            config = classes.Config(uid,groupid,updint, hw_config.__dict__, net_config.__dict__, lin_packages.getSoftware(), cert_check) 
         else:
             exit()
 
