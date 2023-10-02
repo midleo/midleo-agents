@@ -31,9 +31,10 @@ class NetConfig:
         self.if_addresses = if_addresses
 
 class Config:
-    def __init__(self, uid, groupid, updint, hw, net, geo, certs):
+    def __init__(self, uid, groupid, agtver, updint, hw, net, geo, certs):
         self.uid = uid
         self.groupid = groupid
+        self.agtver = agtver
         self.updint = updint
         self.hw_info = hw
         self.net_info = net
