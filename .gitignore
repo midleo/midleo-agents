@@ -1,5 +1,5 @@
 # ignore agents local configs
-getinfo/agentConfig.json
-getinfo/__pycache__
+ibmmq.pcfget/agentConfig.json
+ibmmq.pcfget/__pycache__
 ibmmq.restget/agentConfig.json
 ibmmq.restget/__pycache__
