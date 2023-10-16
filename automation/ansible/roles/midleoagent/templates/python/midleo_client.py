@@ -5,7 +5,7 @@ from modules import makerequest,decrypt,classes,certcheck
 
 PORT_NUMBER = 5550
 SIZE = 1024
-AGENT_VER = "1.23.09"
+AGENT_VER = "1.23.10"
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -118,12 +118,14 @@ def listenfordata():
         data = conn.recv(1024)
         if not data:
            pass
+           conn.close()
         try:
             data = data.rstrip()
             data = decrypt.decryptit(data,uid)
             data = json.loads(data)
             if not data["uid"]==uid:
                pass
+               conn.close()
             if data["command"]:
                data["command"]=base64.b64decode(data["command"]).decode('utf-8')
                try:
@@ -132,14 +134,18 @@ def listenfordata():
                  output=e.output
                classes.Err("Command:"+data["command"])
                conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:"+data["command"]+"<br>"+"Output:"+str(output.decode('utf-8'))))
+               conn.close()
             else:
                classes.Err("Command:empty")
                conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:empty!"))
+               conn.close()
         except Exception as ex:
             conn.sendall(str.encode("Error:"+str(ex)))
+            conn.close()
 
 if __name__ == '__main__':
 
+    classes.ClearLog()
     proc1 = Process(target=funcgetdata)
     proc1.start()
 
