@@ -21,8 +21,8 @@ def get_yum():
     return stdout.decode().replace('\t',' ').split('\n')
 
 def get_rpm():
-    cmd=['/usr/bin/rpm','-qa']
-    process=sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
+    cmd=['/usr/bin/rpm -qa --qf "%{NAME} %{VERSION} %{VENDOR}\n"']
+    process=sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
     stdout, stderr = process.communicate()
     return stdout.decode().replace('\t',' ').split('\n')
 
@@ -102,8 +102,12 @@ def getSoftware():
     if rpm:
         pkgs = get_rpm()
         for pkg in pkgs:
-            if ' ' in pkg:
-                software_list.append(pkg.split()[0])
+            if len(pkg.split())>0:
+                software = {}
+                software['name']=pkg.split()[0]
+                software['version']=pkg.split()[1]
+                software['publisher']=pkg.split()[2]
+                software_list.append(software)
 
     if yum:
         pkgs = get_yum()
