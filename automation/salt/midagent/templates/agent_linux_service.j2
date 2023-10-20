@@ -1,0 +1,12 @@
+[Unit]
+Description = Midleo Agent
+After=syslog.target network.target
+ 
+[Service]
+WorkingDirectory={{agent_install_dir}}
+ExecStart={{python_install_dir}} {{agent_install_dir}}midleo_client.py
+Restart=always
+RestartSec=120
+ 
+[Install]
+WantedBy=multi-user.target
