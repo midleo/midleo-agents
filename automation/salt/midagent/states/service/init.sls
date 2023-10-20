@@ -2,6 +2,11 @@
 
 {% set agent_install_dir = salt['pillar.get']('midagent_vars:agent_install_dir') %}
 {% set python_install_dir = salt['pillar.get']('midagent_vars:python_install_dir') %}
+{% set midleo_website_base_url = salt['pillar.get']('INPUT:midleo_website_base_url') %}
+{% set midleo_website_base_url_ssl = salt['pillar.get']('INPUT:midleo_website_base_url_ssl') %}
+{% set group_id = salt['pillar.get']('INPUT:group_id') %}
+{% set update_interval_minutes = salt['pillar.get']('INPUT:update_interval_minutes') %}
+
 {% set agent_unique_id = salt['random.get_str'](length=16) %}
 
 {{agent_install_dir}}:
@@ -43,3 +48,37 @@ midagent_create_client_{{file}}:
       - {{agent_install_dir}}modules/{{file}}.py
         - source: salt://midagent/templates/python/modules/{{file}}.py
 {% endfor %}
+
+midagent_create_config:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: '0755'
+    - template: jinja
+    - names:
+      - {{agent_install_dir}}config/agentConfig.json
+        - source: salt://midagent/templates/agentConfig.json.j2
+    - context:
+        agent_unique_id: "{{agent_unique_id}}"
+        midleo_website_base_url: "{{midleo_website_base_url}}"
+        midleo_website_base_url_ssl: "{{midleo_website_base_url_ssl}}"
+        group_id: "{{group_id}}"
+        update_interval_minutes: "{{update_interval_minutes}}"
+
+midagent_create_service:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: '0755'
+    - template: jinja
+    - names:
+      - /etc/systemd/system/midleoagent.service
+        - source: salt://midagent/templates/agent_linux_service.j2
+    - context:
+        agent_install_dir: "{{agent_install_dir}}"
+        python_install_dir: "{{python_install_dir}}"
+
+midagent.service:
+   service.running:
+     - name: midleoagent
+     - enable: True
