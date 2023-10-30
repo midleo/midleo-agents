@@ -5,7 +5,7 @@ from modules import makerequest,decrypt,classes,certcheck
 
 PORT_NUMBER = 5550
 SIZE = 1024
-AGENT_VER = "1.23.10"
+AGENT_VER = "1.23.11"
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -54,12 +54,12 @@ def create():
         if platform.system()=="Windows":
             cpu = classes.CPU(win_utils.getCPUName(), win_utils.getCPUCoreCount())
             hw_config = classes.HWConfig(win_utils.getName(), win_utils.getOS(), win_utils.getArchitecture(), win_utils.getMachineType(), cpu.__dict__, win_utils.getMemory(), win_utils.getDiskPartitions(), win_utils.getLBTS())
-            net_config = classes.NetConfig(win_utils.getIP(), win_utils.getIFAddresses())
+            net_config = classes.NetConfig(win_utils.getIP())
             config = classes.Config(uid,groupid,AGENT_VER,updint, hw_config.__dict__, net_config.__dict__, win_utils.getSoftware()) 
         elif platform.system()=="Linux":
             cpu = classes.CPU(lin_utils.getCPUName(), lin_utils.getCPUCoreCount())
             hw_config = classes.HWConfig(lin_utils.getName(), lin_utils.getOS(), lin_utils.getArchitecture(), lin_utils.getMachineType(), cpu.__dict__, lin_utils.getMemory(), lin_utils.getDiskPartitions(), lin_utils.getLBTS())
-            net_config = classes.NetConfig(lin_utils.getIP(), lin_utils.getIFAddresses())
+            net_config = classes.NetConfig(lin_utils.getIP())
             if bool(certs.strip()):
                cert_check = certcheck.Run(certs)
             else:

@@ -33,9 +33,8 @@ class HWConfig:
         self.last_boot_time = last_boot_time
 
 class NetConfig:
-    def __init__(self, dns, if_addresses):
+    def __init__(self, dns):
         self.dns = dns
-        self.if_addresses = if_addresses
 
 class Config:
     def __init__(self, uid, groupid, agtver, updint, hw, net, geo, certs):
