@@ -15,7 +15,7 @@ def Run(certs):
        clabel=cert.split("#")[1]
        cpass=cert.split("#")[2]
        if(command=="keytool"):
-         certcn = subprocess.check_output("keytool -list -v -keystore "+cfile+" -storepass "+cpass+" -alias "+clabel+" | grep 'Owner' | grep -o -P '(?<=CN=).*(?=, OU)'", shell=True).strip().decode("utf-8").replace('  ','')
+         certcn = subprocess.check_output("keytool -list -v -keystore "+cfile+" -storepass "+cpass+" -alias "+clabel+" | grep 'Owner' | grep -o -P '(?<=CN=).*(?=, OU)?'", shell=True).strip().decode("utf-8").replace('  ','')
          certvalid = subprocess.check_output("keytool -list -v -keystore "+cfile+" -storepass "+cpass+" -alias "+clabel+" | grep 'until' | sed -n -e 's/^.*until: //p'", shell=True).strip().decode("utf-8")
        if(command=="runmqakm"):
          certcn = subprocess.check_output("runmqakm -cert -details -db "+cfile+" -label "+clabel+" -stashed | grep 'CN' | grep 'Subject' | sed -n -e 's/^.*CN=//p'", shell=True).strip().decode("utf-8")
