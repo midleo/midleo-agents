@@ -37,7 +37,7 @@ def createConfigJson():
             "webssl": input("SSL enabled ? (y/n):"),
             "groupid": input("Please provide responsible GroupID:"),
             "updint": input("Update interval (in minutes):"),
-            "certs": input("*OPTIONAL* list of keystores separated with ; in format keystore#label#password:")
+            "certs": input("*OPTIONAL* list of keystores separated with ; in format tool#keystore#label#password (tool - keytool or runmqakm):")
         }
 
         with open(os.getcwd()+"/config/agentConfig.json", 'w+') as config_file:
