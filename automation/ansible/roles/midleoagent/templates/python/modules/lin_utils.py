@@ -3,7 +3,7 @@ from modules import classes
 
 def getName():
     try:
-        return platform.node()
+        return socket.getfqdn()
     except Exception as err:
         classes.Err("Exception:"+str(err)+" at getName()")
         return None
