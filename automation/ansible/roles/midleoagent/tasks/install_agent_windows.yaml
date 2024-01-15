@@ -16,6 +16,10 @@
   win_template:
     src: templates/python/midleo_client.py
     dest: "{{agent_install_dir}}midleo_client.py"
+- name: "creage agent script"
+  win_template:
+    src: templates/python/magent.bat
+    dest: "{{agent_install_dir}}magent.bat"
 - name: "creage agentconfig"
   win_template:
     src: templates/agentConfig.json.j2

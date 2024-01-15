@@ -37,6 +37,16 @@ midagent_create_client:
       - {{agent_install_dir}}midleo_client.py
         - source: salt://midagent/templates/python/midleo_client.py
 
+midagent_create_script:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: '0755'
+    - template: jinja
+    - names:
+      - {{agent_install_dir}}magent.sh
+        - source: salt://midagent/templates/python/magent.sh
+
 {% for file in '__init__', 'certcheck', 'classes', 'decrypt', 'lin_packages', 'lin_utils', 'makerequest', 'win_utils' %}
 midagent_create_client_{{file}}:
   file.managed:

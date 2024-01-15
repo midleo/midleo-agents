@@ -1,24 +1,23 @@
-import subprocess,json
-from modules import classes
+import subprocess,json,os
+from modules import classes,decrypt
 
-def Run(certs):
+def Run(uid):
   try:
     data = []
-    certlist=certs.split(";")
-    for cert in certlist:
-       command=cert.split("#")[0]
-       cfile=cert.split("#")[1]
-       clabel=cert.split("#")[2]
-       cpass=cert.split("#")[3]
-       if(command=="keytool"):
-         certcn = subprocess.check_output("keytool -list -v -keystore "+cfile+" -storepass "+cpass+" -alias "+clabel+" | grep 'Owner' | grep -o -P '(?<=CN=).*(?=, OU)?'", shell=True).strip().decode("utf-8").replace('  ','')
-         certvalid = subprocess.check_output("keytool -list -v -keystore "+cfile+" -storepass "+cpass+" -alias "+clabel+" | grep 'until' | sed -n -e 's/^.*until: //p'", shell=True).strip().decode("utf-8")
-       if(command=="runmqakm"):
-         certcn = subprocess.check_output("runmqakm -cert -details -db "+cfile+" -label "+clabel+" -stashed | grep 'CN' | grep 'Subject' | sed -n -e 's/^.*CN=//p'", shell=True).strip().decode("utf-8")
-         certvalid = subprocess.check_output("runmqakm -cert -details -db "+cfile+" -label "+clabel+" -stashed | grep 'Not After' | sed -n -e 's/^.*: //p'", shell=True).strip().decode("utf-8")
-       if bool(certcn):
-         certdetails={"CN":certcn,"VALID":certvalid,"FILE":cfile}
-         data.append(json.loads(json.dumps(certdetails)))
+    with open(os.getcwd()+"/config/certs.json", 'r') as cert_file:
+      certlist=json.load(cert_file)
+    for attr, value in certlist.items():
+       cpass=decrypt.decryptit(value['cpass'],uid)
+       if(os.path.isfile(value['cfile'])):
+         if(value['command']=="keytool"):
+           certcn = subprocess.check_output("keytool -list -v -keystore "+value['cfile']+" -storepass "+cpass+" -alias "+value['clabel']+" | grep 'Owner' | grep -o -P '(?<=CN=).*?(?=,)'", shell=True).strip().decode("utf-8").replace('  ','')
+           certvalid = subprocess.check_output("keytool -list -v -keystore "+value['cfile']+" -storepass "+cpass+" -alias "+value['clabel']+" | grep 'until' | sed -n -e 's/^.*until: //p'", shell=True).strip().decode("utf-8")
+         if(value['command']=="runmqakm"):
+           certcn = subprocess.check_output("runmqakm -cert -details -db "+value['cfile']+" -label "+value['clabel']+" -stashed | grep 'CN' | grep 'Subject' | sed -n -e 's/^.*CN=//p'", shell=True).strip().decode("utf-8")
+           certvalid = subprocess.check_output("runmqakm -cert -details -db "+value['cfile']+" -label "+value['clabel']+" -stashed | grep 'Not After' | sed -n -e 's/^.*: //p'", shell=True).strip().decode("utf-8")
+         if bool(certcn):
+           certdetails={"CN":certcn,"VALID":certvalid,"FILE":value['cfile']}
+           data.append(json.loads(json.dumps(certdetails)))
     return data
   except Exception as err:
     classes.Err("Exception:"+str(err)+" at checkcert()")

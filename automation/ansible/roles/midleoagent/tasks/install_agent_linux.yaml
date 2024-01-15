@@ -20,6 +20,13 @@
     owner: root
     group: root
     mode: '0644'
+- name: "creage agent script"
+  template:
+    src: templates/python/magent.sh
+    dest: "{{agent_install_dir}}magent.sh"
+    owner: root
+    group: root
+    mode: '0755'
 - name: "creage agentconfig"
   template:
     src: templates/agentConfig.json.j2
