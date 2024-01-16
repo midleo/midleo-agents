@@ -10,7 +10,7 @@ def Run(uid):
        cpass=decrypt.decryptit(value['cpass'],uid)
        if(os.path.isfile(value['cfile'])):
          if(value['command']=="keytool"):
-           certcn = subprocess.check_output("keytool -list -v -keystore "+value['cfile']+" -storepass "+cpass+" -alias "+value['clabel']+" | grep 'Owner' | grep -o -P '(?<=CN=).*?(?=,)'", shell=True).strip().decode("utf-8").replace('  ','')
+           certcn = subprocess.check_output("keytool -list -v -keystore "+value['cfile']+" -storepass "+cpass+" -alias "+value['clabel']+" | grep 'Owner' | cut -d '=' -f2 | cut -d ',' -f1", shell=True).strip().decode("utf-8").replace('  ','')
            certvalid = subprocess.check_output("keytool -list -v -keystore "+value['cfile']+" -storepass "+cpass+" -alias "+value['clabel']+" | grep 'until' | sed -n -e 's/^.*until: //p'", shell=True).strip().decode("utf-8")
          if(value['command']=="runmqakm"):
            certcn = subprocess.check_output("runmqakm -cert -details -db "+value['cfile']+" -label "+value['clabel']+" -stashed | grep 'CN' | grep 'Subject' | sed -n -e 's/^.*CN=//p'", shell=True).strip().decode("utf-8")
