@@ -1,11 +1,11 @@
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+import base64,platform,json,re,uuid,time,subprocess,socket,sys,os, zlib
 from multiprocessing import Process
 from datetime import datetime
 from modules import makerequest,decrypt,classes,certcheck
 
 PORT_NUMBER = 5550
 SIZE = 1024
-AGENT_VER = "1.24.01"
+AGENT_VER = "1.24.02"
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -61,9 +61,9 @@ def create():
 
         return config
     except OSError as err:
-        classes.Err("Error:"+str(err))
+        classes.Err("Error in create:"+str(err))
     except Exception as ex:
-        classes.Err("Exception:"+str(ex))
+        classes.Err("Exception in create:"+str(ex))
 
 def main():
     config = create()
@@ -82,9 +82,9 @@ def main():
         makerequest.postData(webssl,website,json.loads(output))
         return updint
     except OSError as err:
-        classes.Err("Error:"+str(err))
+        classes.Err("Error in main:"+str(err))
     except Exception as ex:
-        classes.Err("Exception:"+str(ex))
+        classes.Err("Exception in main:"+str(ex))
 
 createConfigJson()
 
@@ -106,18 +106,32 @@ def listenfordata():
         current_time = now.strftime("%H:%M:%S")
         conn, addr = s.accept()
         classes.Err("Info:"+"Connected by "+str(addr))
-        data = conn.recv(1024)
+        data = conn.recv(10240)
         if not data:
            pass
            conn.close()
         try:
-            data = data.rstrip()
-            data = decrypt.decryptit(data,uid)
+            datamess = data.rstrip()
+            datamess = json.loads(datamess)
+            data = decrypt.decryptit(datamess["data"],uid)
             data = json.loads(data)
             if not data["uid"]==uid:
                pass
                conn.close()
-            if data["command"]:
+            if 'filename' in data:
+               strf=base64.b64decode(datamess["file"])
+               strd=zlib.decompress(strf).decode('utf-8').replace('\r', '')
+               try:
+                 tf = open(data["filename"], "w")
+                 tf.write(strd)
+                 tf.close()
+                 output=""
+               except IOError:
+                 output="File write failed:"+data["filename"]
+               classes.Err("filename:"+data["filename"])
+               conn.sendall(str.encode("Time:"+current_time+"<br>"+"filename:"+data["filename"]+"<br>"+str(output)))
+               conn.close()
+            elif 'command' in data:
                data["command"]=base64.b64decode(data["command"]).decode('utf-8')
                try:
                  output = subprocess.check_output(data["command"], shell=True,stderr=subprocess.STDOUT)
@@ -131,7 +145,7 @@ def listenfordata():
                conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:empty!"))
                conn.close()
         except Exception as ex:
-            conn.sendall(str.encode("Error:"+str(ex)))
+            conn.sendall(str.encode("Error in receive:"+str(ex)))
             conn.close()
 
 if __name__ == '__main__':
