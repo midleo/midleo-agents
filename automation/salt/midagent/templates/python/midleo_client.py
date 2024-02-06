@@ -5,7 +5,7 @@ from modules import makerequest,decrypt,classes,certcheck
 
 PORT_NUMBER = 5550
 SIZE = 1024
-AGENT_VER = "1.24.02"
+AGENT_VER = "1.24.03"
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -115,10 +115,11 @@ def listenfordata():
             datamess = json.loads(datamess)
             data = decrypt.decryptit(datamess["data"],uid)
             data = json.loads(data)
+            ftype=(data['ftype'] if 'ftype' in data else "")
             if not data["uid"]==uid:
                pass
                conn.close()
-            if 'filename' in data:
+            if 'filename' in data and ftype=='create':
                strf=base64.b64decode(datamess["file"])
                strd=zlib.decompress(strf).decode('utf-8').replace('\r', '')
                try:
@@ -128,6 +129,15 @@ def listenfordata():
                  output=""
                except IOError:
                  output="File write failed:"+data["filename"]
+               classes.Err("filename:"+data["filename"])
+               conn.sendall(str.encode("Time:"+current_time+"<br>"+"filename:"+data["filename"]+"<br>"+str(output)))
+               conn.close()
+            if 'filename' in data and ftype=='delete':
+               try:
+                  os.remove(data["filename"])
+                  output="File deleted:"+data["filename"]
+               except OSError as e:
+                  output="Error"+e.filename+" - "+e.strerror
                classes.Err("filename:"+data["filename"])
                conn.sendall(str.encode("Time:"+current_time+"<br>"+"filename:"+data["filename"]+"<br>"+str(output)))
                conn.close()

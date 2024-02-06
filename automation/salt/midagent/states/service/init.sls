@@ -92,3 +92,13 @@ midagent.service:
    service.running:
      - name: midleoagent
      - enable: True
+
+midagent.cron:
+  cron.present:
+    - name: service midleoagent restart \;
+    - user: root
+    - minute: 00
+    - hour: 01
+    - daymonth: '*'
+    - month: '*'
+    - dayweek: '*'

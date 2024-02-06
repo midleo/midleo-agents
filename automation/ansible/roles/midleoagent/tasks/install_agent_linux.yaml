@@ -80,4 +80,13 @@
   service:
     name: midleoagent
     state: started
+- name: "Create crontab /etc/cron.d/midleoagent"
+  ansible.builtin.cron:
+    name: clean memory
+    weekday: "*/2"
+    minute: "0"
+    hour: "1"
+    user: root
+    job: "service midleoagent restart"
+    cron_file: midleoagent
 ...
