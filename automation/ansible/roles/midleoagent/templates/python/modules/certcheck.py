@@ -16,7 +16,7 @@ def Run(uid):
            certcn = subprocess.check_output("runmqakm -cert -details -db "+value['cfile']+" -label "+value['clabel']+" -stashed | grep 'CN' | grep 'Subject' | sed -n -e 's/^.*CN=//p'", shell=True).strip().decode("utf-8")
            certvalid = subprocess.check_output("runmqakm -cert -details -db "+value['cfile']+" -label "+value['clabel']+" -stashed | grep 'Not After' | sed -n -e 's/^.*: //p'", shell=True).strip().decode("utf-8")
          if bool(certcn):
-           certdetails={"CN":certcn,"VALID":certvalid,"FILE":value['cfile']}
+           certdetails={"CN":value['clabel'],"VALID":certvalid,"FILE":value['cfile']}
            data.append(json.loads(json.dumps(certdetails)))
     return data
   except Exception as err:
