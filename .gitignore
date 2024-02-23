@@ -1,5 +1,8 @@
 # ignore agents local configs
 ibmmq.pcfget/agentConfig.json
-ibmmq.pcfget/__pycache__
+ibmmq.pcfget/__pycache__/*
 ibmmq.restget/agentConfig.json
-ibmmq.restget/__pycache__
+ibmmq.restget/__pycache__/*
+automation/salt/midagent/templates/python/config/confmon.json
+automation/salt/midagent/templates/python/config/midleoclient.conf
+automation/salt/midagent/templates/python/modules/__pycache__/*
