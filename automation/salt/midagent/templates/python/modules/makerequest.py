@@ -21,7 +21,7 @@ def postQData(webssl,website,qm,q,data):
 def getQStat(webssl,website,webport,qmgr,queue,usr,passwd):
     headers = {'Content-Type': 'text/plain', 'charset':'utf-8'}
     try:
-        res = requests.get('http'+('s' if webssl=="y" else '')+'://'+website+':'+webport+'/ibmmq/rest/v1/admin/qmgr/'+qmgr+'/queue/'+queue+'?attributes=storage.maximumDepth&status=status.currentDepth,status.oldestMessageAge,status.uncommittedMessages,status.lastGet,status.lastPut', verify=False, headers=headers, auth=(usr, base64.b64decode(passwd).decode('utf-8').rstrip()))
+        res = requests.get('http'+('s' if webssl=="y" else '')+'://'+website+':'+webport+'/ibmmq/rest/v1/admin/qmgr/'+qmgr+'/queue?name='+queue+'&attributes=storage.maximumDepth&status=status.currentDepth,status.oldestMessageAge,status.uncommittedMessages,status.lastGet,status.lastPut', verify=False, headers=headers, auth=(usr, base64.b64decode(passwd).decode('utf-8').rstrip()))
         if 200 == res.status_code :
           return res.json()
         else:
