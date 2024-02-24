@@ -38,22 +38,92 @@ create_config (){
       mainver=`$DSPMQVER | grep Version | awk '{print $2}' | cut -d '.' -f 1`
       echo mainver=$mainver >> $HOMEDIR/"midleoclient.conf"
     fi
+    if [ -n "$mainver" ] && [ $mainver -gt 8 ]; then
+      echo mqwebhost=`hostname -f` >> $HOMEDIR/"midleoclient.conf"
+      echo "IBM MQWeb user:"
+      read ibmmqwebusr
+      echo ibmmqwebusr=$ibmmqwebusr >> $HOMEDIR/"midleoclient.conf"
+      echo "IBM MQWeb password:"
+      read -s ibmmqwebusrpwd
+      echo ibmmqwebusrpwd=`echo $ibmmqwebusrpwd | base64`  >> $HOMEDIR/"midleoclient.conf"
+      echo "IBM MQWeb SSL enabled(y/n):"
+      read ibmmqwebssl
+      echo ibmmqwebssl=$ibmmqwebssl >> $HOMEDIR/"midleoclient.conf"
+      echo "IBM MQWeb port:"
+      read mqwebport
+      echo mqwebport=$mqwebport >> $HOMEDIR/"midleoclient.conf"
+    fi
 }
 runjob (){
 JAVA_OPTS="-Djava.library.path=$ibmmqlibpath"
-if [ $mainver -gt 8 ]; then
-  runmqweb 
+if [ -n "$mainver" ] && [ $mainver -gt 8 ]; then
+  runmqweb $ibmmqwebssl $mqwebhost $mqwebport $ibmmqwebusr $ibmmqwebusrpwd
 else
   runmqmon $JAVA_OPTS
 fi
 }
 
 runmqmon(){
-  
-}
-runmqweb(){
+/usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+from datetime import datetime
+from modules import makerequest,decrypt,classes,certcheck
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
 
+EOF
 }
+
+runmqweb(){
+/usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,requests
+from datetime import datetime
+from modules import makerequest,decrypt,classes,certcheck
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
+
+SSL="$1"
+HOST="$2"
+PORT="$3"
+USR="$4"
+PASS="$5"
+
+def getmonData():
+   with open(os.getcwd()+"/config/confmon.json", 'r') as mon_file:
+      mon_data=json.load(mon_file)
+      return mon_data
+
+def getcfgData():
+    with open(os.getcwd()+"/config/agentConfig.json", 'r') as config_file:
+        config_data=json.load(config_file)
+        return config_data
+
+if __name__ == "__main__":
+   try:
+      mon_data = getmonData()
+      config_data = getcfgData()
+      website = config_data['website']
+      webssl = config_data['webssl']
+   except Exception as err:
+      mon_data = {}
+   for qm in mon_data:
+      value = mon_data[qm]
+      for q,val in value.items():
+        qinfo=makerequest.getQStat(SSL,HOST,PORT,qm,q,USR,PASS)
+        if(qinfo!="{}" and qinfo is not None):
+          makerequest.postQData(webssl,website,qm,q,qinfo)
+
+EOF
+}
+
 addmon(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os

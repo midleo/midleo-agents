@@ -3,6 +3,6 @@ ibmmq.pcfget/agentConfig.json
 ibmmq.pcfget/__pycache__/*
 ibmmq.restget/agentConfig.json
 ibmmq.restget/__pycache__/*
-automation/salt/midagent/templates/python/config/confmon.json
-automation/salt/midagent/templates/python/config/midleoclient.conf
 automation/salt/midagent/templates/python/modules/__pycache__/*
+automation/salt/midagent/templates/python/config/*
+automation/salt/midagent/templates/python/logs/*
