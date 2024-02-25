@@ -67,13 +67,27 @@ runmqmon(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck
+from modules import makerequest,decrypt,classes,certcheck,configs
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
 elif platform.system()=="Windows":
    from modules import win_utils
 else:
    exit()
+
+JAVA_OPTS="$1"
+
+if __name__ == "__main__":
+   try:
+      mon_data = configs.getmonData()
+   except Exception as err:
+      mon_data = {}
+   for qm in mon_data:
+      value = mon_data[qm]
+      for q,val in value.items():
+        qinfo=makerequest.getJQstat(JAVA_OPTS,qm,q,val["thres"])
+        if(qinfo!="{}" and qinfo is not None):
+          makerequest.postQData(webssl,website,qm,q,qinfo)   
 
 EOF
 }
@@ -82,7 +96,7 @@ runmqweb(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,requests
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck
+from modules import makerequest,decrypt,classes,certcheck,configs
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
 elif platform.system()=="Windows":
@@ -96,20 +110,10 @@ PORT="$3"
 USR="$4"
 PASS="$5"
 
-def getmonData():
-   with open(os.getcwd()+"/config/confmon.json", 'r') as mon_file:
-      mon_data=json.load(mon_file)
-      return mon_data
-
-def getcfgData():
-    with open(os.getcwd()+"/config/agentConfig.json", 'r') as config_file:
-        config_data=json.load(config_file)
-        return config_data
-
 if __name__ == "__main__":
    try:
-      mon_data = getmonData()
-      config_data = getcfgData()
+      mon_data = configs.getmonData()
+      config_data = configs.getcfgData()
       website = config_data['website']
       webssl = config_data['webssl']
    except Exception as err:
@@ -128,7 +132,7 @@ addmon(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck
+from modules import makerequest,decrypt,classes,certcheck,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -142,14 +146,9 @@ QUEUE="$2"
 TMON="$3"
 THRES="$4"
 
-def getmonData():
-   with open(os.getcwd()+"/config/confmon.json", 'r') as mon_file:
-      mon_data=json.load(mon_file)
-      return mon_data
-
 def createMonJson():
    try:
-      mon_data = getmonData()
+      mon_data = configs.getmonData()
    except Exception as err:
       mon_data = {}
    try:
@@ -178,7 +177,7 @@ delmon(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck
+from modules import makerequest,decrypt,classes,certcheck,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -190,13 +189,8 @@ else:
 QMGR="$1"
 QUEUE="$2"
 
-def getmonData():
-   with open(os.getcwd()+"/config/confmon.json", 'r') as mon_file:
-      mon_data=json.load(mon_file)
-      return mon_data
-
 try:
-   mon_data = getmonData()
+   mon_data = configs.getmonData()
 except Exception as err:
    print("No such configuration file - config/confmon.json")
 mon_data[QMGR].pop(QUEUE, None)
