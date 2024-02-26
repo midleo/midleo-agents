@@ -1,11 +1,11 @@
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os, zlib
+import base64,platform,json,re,time,subprocess,socket,os, zlib
 from multiprocessing import Process
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck
+from modules import makerequest,decrypt,classes,certcheck,configs
 
 PORT_NUMBER = 5550
 SIZE = 1024
-AGENT_VER = "1.24.03"
+AGENT_VER = "1.24.04"
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -14,30 +14,10 @@ elif platform.system()=="Windows":
 else:
    exit()
 
-def getcfgData():
-    with open(os.getcwd()+"/config/agentConfig.json", 'r') as config_file:
-        config_data=json.load(config_file)
-        return config_data
-
-def createConfigJson():
-    try:
-        config_data = getcfgData()
-    except Exception as err:
-
-        config_data = {
-            "uid": str(uuid.uuid4().hex[:16]),
-            "website": input("Please provide midleo DNS:"),
-            "webssl": input("SSL enabled ? (y/n):"),
-            "groupid": input("Please provide responsible GroupID:"),
-            "updint": input("Update interval (in minutes):")
-        }
-
-        with open(os.getcwd()+"/config/agentConfig.json", 'w+') as config_file:
-            json.dump(config_data, config_file)
 
 def create():
     try:
-        config_data = getcfgData()
+        config_data = configs.getcfgData()
         uid = config_data['uid']
         groupid = config_data['groupid']
         updint = config_data['updint']
@@ -67,7 +47,7 @@ def create():
 
 def main():
     config = create()
-    config_data = getcfgData()
+    config_data = configs.getcfgData()
     website = config_data['website']
     webssl = config_data['webssl']
     updint = config_data['updint']
@@ -86,7 +66,7 @@ def main():
     except Exception as ex:
         classes.Err("Exception in main:"+str(ex))
 
-createConfigJson()
+configs.createConfigJson()
 
 def funcgetdata():
     while True:
@@ -95,7 +75,7 @@ def funcgetdata():
 
 def listenfordata():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-      config_data = getcfgData()
+      config_data = configs.getcfgData()
       uid = config_data['uid']
       uid = uid+uid+uid+uid
       s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
