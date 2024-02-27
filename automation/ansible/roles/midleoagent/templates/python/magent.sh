@@ -3,12 +3,13 @@
 #script for midleo.CORE agent
 #created by V.Vasilev
 #https://vasilev.link
+cd $(dirname $0)
 
 addcert(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck
+from modules import makerequest,decrypt,classes,certcheck,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -19,25 +20,15 @@ else:
 
 CERT="$1"
 
-def getcfgData():
-   with open(os.getcwd()+"/config/agentConfig.json", 'r') as config_file:
-      data=json.load(config_file)
-      return data
-
-def getcertData():
-   with open(os.getcwd()+"/config/certs.json", 'r') as cert_file:
-      cert_data=json.load(cert_file)
-      return cert_data
-
 def createCertJson():
-   config_data = getcfgData()
+   config_data = configs.getcfgData()
    uid = config_data['uid']
 
    if not uid:
       pass
 
    try:
-      cert_data = getcertData()
+      cert_data = configs.getcertData()
    except Exception as err:
 
       cert_data = {}
@@ -66,7 +57,7 @@ delcert(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck
+from modules import makerequest,decrypt,classes,certcheck,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -77,13 +68,8 @@ else:
 
 CERT="$1"
 
-def getcertData():
-   with open(os.getcwd()+"/config/certs.json", 'r') as cert_file:
-      cert_data=json.load(cert_file)
-      return cert_data
-
 try:
-   cert_data = getcertData()
+   cert_data = configs.getcertData()
 except Exception as err:
    print("No such configuration file - config/certs.json")
 cert_data.pop(CERT, None)

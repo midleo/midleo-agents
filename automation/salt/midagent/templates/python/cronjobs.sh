@@ -6,6 +6,7 @@
 
 HOMEDIR=$(pwd)"/config"
 DSPMQVER=/opt/mqm/bin/dspmqver
+cd $(dirname $0)
 
 if [[ ! -e $HOMEDIR ]]; then
     mkdir $HOMEDIR

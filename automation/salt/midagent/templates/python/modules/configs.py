@@ -4,7 +4,7 @@ def getcfgData():
     with open(os.getcwd()+"/config/agentConfig.json", 'r') as config_file:
         config_data=json.load(config_file)
         return config_data
-    
+   
 def getmonData():
    with open(os.getcwd()+"/config/confmon.json", 'r') as mon_file:
       mon_data=json.load(mon_file)
@@ -25,3 +25,8 @@ def createConfigJson():
 
         with open(os.getcwd()+"/config/agentConfig.json", 'w+') as config_file:
             json.dump(config_data, config_file)
+
+def getcertData():
+   with open(os.getcwd()+"/config/certs.json", 'r') as cert_file:
+      cert_data=json.load(cert_file)
+      return cert_data
