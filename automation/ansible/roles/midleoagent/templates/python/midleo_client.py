@@ -1,11 +1,11 @@
-import base64,platform,json,re,time,subprocess,socket,os, zlib
+import base64,platform,json,re,time,subprocess,socket,os,zlib,yaml
 from multiprocessing import Process
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,decrypt,classes,certcheck,configs,file_utils,statarr
 
 PORT_NUMBER = 5550
 SIZE = 1024
-AGENT_VER = "1.24.04"
+AGENT_VER = "1.24.05"
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -54,6 +54,21 @@ def main():
 
     if 'error' in config.__dict__.keys():
         return
+    
+    if os.path.isfile(os.getcwd()+"/config/statlist.yaml"):
+       try:
+          with open(os.getcwd()+"/config/statlist.yaml") as f:
+            yamldict=yaml.safe_load(f)
+            for item in yamldict:
+               func = getattr(statarr, item["function"], None)
+               ret=file_utils.csv_json(item["file"],func(),item["line"],item["clean"])
+               retarr=json.loads(ret)
+               ret={}
+               ret["type"]=item["type"]
+               ret["data"]=retarr
+               makerequest.postStatData(webssl,website,json.dumps(ret))         
+       except OSError as err:
+          classes.Err("Error opening the file statlist:"+str(err))
 
     try:
         output = json.dumps(config.__dict__)

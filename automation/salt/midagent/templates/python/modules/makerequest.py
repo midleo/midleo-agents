@@ -10,6 +10,14 @@ def postData(webssl,website,data):
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
 
+def postStatData(webssl,website,thisdata):
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    try:
+        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updatestat', data=thisdata, headers=headers)
+        classes.Err("HTTPResponse:"+res.content.decode())
+    except requests.exceptions.RequestException as ex:  
+        classes.Err("Exception:"+str(ex))
+
 def postQData(webssl,website,qm,q,data):
     headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
     try:
