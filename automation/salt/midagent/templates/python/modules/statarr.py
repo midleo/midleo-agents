@@ -2,6 +2,7 @@
 def ACEJVMStat():
     arr={}
     arr["type"]="JVM"
+    arr["noteq"]="ResourceName"
     arr["node"]=1
     arr["server"]=2
     arr["timestamp"]=5

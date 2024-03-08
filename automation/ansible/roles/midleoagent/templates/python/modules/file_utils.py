@@ -25,7 +25,7 @@ def csv_json(file,array,check=False,cleanit=False):
                          json_arr.append(in_arr)
                        else:
                          pass
-                     if(not check):
+                     if(not check and linearr[0]!=array["noteq"]):
                         in_arr["type"]=array["type"]
                         for (key, value) in array.items():
                             in_arr["line"]=linearr[0]
