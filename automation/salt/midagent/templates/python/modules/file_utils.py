@@ -16,8 +16,8 @@ def csv_json(file,array,check=False,cleanit=False):
                        in_arr={}
                        if(check and linearr[0]==check):
                          in_arr["type"]=array["type"]
+                         in_arr["line"]=str("sumarized" if linearr[0]=='summary' else linearr[0])
                          for (key, value) in array.items():
-                            in_arr["line"]=linearr[0]
                             try:
                                in_arr[key]=linearr[int(value)]
                             except:
@@ -27,8 +27,8 @@ def csv_json(file,array,check=False,cleanit=False):
                          pass
                      if(not check and linearr[0]!=array["noteq"]):
                         in_arr["type"]=array["type"]
+                        in_arr["line"]=str("sumarized" if linearr[0]=='summary' else linearr[0])
                         for (key, value) in array.items():
-                            in_arr["line"]=linearr[0]
                             try:
                                in_arr[key]=linearr[int(value)]
                             except:
