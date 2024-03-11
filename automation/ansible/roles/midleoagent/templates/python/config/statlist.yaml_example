@@ -1,6 +1,6 @@
 #example configuration file for statistics
 - type: ibmace|ibmmq
-  function: ACEJVMStat
+  function: aceJVM
   file: "/var/tmp/test.csv"
   line: "first element of the csv line"
   clean: True|False                           #empty file after read
