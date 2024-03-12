@@ -1,5 +1,5 @@
 
-def aceJVM():
+def ibmaceJVM():
     arr={}
     arr["type"]="JVM"
     arr["noteq"]="ResourceName"
@@ -10,7 +10,7 @@ def aceJVM():
     arr["max"]=9
     return arr
 
-def aceODBC():
+def ibmaceODBC():
     arr={}
     arr["type"]="ODBC"
     arr["noteq"]="ResourceName"

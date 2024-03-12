@@ -1,4 +1,4 @@
-import base64,platform,json,re,time,subprocess,socket,os,zlib,yaml, glob
+import base64,platform,json,re,time,subprocess,socket,os,zlib, glob
 from multiprocessing import Process
 from datetime import datetime
 from modules import makerequest,decrypt,classes,certcheck,configs,file_utils,statarr
@@ -55,11 +55,11 @@ def main():
     if 'error' in config.__dict__.keys():
         return
     
-    if os.path.isfile(os.getcwd()+"/config/statlist.yaml"):
+    if os.path.isfile(os.getcwd()+"/config/statlist.json"):
        try:
-          with open(os.getcwd()+"/config/statlist.yaml") as f:
-            yamldict=yaml.safe_load(f)
-            for item in yamldict:
+         stat_data = configs.getstatData()
+         if len(stat_data)>0:
+            for k,item in stat_data.items():
                func = getattr(statarr, item["function"], None)
                files = glob.glob(item["file"])
                for file in files:
@@ -69,7 +69,7 @@ def main():
                      ret={}
                      ret["type"]=item["type"]
                      ret["data"]=retarr
-                     makerequest.postStatData(webssl,website,json.dumps(ret))      
+                     makerequest.postStatData(webssl,website,json.dumps(ret))   
        except OSError as err:
           classes.Err("Error opening the file statlist:"+str(err))
 

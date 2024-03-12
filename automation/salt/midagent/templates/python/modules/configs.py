@@ -30,3 +30,8 @@ def getcertData():
    with open(os.getcwd()+"/config/certs.json", 'r') as cert_file:
       cert_data=json.load(cert_file)
       return cert_data
+   
+def getstatData():
+    with open(os.getcwd()+"/config/statlist.json", 'r') as stat_file:
+      stat_data=json.load(stat_file)
+      return stat_data
