@@ -5,7 +5,7 @@ from modules import makerequest,decrypt,classes,certcheck,configs,file_utils,sta
 
 PORT_NUMBER = 5550
 SIZE = 1024
-AGENT_VER = "1.24.05"
+AGENT_VER = "1.24.06"
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -68,6 +68,7 @@ def main():
                   if len(retarr)>0:
                      ret={}
                      ret["type"]=item["type"]
+                     ret["subtype"]=item["function"].replace(item["type"],"")
                      ret["data"]=retarr
                      makerequest.postStatData(webssl,website,json.dumps(ret))   
        except OSError as err:
