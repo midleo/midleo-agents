@@ -2,7 +2,6 @@ import json, os, csv
 from modules import classes
 
 def csv_json(file,array,check=False,cleanit=False):
-    json_arr = []
     if os.path.isfile(file):
         if len(array) > 0:
             try:
@@ -15,14 +14,16 @@ def csv_json(file,array,check=False,cleanit=False):
                      else:
                        
                        if(check and linearr[0]==check):
-                          in_arr["type"]=array["type"]
-                          in_arr["line"]=str("sumarized" if linearr[0]=='summary' else linearr[0])
-                          for (key, value) in array.items():
+                          if linearr[int(array["node"])]+"#"+linearr[int(array["server"])]+"#"+str("sumarized" if linearr[0]=='summary' else linearr[0]) not in in_arr:
+                            in_arr[linearr[int(array["node"])]+"#"+linearr[int(array["server"])]+"#"+str("sumarized" if linearr[0]=='summary' else linearr[0])]=""
+                          strline=""
+                          for (key, value) in array["keys"].items():
                             try:
-                               in_arr[key]=linearr[int(value)]
+                              strline+=linearr[int(value)]+"#"
                             except:
                                pass
-                          json_arr.append(in_arr)
+                          strline=strline[:-1]+";"
+                          in_arr[linearr[int(array["node"])]+"#"+linearr[int(array["server"])]+"#"+str("sumarized" if linearr[0]=='summary' else linearr[0])]+=strline
                        else:
                           pass
                        if(not check and linearr[0]!=array["noteq"]):
@@ -36,9 +37,8 @@ def csv_json(file,array,check=False,cleanit=False):
                                pass
                           strline=strline[:-1]+";"
                           in_arr[linearr[int(array["node"])]+"#"+linearr[int(array["server"])]+"#"+str("sumarized" if linearr[0]=='summary' else linearr[0])]+=strline
-               json_arr.append(in_arr)
             except OSError as err:
                classes.Err("Error opening the file:"+str(err))
         if(cleanit):
             with open(file, 'w'): pass
-    return json.dumps(json_arr)
+    return json.dumps(in_arr)
