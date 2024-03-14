@@ -354,7 +354,7 @@ case "$1" in
         echo "Empty Qmanager"
         exit 1
       fi
-      echo "ALTER QMGR ACTVTRC(ON)" | $RUNMQSC $2
+      sudo su - mqm -c "echo 'ALTER QMGR ACTVTRC(ON)' | $RUNMQSC $2"
       enabletrackqm $2
       ;;
     disabletrackqm )
@@ -363,7 +363,7 @@ case "$1" in
         echo "Empty Qmanager"
         exit 1
       fi
-      echo "ALTER QMGR ACTVTRC(OFF)" | $RUNMQSC $2
+      sudo su - mqm -c "echo 'ALTER QMGR ACTVTRC(OFF)' | $RUNMQSC $2"
       disabletrackqm $2
       ;;
     help )
