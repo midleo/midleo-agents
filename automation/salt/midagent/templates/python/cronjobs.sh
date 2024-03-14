@@ -6,6 +6,8 @@
 
 HOMEDIR=$(pwd)"/config"
 DSPMQVER=/opt/mqm/bin/dspmqver
+RUNMQSC=/opt/mqm/bin/runmqsc
+AMQSEVT=/opt/mqm/samp/bin/amqsevt
 cd $(dirname $0)
 
 if [[ ! -e $HOMEDIR ]]; then
@@ -62,6 +64,128 @@ if [ -n "$mainver" ] && [ $mainver -gt 8 ]; then
 else
   runmqmon $JAVA_OPTS
 fi
+}
+
+runmqtracker (){
+if [ -f $HOMEDIR"/conftrack.json" ]; then
+    /usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+from datetime import datetime
+from modules import makerequest,decrypt,classes,certcheck,configs
+
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
+
+AMQSEVT="$AMQSEVT"
+
+try:
+   track_data = configs.gettrackData()
+   config_data = configs.getcfgData()
+   website = config_data['website']
+   webssl = config_data['webssl']
+   if len(track_data)>0:
+      for k,item in track_data.items():
+         try:
+            output = subprocess.run("sudo su - mqm -c '"+AMQSEVT+" -m "+k+" -q SYSTEM.ADMIN.TRACE.ACTIVITY.QUEUE -w 1 -o json | jq . -c --slurp'",shell=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+            output = output.stdout.decode()
+            try:
+               out = json.loads(output)
+               if len(out)>0:
+                  for event in out:
+                     eventData = event["eventData"]
+                     if "channelName" in eventData: 
+                         channelName = eventData["channelName"]
+                         connectionName = eventData["connectionName"]
+                     else:     
+                          channelName = "Local"
+                          connectionName = "Local     "
+                     app = eventData["applName"]
+                     actTr = eventData["activityTrace"]
+                     for act in actTr:
+                         if act["operationId"] in ["Put1","Put","Get","Cb","Callback"] and act["objectName"]!="SYSTEM.ADMIN.TRACE.ACTIVITY.QUEUE":
+                            ret={}
+                            ret["qmgr"]=k
+                            ret["objectName"]=act["objectName"]
+                            ret["applName"] = app
+                            ret["channelName"]= channelName
+                            ret["connectionName"] = connectionName
+                            ret["trackdata"]=act
+                            makerequest.postTrackData(webssl,website,json.dumps(ret))
+            except:
+               classes.Err("Return error:"+output)
+         except subprocess.CalledProcessError as e:
+            classes.Err("amqsevt err:"+e.output)
+   
+except Exception as err:
+   print("No such configuration file - config/conftrack.json") 
+
+EOF
+fi
+}
+
+enabletrackqm (){
+/usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+from datetime import datetime
+from modules import makerequest,decrypt,classes,certcheck,configs
+
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
+
+QMGR="$1"
+
+def createTrackJson():
+   try:
+      track_data = configs.gettrackData()
+   except Exception as err:
+      track_data = {}
+
+   track_data[QMGR] = {
+    "type": "enabled"
+   }
+
+   with open(os.getcwd()+"/config/conftrack.json", 'w+') as track_file:
+      json.dump(track_data, track_file)
+   print(QMGR+" have been added")
+    
+if __name__ == "__main__":
+   createTrackJson()
+
+EOF
+}
+
+disabletrackqm (){
+/usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+from datetime import datetime
+from modules import makerequest,decrypt,classes,certcheck,configs
+
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
+
+QMGR="$1"
+
+try:
+   track_data = configs.gettrackData()
+except Exception as err:
+   print("No such configuration file - config/conftrack.json")
+track_data.pop(QMGR, None)
+with open(os.getcwd()+"/config/conftrack.json", 'w+') as track_file:
+   json.dump(track_data, track_file)
+print(QMGR+" configuration deleted")
+EOF
 }
 
 runmqmon(){
@@ -202,13 +326,13 @@ EOF
 }
 
 case "$1" in
-	addq )
+	 addmonq )
       addmon $2 $3 $4 $5
       ;;
-    addchl )
+    addmonchl )
       addmon $2 $3 "CHANNELS"
       ;;
-    delq )
+    delmonq )
       if [ -z "$2" ]
       then
         $0
@@ -216,22 +340,42 @@ case "$1" in
       fi
       delmon $2 $3
       ;;
-    delchl )
+    delmonchl )
       if [ -z "$2" ]
       then
         $0
         exit 1
       fi
       delmon $2 $3
+      ;;
+    enabletrackqm )
+      if [ -z "$2" ]
+      then
+        echo "Empty Qmanager"
+        exit 1
+      fi
+      echo "ALTER QMGR ACTVTRC(ON)" | $RUNMQSC $2
+      enabletrackqm $2
+      ;;
+    disabletrackqm )
+      if [ -z "$2" ]
+      then
+        echo "Empty Qmanager"
+        exit 1
+      fi
+      echo "ALTER QMGR ACTVTRC(OFF)" | $RUNMQSC $2
+      disabletrackqm $2
       ;;
     help )
       echo ""
       echo "Usage:"
       echo " - $0 addconf QMGR WebUser(Optional) WebPassword(Optional)"
-      echo " - $0 addq QMGR QUEUE TYPE_OF_MON THRESHOLD"
-      echo " - $0 delq QMGR QUEUE"
-      echo " - $0 addchl QMGR CHANNEL"
-      echo " - $0 delchl QMGR CHANNEL"
+      echo " - $0 addmonq QMGR QUEUE TYPE_OF_MON THRESHOLD"
+      echo " - $0 delmonq QMGR QUEUE"
+      echo " - $0 enabletrackqm QMGR # Transfer the mqat.ini file to /var/mqm/qmgr/QMGR/ folder"
+      echo " - $0 disabletrackqm QMGR"
+      echo " - $0 addmonchl QMGR CHANNEL"
+      echo " - $0 delmonchl QMGR CHANNEL"
       echo ""
       echo "Parameters:"
       echo " - TYPE_OF_MON: QAGE - monitor queue age, QFULL - monitor percentage of maxdepth/curdepth"
@@ -239,6 +383,7 @@ case "$1" in
       ;;
     * )
       load_config
-      runjob
+#      runjob
+      runmqtracker
       ;;
    esac

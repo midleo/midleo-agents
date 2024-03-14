@@ -35,3 +35,8 @@ def getstatData():
     with open(os.getcwd()+"/config/statlist.json", 'r') as stat_file:
       stat_data=json.load(stat_file)
       return stat_data
+    
+def gettrackData():
+   with open(os.getcwd()+"/config/conftrack.json", 'r') as track_file:
+      track_data=json.load(track_file)
+      return track_data
