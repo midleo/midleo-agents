@@ -35,7 +35,7 @@ class HWConfig:
 class NetConfig:
     def __init__(self, dns):
         self.dns = dns
-
+        
 class Config:
     def __init__(self, uid, groupid, agtver, updint, hw, net, geo, certs):
         self.uid = uid

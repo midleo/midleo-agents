@@ -7,7 +7,7 @@
 HOMEDIR=$(pwd)"/config"
 DSPMQVER=/opt/mqm/bin/dspmqver
 RUNMQSC=/opt/mqm/bin/runmqsc
-AMQSEVT=/opt/mqm/samp/bin/amqsevt
+AMQSEVT=/opt/mqm/bin/amqsevt
 cd $(dirname $0)
 
 if [[ ! -e $HOMEDIR ]]; then
