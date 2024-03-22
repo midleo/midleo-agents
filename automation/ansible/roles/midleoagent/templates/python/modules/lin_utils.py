@@ -1,4 +1,8 @@
-import platform, sys, subprocess, datetime, re, multiprocessing, psutil, socket
+import platform, sys, subprocess, datetime, re, multiprocessing, socket
+try:
+    __import__('imp').find_module('psutil')
+except ImportError:
+    pass
 from modules import classes
 
 def getName():
