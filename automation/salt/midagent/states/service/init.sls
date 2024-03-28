@@ -7,7 +7,7 @@
 {% set group_id = salt['pillar.get']('INPUT:group_id') %}
 {% set update_interval_minutes = salt['pillar.get']('INPUT:update_interval_minutes') %}
 
-{% set agent_unique_id = salt['random.get_str'](length=16) %}
+{% set agent_unique_id = salt['random.get_str'](length=16,chars='abcdefABCDEF0123456789') %}
 
 {{agent_install_dir}}:
   file.directory:
@@ -34,7 +34,7 @@ midagent_create_client:
     - mode: '0755'
     - template: jinja
     - names:
-      - {{agent_install_dir}}midleo_client.py
+      - {{agent_install_dir}}midleo_client.py:
         - source: salt://midagent/templates/python/midleo_client.py
 
 midagent_create_script:
@@ -44,10 +44,10 @@ midagent_create_script:
     - mode: '0755'
     - template: jinja
     - names:
-      - {{agent_install_dir}}magent.sh
+      - {{agent_install_dir}}magent.sh:
         - source: salt://midagent/templates/python/magent.sh
 
-{% for file in '__init__', 'certcheck', 'classes', 'decrypt', 'lin_packages', 'lin_utils', 'makerequest', 'win_utils' %}
+{% for file in '__init__', 'certcheck', 'classes', 'decrypt', 'configs', 'file_utils', 'lin_packages', 'statarr', 'lin_utils', 'makerequest', 'win_utils' %}
 midagent_create_client_{{file}}:
   file.managed:
     - user: root
@@ -55,7 +55,7 @@ midagent_create_client_{{file}}:
     - mode: '0755'
     - template: jinja
     - names:
-      - {{agent_install_dir}}modules/{{file}}.py
+      - {{agent_install_dir}}modules/{{file}}.py:
         - source: salt://midagent/templates/python/modules/{{file}}.py
 {% endfor %}
 
@@ -66,7 +66,7 @@ midagent_create_config:
     - mode: '0755'
     - template: jinja
     - names:
-      - {{agent_install_dir}}config/agentConfig.json
+      - {{agent_install_dir}}config/agentConfig.json:
         - source: salt://midagent/templates/agentConfig.json.j2
     - context:
         agent_unique_id: "{{agent_unique_id}}"
@@ -82,7 +82,7 @@ midagent_create_service:
     - mode: '0755'
     - template: jinja
     - names:
-      - /etc/systemd/system/midleoagent.service
+      - /etc/systemd/system/midleoagent.service:
         - source: salt://midagent/templates/agent_linux_service.j2
     - context:
         agent_install_dir: "{{agent_install_dir}}"
