@@ -17,7 +17,7 @@
     - dir_mode: 755
     - makedirs: True
 
-{% for dir in 'modules', 'logs', 'config' %}
+{% for dir in 'modules', 'logs', 'config', 'resources' %}
 {{agent_install_dir}}{{ dir }}:
   file.directory:
     - name: {{agent_install_dir}}{{ dir }}
@@ -47,17 +47,29 @@ midagent_create_script:
       - {{agent_install_dir}}magent.sh:
         - source: salt://midagent/templates/python/magent.sh
 
-{% for file in '__init__', 'certcheck', 'classes', 'decrypt', 'configs', 'file_utils', 'lin_packages', 'statarr', 'lin_utils', 'makerequest', 'win_utils' %}
-midagent_create_client_{{file}}:
-  file.managed:
+midagent_create_client_modules:
+  file.recurse:
     - user: root
     - group: root
     - mode: '0755'
-    - template: jinja
+    - makedirs: True
     - names:
-      - {{agent_install_dir}}modules/{{file}}.py:
-        - source: salt://midagent/templates/python/modules/{{file}}.py
-{% endfor %}
+      - {{agent_install_dir}}modules:
+        - source: salt://midagent/templates/python/modules
+
+midagent_create_client_resources:
+  file.recurse:
+    - user: root
+    - group: root
+    - mode: '0755'
+    - makedirs: True
+    - names:
+      - {{agent_install_dir}}resources:
+        - source: salt://midagent/templates/python/resources
+
+midagent_create_config_exist:
+  file.exists:
+    - name: {{agent_install_dir}}config/agentConfig.json
 
 midagent_create_config:
   file.managed:
@@ -74,6 +86,7 @@ midagent_create_config:
         midleo_website_base_url_ssl: "{{midleo_website_base_url_ssl}}"
         group_id: "{{group_id}}"
         update_interval_minutes: "{{update_interval_minutes}}"
+    - unless: midagent_create_config_exist
 
 midagent_create_service:
   file.managed:
@@ -95,7 +108,7 @@ midagent.service:
 
 midagent.cron:
   cron.present:
-    - name: service midleoagent restart \;
+    - name: service midleoagent stop && sleep 5 && service midleoagent start \;
     - user: root
     - minute: 00
     - hour: 01

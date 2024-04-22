@@ -13,6 +13,7 @@
     - "{{agent_install_dir}}modules"
     - "{{agent_install_dir}}logs"
     - "{{agent_install_dir}}config"
+    - "{{agent_install_dir}}resources"
 - name: "creage agent"
   template:
     src: templates/python/midleo_client.py
@@ -27,6 +28,9 @@
     owner: root
     group: root
     mode: '0755'
+- name: "check exist agentconfig"
+  stat: "path={{agent_install_dir}}config/agentConfig.json"
+  register: st_agcfg
 - name: "creage agentconfig"
   template:
     src: templates/agentConfig.json.j2
@@ -34,7 +38,8 @@
     owner: root
     group: root
     mode: '0644'
-- name: "upload python scripts"
+  when: not st_agcfg.stat.exists
+- name: "upload modules scripts"
   template:
     src: '{{ item.src }}'
     dest: "{{agent_install_dir}}modules/{{ item.path }}"
@@ -43,6 +48,15 @@
     mode: 'a+x'
     force: yes
   with_filetree: templates/python/modules
+- name: "upload resources scripts"
+  file:
+    src: '{{ item.src }}'
+    dest: "{{agent_install_dir}}resources/{{ item.path }}"
+    owner: root
+    group: root
+    mode: 'a+x'
+    force: yes
+  with_filetree: templates/python/resources
 - name: Update apt repo and cache on all Debian/Ubuntu boxes
   apt: 
     update_cache: yes 
@@ -82,11 +96,11 @@
     state: started
 - name: "Create crontab /etc/cron.d/midleoagent"
   ansible.builtin.cron:
-    name: clean memory
+    name: restart agent
     weekday: "*/2"
     minute: "0"
     hour: "1"
     user: root
-    job: "service midleoagent restart"
+    job: "service midleoagent stop && sleep 5 && service midleoagent start"
     cron_file: midleoagent
 ...
