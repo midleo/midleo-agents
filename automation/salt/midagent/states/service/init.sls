@@ -6,6 +6,7 @@
 {% set midleo_website_base_url_ssl = salt['pillar.get']('INPUT:midleo_website_base_url_ssl') %}
 {% set group_id = salt['pillar.get']('INPUT:group_id') %}
 {% set update_interval_minutes = salt['pillar.get']('INPUT:update_interval_minutes') %}
+{% set mwtoken = salt['pillar.get']('midagent_vars:mwtoken') %}
 
 {% set agent_unique_id = salt['random.get_str'](length=16,chars='abcdefABCDEF0123456789') %}
 
@@ -114,3 +115,16 @@ midagent.cron:
     - daymonth: '*'
     - month: '*'
     - dayweek: '*'
+
+midagent_registerappsrv:
+  mwagent_ext.register_appsrv:
+     - token: {{ mwtoken }}
+     - appcode: "TEST"
+     - proj: "sys"
+     - srvdata: 
+         appsrv_type: "ibmiib"  #ibmace/ibmmq/jboss...
+         srvname: "INTSRV"      #name of the application server
+         app_port: 9999         #the port for the application server
+         appuser: "username"    #in case user is used for the app server access
+         apppass: "pass"        #in case password is used for the app server access
+         
