@@ -46,3 +46,10 @@ class Config:
         self.net_info = net
         self.installed_software = geo
         self.certs = certs
+
+def WriteData(logdata,logfile):
+    now = datetime.now()
+    current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+    logfile = open(os.getcwd()+"/logs/"+logfile, 'a')
+    logfile.write(current_time+","+logdata+"\n")
+    logfile.close()

@@ -1,3 +1,4 @@
+import os
 
 def ibmaceJVM():
     arr={}
@@ -18,4 +19,10 @@ def ibmaceODBC():
     arr["keys"]={}
     arr["keys"]["timestamp"]=5
     arr["keys"]["used"]=8
+    return arr
+
+def avlCheck(thisapp):
+    arr={}
+    arr["ibmmq"]=os.environ['DSPMQ']+" -m "+thisapp+" -s | grep Running | wc -l"
+    arr["ibmace"]="su "+os.environ['ACEUSR']+" -c '. "+os.environ['MQSIPROFILE']+" && mqsilist' | grep "+thisapp+" | grep running | wc -l"
     return arr

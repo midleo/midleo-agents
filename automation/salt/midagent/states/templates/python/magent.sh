@@ -4,12 +4,13 @@
 #created by V.Vasilev
 #https://vasilev.link
 cd $(dirname $0)
+USR=`whoami`
 
 addcert(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,decrypt,classes,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -53,7 +54,7 @@ delcert(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,classes,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -79,7 +80,7 @@ addstat(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,classes,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -124,7 +125,7 @@ delstat(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,classes,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -146,6 +147,135 @@ print(STATCONF+" configuration deleted")
 EOF
 }
 
+enableavl(){
+/usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,sys,os
+from datetime import datetime
+from modules import classes,configs
+
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
+USR="$USR"
+APPSRV="$1"
+APPSRVTYPE="$2"
+
+def createAvlJson():
+   try:
+      avl_data = configs.getAvlData()
+   except Exception as err:
+      avl_data = {}
+   
+   avl_data[APPSRV] = {
+     "type": APPSRVTYPE,
+     "enabled": "yes"
+   }
+
+   with open(os.getcwd()+"/config/confavl.json", 'w+') as avl_file:
+      json.dump(avl_data, avl_file)
+   print("Availability check for "+APPSRV+" have been enabled")
+    
+if __name__ == "__main__":
+   createAvlJson()
+
+EOF
+}
+
+disableavl(){
+/usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,sys,os
+from datetime import datetime
+from modules import classes,configs
+
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
+
+USR="$USR"
+APPSRV="$1"
+
+try:
+   avl_data = configs.getAvlData()
+except Exception as err:
+   print("No such configuration file - config/confavl.json")
+avl_data.pop(APPSRV, None)
+with open(os.getcwd()+"/config/confavl.json", 'w+') as avl_file:
+   json.dump(avl_data, avl_file)
+print("Availability check for "+APPSRV+" have been disabled")
+    
+EOF
+}
+
+stopavl(){
+/usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,sys,os
+from datetime import datetime
+from modules import classes,configs
+
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
+
+USR="$USR"
+APPSRV="$1"
+COMMENT="$2"
+
+try:
+   avl_data = configs.getAvlData()
+except Exception as err:
+   print("No such configuration file - config/confavl.json")
+try:
+   avl_data[APPSRV]["enabled"]="no"
+   with open(os.getcwd()+"/config/confavl.json", 'w+') as avl_file:
+      json.dump(avl_data, avl_file)
+   classes.WriteData("stopped,"+USR+","+COMMENT,"avl_"+APPSRV+".csv")
+   print("Availability check for "+APPSRV+" have been stopped")
+except Exception as err:
+   print("No such availability for:"+APPSRV)
+
+EOF
+}
+
+startavl(){
+/usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,sys,os
+from datetime import datetime
+from modules import classes,configs
+
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
+
+USR="$USR"
+APPSRV="$1"
+
+try:
+   avl_data = configs.getAvlData()
+except Exception as err:
+   print("No such configuration file - config/confavl.json")
+try:
+   avl_data[APPSRV]["enabled"]="yes"
+   with open(os.getcwd()+"/config/confavl.json", 'w+') as avl_file:
+      json.dump(avl_data, avl_file)
+   classes.WriteData("started,"+USR,"avl_"+APPSRV+".csv")
+   print("Availability check for "+APPSRV+" have been started")
+except Exception as err:
+   print("No such availability for:"+APPSRV)
+
+EOF
+}
 
 case "$1" in
 	addcert )
@@ -179,6 +309,38 @@ case "$1" in
       fi
       delstat $2
       ;;
+   enableavl )
+      if [ -z "$2" ]
+      then
+        $0
+        exit 1
+      fi
+      enableavl $2 $3
+      ;;
+   disableavl )
+      if [ -z "$2" ]
+      then
+        $0
+        exit 1
+      fi
+      disableavl $2
+      ;;
+   stopavl )
+      if [ -z "$3" ]
+      then
+        $0
+        exit 1
+      fi
+      stopavl $2 "${3}"
+      ;;
+   startavl )
+      if [ -z "$2" ]
+      then
+        $0
+        exit 1
+      fi
+      startavl $2
+      ;;
    * )
       echo ""
       echo "usage:"
@@ -186,4 +348,8 @@ case "$1" in
       echo "   -  $0 delcert LABEL"
       echo "   -  $0 addstat"
       echo "   -  $0 delstat FILE_PATH"
+      echo "   -  $0 enableavl APP_SERVER SERVER_TYPE"
+      echo "   -  $0 disableavl APP_SERVER"
+      echo "   -  $0 stopavl APP_SERVER comment"
+      echo "   -  $0 startavl APP_SERVER"
    esac

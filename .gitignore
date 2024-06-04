@@ -1,12 +1,8 @@
 # ignore agents local configs
-ibmmq.pcfget/agentConfig.json
-ibmmq.pcfget/__pycache__/*
-ibmmq.restget/agentConfig.json
-ibmmq.restget/__pycache__/*
-automation/salt/midagent/templates/python/modules/__pycache__/*
-automation/salt/midagent/templates/python/config/*
-!automation/salt/midagent/templates/python/config/statlist.yaml_example
-automation/salt/midagent/templates/python/logs/*
+automation/salt/midagent/states/templates/python/modules/__pycache__/*
+automation/salt/midagent/states/templates/python/config/*
+!automation/salt/midagent/states/templates/python/config/statlist.yaml_example
+automation/salt/midagent/states/templates/python/logs/*
 automation/ansible/roles/midleoagent/templates/python/modules/__pycache__/*
 automation/ansible/roles/midleoagent/templates/python/config/*
 !automation/ansible/roles/midleoagent/templates/python/config/statlist.yaml_example

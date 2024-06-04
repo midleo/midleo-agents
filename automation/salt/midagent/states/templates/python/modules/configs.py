@@ -40,3 +40,8 @@ def gettrackData():
    with open(os.getcwd()+"/config/conftrack.json", 'r') as track_file:
       track_data=json.load(track_file)
       return track_data
+   
+def getAvlData():
+   with open(os.getcwd()+"/config/confavl.json", 'r') as avl_file:
+      avl_data=json.load(avl_file)
+      return avl_data

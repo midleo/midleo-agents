@@ -6,8 +6,19 @@
 
 HOMEDIR=$(pwd)"/config"
 DSPMQVER=/opt/mqm/bin/dspmqver
+DSPMQ=/opt/mqm/bin/dspmq
 RUNMQSC=/opt/mqm/bin/runmqsc
 AMQSEVT=/opt/mqm/bin/amqsevt
+ACEUSR=mqbrk
+MQSIPROFILE=/opt/ibm/ace/server/bin/mqsiprofile
+
+export DSPMQ
+export DSPMQVER
+export AMQSEVT
+export RUNMQSC
+export ACEUSR
+export MQSIPROFILE
+
 cd $(dirname $0)
 
 if [[ ! -e $HOMEDIR ]]; then
@@ -57,7 +68,8 @@ create_config (){
       echo mqwebport=$mqwebport >> $HOMEDIR/"midleoclient.conf"
     fi
 }
-runjob (){
+
+runmqjob (){
 JAVA_OPTS="-Djava.library.path=$ibmmqlibpath"
 if [ -n "$mainver" ] && [ $mainver -gt 8 ]; then
   runmqweb $ibmmqwebssl $mqwebhost $mqwebport $ibmmqwebusr $ibmmqwebusrpwd
@@ -66,12 +78,53 @@ else
 fi
 }
 
+runappavl(){
+if [ -e "$HOMEDIR/confavl.json" ]; then
+  /usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+from datetime import datetime
+from modules import makerequest,classes,configs,statarr
+
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
+
+try:
+   avl_data = configs.getAvlData()
+   config_data = configs.getcfgData()
+   website = config_data['website']
+   webssl = config_data['webssl']
+   if len(avl_data)>0:
+      for k,item in avl_data.items():
+         ret=statarr.avlCheck(k)
+         if(item["enabled"]=='yes'):
+           ret=ret[item["type"]]
+           try:
+             output = subprocess.run(ret,shell=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+             output = output.stdout.decode()
+             if(int(output)==1):
+               classes.WriteData("online","avl_"+k+".csv")
+             else:
+               classes.WriteData("offline","avl_"+k+".csv")
+           except subprocess.CalledProcessError as e:
+             classes.Err("avlCheck err:"+e.output)
+except Exception as err:
+   print("No such configuration file - config/conftrack.json") 
+
+EOF
+
+fi
+}
+
 runmqtracker (){
 if [ -f $HOMEDIR"/conftrack.json" ]; then
     /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,classes,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -131,7 +184,7 @@ enabletrackqm (){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,classes,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -166,7 +219,7 @@ disabletrackqm (){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,classes,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -192,7 +245,7 @@ runmqmon(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,classes,configs
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
 elif platform.system()=="Windows":
@@ -221,7 +274,7 @@ runmqweb(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,requests
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,classes,configs
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
 elif platform.system()=="Windows":
@@ -257,7 +310,7 @@ addmon(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,classes,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -302,7 +355,7 @@ delmon(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs
+from modules import makerequest,classes,configs
 
 if platform.system()=="Linux":
    from modules import lin_utils,lin_packages
@@ -383,7 +436,8 @@ case "$1" in
       ;;
     * )
       load_config
-#      runjob
+#      runmqjob
+      runappavl
       runmqtracker
       ;;
    esac
