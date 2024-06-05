@@ -64,7 +64,7 @@ def ReadAvl(logfile):
                      navl+= 1
                   elif (linearr[1]=="stopped"or linearr[1]=="started"):
                      nplavl+= 1
-                     pltext+=linearr[0]+": "+(linearr[2] if linearr[2] else "nobody")+" - "+(linearr[3] if linearr[3] else "no comment")+";"
+                     pltext+=linearr[0]+": "+linearr[1]+" - "+('nobody' if not(linearr[2]) else linearr[2])+" - "+('no comment' if len(linearr)<4 else linearr[3])+";"
                   else:
                      nnplavl+= 1
                      pltext+=linearr[0]+": not available;"

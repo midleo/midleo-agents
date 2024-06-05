@@ -7,3 +7,4 @@ automation/ansible/roles/midleoagent/templates/python/modules/__pycache__/*
 automation/ansible/roles/midleoagent/templates/python/config/*
 !automation/ansible/roles/midleoagent/templates/python/config/statlist.yaml_example
 automation/ansible/roles/midleoagent/templates/python/logs/*
+automation/salt/midagent/states/templates/python/logs/midleoagent.log
