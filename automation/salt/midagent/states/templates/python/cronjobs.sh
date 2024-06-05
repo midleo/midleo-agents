@@ -19,6 +19,10 @@ export RUNMQSC
 export ACEUSR
 export MQSIPROFILE
 
+YM=$(date '+%Y-%m')
+WD=$(date '+%d')
+HOUR=$(date '+%H%M')
+
 cd $(dirname $0)
 
 if [[ ! -e $HOMEDIR ]]; then
@@ -112,11 +116,51 @@ try:
            except subprocess.CalledProcessError as e:
              classes.Err("avlCheck err:"+e.output)
 except Exception as err:
-   print("No such configuration file - config/conftrack.json") 
+   classes.Err("No such configuration file - config/conftrack.json."+err) 
 
 EOF
-
 fi
+}
+
+resetappavl (){
+if [ -e "$HOMEDIR/confavl.json" ]; then
+  /usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+from datetime import datetime
+from modules import makerequest,classes,configs,statarr,file_utils
+
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit()
+
+YM="$YM"
+WD="$WD"
+
+try:
+   avl_data = configs.getAvlData()
+   config_data = configs.getcfgData()
+   website = config_data['website']
+   webssl = config_data['webssl']
+   uid = config_data['uid']
+   if len(avl_data)>0:
+      for k,item in avl_data.items():
+         ret=file_utils.ReadAvl("avl_"+k+".csv")
+         if 'navl' in ret:
+            ret["appsrv"]=k
+            ret["srvid"]=uid
+            ret["srvtype"]=item["type"]
+            ret["thismonth"]=YM
+            ret["thisdate"]=WD
+            makerequest.postAvlData(webssl,website,json.dumps(ret))
+
+except Exception as err:
+   classes.Err("No such configuration file - config/conftrack.json."+err)
+
+EOF
+fi  
 }
 
 runmqtracker (){
@@ -174,7 +218,7 @@ try:
             classes.Err("amqsevt err:"+e.output)
    
 except Exception as err:
-   print("No such configuration file - config/conftrack.json") 
+   classes.Err("No such configuration file - config/conftrack.json."+err) 
 
 EOF
 fi
@@ -258,14 +302,14 @@ JAVA_OPTS="$1"
 if __name__ == "__main__":
    try:
       mon_data = configs.getmonData()
+      for qm in mon_data:
+         value = mon_data[qm]
+         for q,val in value.items():
+            qinfo=makerequest.getJQstat(JAVA_OPTS,qm,q,val["thres"])
+            if(qinfo!="{}" and qinfo is not None):
+              makerequest.postQData(webssl,website,qm,q,qinfo)
    except Exception as err:
-      mon_data = {}
-   for qm in mon_data:
-      value = mon_data[qm]
-      for q,val in value.items():
-        qinfo=makerequest.getJQstat(JAVA_OPTS,qm,q,val["thres"])
-        if(qinfo!="{}" and qinfo is not None):
-          makerequest.postQData(webssl,website,qm,q,qinfo)   
+      classes.Err("MQMON not configured err:"+err)
 
 EOF
 }
@@ -294,15 +338,16 @@ if __name__ == "__main__":
       config_data = configs.getcfgData()
       website = config_data['website']
       webssl = config_data['webssl']
-   except Exception as err:
-      mon_data = {}
-   for qm in mon_data:
-      value = mon_data[qm]
-      for q,val in value.items():
-        qinfo=makerequest.getQStat(SSL,HOST,PORT,qm,q,USR,PASS)
-        if(qinfo!="{}" and qinfo is not None):
-          makerequest.postQData(webssl,website,qm,q,qinfo)
 
+      for qm in mon_data:
+        value = mon_data[qm]
+        for q,val in value.items():
+          qinfo=makerequest.getQStat(SSL,HOST,PORT,qm,q,USR,PASS)
+          if(qinfo!="{}" and qinfo is not None):
+            makerequest.postQData(webssl,website,qm,q,qinfo)
+   except Exception as err:
+      classes.Err("MQWEB not configured err:"+err)
+   
 EOF
 }
 
@@ -437,7 +482,11 @@ case "$1" in
     * )
       load_config
 #      runmqjob
-      runappavl
+      if [ $HOUR == "2359" ]; then
+        resetappavl
+      else
+        runappavl
+      fi
       runmqtracker
       ;;
    esac

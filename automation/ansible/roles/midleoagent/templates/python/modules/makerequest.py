@@ -51,3 +51,11 @@ def postTrackData(webssl,website,thisdata):
         classes.Err("HTTPResponse:"+res.content.decode())
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
+
+def postAvlData(webssl,website,thisdata):
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    try:
+        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateappsrvavl', data=thisdata, headers=headers)
+        classes.Err("HTTPResponse:"+res.content.decode())
+    except requests.exceptions.RequestException as ex:  
+        classes.Err("Exception:"+str(ex))

@@ -42,3 +42,46 @@ def csv_json(file,array,check=False,cleanit=False):
         if(cleanit):
             with open(file, 'w'): pass
     return json.dumps(in_arr)
+
+def ReadAvl(logfile):
+    if os.path.isfile(os.getcwd()+"/logs/"+logfile):
+      try:
+         with open(os.getcwd()+"/logs/"+logfile) as f:
+            reader_obj = csv.reader((line.replace('\0','') for line in f), delimiter = ',')
+            ret={}
+            nl=0
+            navl=0
+            nplavl=0
+            nnplavl=0
+            pltext=""
+
+            for linearr in reader_obj:
+               if(len(linearr)<2): 
+                  pass
+               else:
+                  nl+= 1
+                  if (linearr[1]=="online"):
+                     navl+= 1
+                  elif (linearr[1]=="stopped"or linearr[1]=="started"):
+                     nplavl+= 1
+                     pltext+=linearr[0]+": "+(linearr[2] if linearr[2] else "nobody")+" - "+(linearr[3] if linearr[3] else "no comment")+";"
+                  else:
+                     nnplavl+= 1
+                     pltext+=linearr[0]+": not available;"
+
+            navl=(navl/nl)*100
+            nplavl=(nplavl/nl)*100
+            nnplavl=(nnplavl/nl)*100
+
+            ret["navl"]=navl
+            ret["nplavl"]=nplavl
+            ret["nnplavl"]=nnplavl
+            ret["pltext"]=pltext
+
+            with open(os.getcwd()+"/logs/"+logfile, 'w'): pass
+      except OSError as err:
+         classes.Err("Error opening the file:"+str(err))
+         ret={}
+    else:
+      ret={}
+    return ret
