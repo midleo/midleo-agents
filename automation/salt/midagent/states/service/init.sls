@@ -48,6 +48,16 @@ midagent_create_script:
       - {{agent_install_dir}}magent.sh:
         - source: salt://midagent/templates/python/magent.sh
 
+midagent_create_scriptcron:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: '0755'
+    - template: jinja
+    - names:
+      - {{agent_install_dir}}cronjobs.sh:
+        - source: salt://midagent/templates/python/cronjobs.sh
+
 midagent_create_client_modules:
   file.recurse:
     - user: root
@@ -112,6 +122,16 @@ midagent.cron:
     - user: root
     - minute: 00
     - hour: 01
+    - daymonth: '*'
+    - month: '*'
+    - dayweek: '*'
+
+midagent.cronjob:
+  cron.present:
+    - name: {{agent_install_dir}}cronjobs.sh \;
+    - user: root
+    - minute: '*'
+    - hour: '*'
     - daymonth: '*'
     - month: '*'
     - dayweek: '*'

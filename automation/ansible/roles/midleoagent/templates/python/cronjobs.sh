@@ -4,6 +4,8 @@
 #created by V.Vasilev
 #https://vasilev.link
 
+cd $(dirname $0)
+
 HOMEDIR=$(pwd)"/config"
 DSPMQVER=/opt/mqm/bin/dspmqver
 DSPMQ=/opt/mqm/bin/dspmq
