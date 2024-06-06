@@ -21,7 +21,7 @@ def postStatData(webssl,website,thisdata):
 def postQData(webssl,website,qm,q,data):
     headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
     try:
-        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateqstat/'+qm+'/'+q, data=json.dumps(data), headers=headers)
+        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateqstat/'+qm+'/'+q, data=json.dumps(data), headers=headers, verify=False)
         classes.Err("postQdata HTTPResponse:"+res.content.decode())
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
@@ -47,7 +47,7 @@ def getJQstat(JAVA_OPTS,qmgr,queue,thres):
 def postTrackData(webssl,website,thisdata):
     headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
     try:
-        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateibmqtrack', data=thisdata, headers=headers)
+        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateibmqtrack', data=thisdata, headers=headers, verify=False)
         classes.Err("HTTPResponse:"+res.content.decode())
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
@@ -55,7 +55,7 @@ def postTrackData(webssl,website,thisdata):
 def postAvlData(webssl,website,thisdata):
     headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
     try:
-        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateappsrvavl', data=thisdata, headers=headers)
+        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateappsrvavl', data=thisdata, headers=headers, verify=False)
         classes.Err("HTTPResponse:"+res.content.decode())
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
