@@ -202,17 +202,19 @@ else:
 
 JAVA_OPTS="$1"
 
-if __name__ == "__main__":
-   try:
-      mon_data = configs.getmonData()
-      for qm in mon_data:
-         value = mon_data[qm]
-         for q,val in value.items():
-            qinfo=makerequest.getJQstat(JAVA_OPTS,qm,q,val["thres"])
-            if(qinfo!="{}" and qinfo is not None):
-              makerequest.postQData(webssl,website,qm,q,qinfo)
-   except Exception as err:
-      classes.Err("MQMON not configured err:"+err)
+try:
+   mon_data = configs.getmonData()
+   config_data = configs.getcfgData()
+   website = config_data['website']
+   webssl = config_data['webssl']
+   for qm in mon_data:
+      value = mon_data[qm]
+      for q,val in value.items():
+         qinfo=makerequest.getJQstat(JAVA_OPTS,qm,q,val["thres"])
+         if(qinfo!="{}" and qinfo is not None):
+           makerequest.postQData(webssl,website,qm,q,qinfo)
+except Exception as err:
+   classes.Err("MQMON not configured err:"+err)
 
 EOF
 }
@@ -235,23 +237,61 @@ PORT="$3"
 USR="$4"
 PASS="$5"
 
-if __name__ == "__main__":
-   try:
-      mon_data = configs.getmonData()
-      config_data = configs.getcfgData()
-      website = config_data['website']
-      webssl = config_data['webssl']
+try:
+   mon_data = configs.getmonData()
+   config_data = configs.getcfgData()
+   website = config_data['website']
+   webssl = config_data['webssl']
 
-      for qm in mon_data:
-        value = mon_data[qm]
-        for q,val in value.items():
-          qinfo=makerequest.getQStat(SSL,HOST,PORT,qm,q,USR,PASS)
-          if(qinfo!="{}" and qinfo is not None):
-            makerequest.postQData(webssl,website,qm,q,qinfo)
-   except Exception as err:
-      classes.Err("MQWEB not configured err:"+err)
+   for qm in mon_data:
+     value = mon_data[qm]
+     for q,val in value.items():
+       qinfo=makerequest.getQStat(SSL,HOST,PORT,qm,q,USR,PASS)
+       if(qinfo!="{}" and qinfo is not None):
+         makerequest.postQData(webssl,website,qm,q,qinfo)
+except Exception as err:
+   classes.Err("MQWEB not configured err:"+err)
    
 EOF
+}
+
+runappstat(){
+if [ -f $HOMEDIR"/statlist.json" ]; then
+   /usr/bin/python3 << EOF
+import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,glob
+from datetime import datetime
+from modules import makerequest,classes,configs,file_utils,statarr
+
+if platform.system()=="Linux":
+   from modules import lin_utils,lin_packages
+elif platform.system()=="Windows":
+   from modules import win_utils
+else:
+   exit() 
+
+try:
+   stat_data = configs.getstatData()
+   config_data = configs.getcfgData()
+   website = config_data['website']
+   webssl = config_data['webssl']
+   if len(stat_data)>0:
+      for k,item in stat_data.items():
+         func = getattr(statarr, item["function"], None)
+         files = glob.glob(item["file"])
+         for file in files:
+            ret=file_utils.csv_json(file,func(),item["line"],item["clean"])
+            retarr=json.loads(ret)
+            if len(retarr)>0:
+               ret={}
+               ret["type"]=item["type"]
+               ret["subtype"]=item["function"].replace(item["type"],"")
+               ret["data"]=retarr
+               makerequest.postStatData(webssl,website,json.dumps(ret))   
+except OSError as err:
+   classes.Err("Error opening the file statlist:"+str(err))
+
+EOF
+fi
 }
 
 case "$1" in
@@ -265,6 +305,7 @@ case "$1" in
          runmqjob
          runmqtracker
       fi
+      runappstat
       if [ $HOUR == "2359" ]; then
         resetappavl
       else

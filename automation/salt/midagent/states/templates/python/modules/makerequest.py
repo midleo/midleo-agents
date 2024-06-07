@@ -1,9 +1,10 @@
 import requests, json, base64, urllib3, subprocess, os
+from midleo_client import AGENT_VER
 from modules import classes
 urllib3.disable_warnings()
 
 def postData(webssl,website,data):
-    headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
     try:
         res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updatesrv', data=json.dumps(data), headers=headers, verify=False)
         classes.Err("HTTPResponse:"+res.content.decode())
@@ -11,7 +12,7 @@ def postData(webssl,website,data):
         classes.Err("Exception:"+str(ex))
 
 def postStatData(webssl,website,thisdata):
-    headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
     try:
         res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updatestat', data=thisdata, headers=headers, verify=False)
         classes.Err("HTTPResponse:"+res.content.decode())
@@ -19,7 +20,7 @@ def postStatData(webssl,website,thisdata):
         classes.Err("Exception:"+str(ex))
 
 def postQData(webssl,website,qm,q,data):
-    headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
     try:
         res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateqstat/'+qm+'/'+q, data=json.dumps(data), headers=headers, verify=False)
         classes.Err("postQdata HTTPResponse:"+res.content.decode())
@@ -27,7 +28,7 @@ def postQData(webssl,website,qm,q,data):
         classes.Err("Exception:"+str(ex))
 
 def getQStat(webssl,website,webport,qmgr,queue,usr,passwd):
-    headers = {'Content-Type': 'text/plain', 'charset':'utf-8'}
+    headers = {'Content-Type': 'text/plain', 'charset':'utf-8', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
     try:
         res = requests.get('http'+('s' if webssl=="y" else '')+'://'+website+':'+webport+'/ibmmq/rest/v1/admin/qmgr/'+qmgr+'/queue/'+queue+'?type=local&attributes=storage.maximumDepth&status=status', verify=False, headers=headers, auth=(usr, base64.b64decode(passwd).decode('utf-8').rstrip()))
         if 200 == res.status_code :
@@ -45,7 +46,7 @@ def getJQstat(JAVA_OPTS,qmgr,queue,thres):
        classes.Err("Exception:"+str(e.output))
 
 def postTrackData(webssl,website,thisdata):
-    headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
     try:
         res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateibmqtrack', data=thisdata, headers=headers, verify=False)
         classes.Err("HTTPResponse:"+res.content.decode())
@@ -53,7 +54,7 @@ def postTrackData(webssl,website,thisdata):
         classes.Err("Exception:"+str(ex))
 
 def postAvlData(webssl,website,thisdata):
-    headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
     try:
         res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateappsrvavl', data=thisdata, headers=headers, verify=False)
         classes.Err("HTTPResponse:"+res.content.decode())
