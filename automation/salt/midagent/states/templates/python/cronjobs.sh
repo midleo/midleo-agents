@@ -65,6 +65,7 @@ try:
    config_data = configs.getcfgData()
    website = config_data['website']
    webssl = config_data['webssl']
+   uid = config_data['uid']
    if len(avl_data)>0:
       for k,item in avl_data.items():
          ret=statarr.avlCheck(k)
@@ -77,6 +78,13 @@ try:
                classes.WriteData("online","avl_"+k+".csv")
              else:
                classes.WriteData("offline","avl_"+k+".csv")
+               if("monid" in item):
+                  req={}
+                  ret["appsrv"]=k
+                  req["monid"]=item["monid"]
+                  req["srvid"]=uid
+                  ret["srvtype"]=item["type"]
+                  makerequest.postMonAl(webssl,website,json.dumps(req))
            except subprocess.CalledProcessError as e:
              classes.Err("avlCheck err:"+e.output)
 except Exception as err:

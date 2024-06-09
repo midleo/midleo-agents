@@ -235,7 +235,8 @@ def createAvlJson():
    
    avl_data[APPSRV] = {
      "type": APPSRVTYPE,
-     "enabled": "yes"
+     "enabled": "yes",
+     "monid": "applavlmon"
    }
 
    with open(os.getcwd()+"/config/confavl.json", 'w+') as avl_file:
