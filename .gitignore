@@ -1,10 +1,11 @@
 # ignore agents local configs
-automation/salt/midagent/states/templates/python/modules/__pycache__/*
-automation/salt/midagent/states/templates/python/config/*
+automation/salt/midagent/states/templates/python/modules/__pycache__/
+automation/salt/midagent/states/templates/python/config/
 !automation/salt/midagent/states/templates/python/config/statlist.yaml_example
 automation/salt/midagent/states/templates/python/logs
-automation/ansible/roles/midleoagent/templates/python/modules/__pycache__/*
-automation/ansible/roles/midleoagent/templates/python/config/*
+automation/ansible/roles/midleoagent/templates/python/modules/__pycache__/
+automation/ansible/roles/midleoagent/templates/python/config/
 !automation/ansible/roles/midleoagent/templates/python/config/statlist.yaml_example
-automation/ansible/roles/midleoagent/templates/python/logs/*
+automation/ansible/roles/midleoagent/templates/python/logs/
 automation/salt/midagent/states/templates/python/logs/midleoagent.log
+automation/salt/midagent/states/templates/python/__pycache__/

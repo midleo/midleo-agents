@@ -60,6 +60,9 @@ elif platform.system()=="Windows":
 else:
    exit()
 
+now = datetime.now()
+current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+
 try:
    avl_data = configs.getAvlData()
    config_data = configs.getcfgData()
@@ -80,13 +83,15 @@ try:
                classes.WriteData("offline","avl_"+k+".csv")
                if("monid" in item):
                   req={}
-                  ret["appsrv"]=k
+                  req["appsrv"]=k
                   req["monid"]=item["monid"]
                   req["srvid"]=uid
-                  ret["srvtype"]=item["type"]
+                  req["srvtype"]=item["type"]
+                  req["errormessage"]="Server not available"
+                  req["alerttime"]=current_time
                   makerequest.postMonAl(webssl,website,json.dumps(req))
            except subprocess.CalledProcessError as e:
-             classes.Err("avlCheck err:"+e.output)
+             classes.Err("avlCheck err:"+str(e.output))
 except Exception as err:
    classes.Err("No such configuration file - config/conftrack.json."+err) 
 
