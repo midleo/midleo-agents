@@ -1,6 +1,10 @@
+filebeat.modules:
 - module: ibmmq
   errorlog:
     enabled: true
     var.paths: ["/var/mqm/qmgrs/*/errors/*.json"]
     json.keys_under_root: true
     json.message_key: message
+    
+output.logstash:
+   hosts: ["${LOGSTASH_HOST}:5044"]
