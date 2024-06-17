@@ -18,15 +18,15 @@
   template:
     src: templates/python/midleo_client.py
     dest: "{{agent_install_dir}}midleo_client.py"
-    owner: root
-    group: root
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
     mode: '0644'
 - name: "creage agent script"
   template:
     src: templates/python/magent.sh
     dest: "{{agent_install_dir}}magent.sh"
-    owner: root
-    group: root
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
     mode: '0755'
 - name: "check exist agentconfig"
   stat: "path={{agent_install_dir}}config/agentConfig.json"
@@ -35,16 +35,16 @@
   template:
     src: templates/agentConfig.json.j2
     dest: "{{agent_install_dir}}config/agentConfig.json"
-    owner: root
-    group: root
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
     mode: '0644'
   when: not st_agcfg.stat.exists
 - name: "upload modules scripts"
   template:
     src: '{{ item.src }}'
     dest: "{{agent_install_dir}}modules/{{ item.path }}"
-    owner: root
-    group: root
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
     mode: 'a+x'
     force: yes
   with_filetree: templates/python/modules
@@ -52,8 +52,8 @@
   file:
     src: '{{ item.src }}'
     dest: "{{agent_install_dir}}resources/{{ item.path }}"
-    owner: root
-    group: root
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
     mode: 'a+x'
     force: yes
   with_filetree: templates/python/resources
@@ -100,7 +100,7 @@
     weekday: "*/2"
     minute: "0"
     hour: "1"
-    user: root
+    user: "{{midleo_mwuser}}"
     job: "service midleoagent stop && sleep 5 && service midleoagent start"
     cron_file: midleoagent
 ...

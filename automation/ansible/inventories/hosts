@@ -1,9 +1,9 @@
 [windows]
-windowshost1 midleo_website_base_url="MIDLEO_BASE_URL" midleo_website_base_url_ssl="n" group_id="middleware_team" update_interval_minutes="5"
+windowshost1 group_id="middleware_team" 
 
 
 [linux]
-linuxhost1 midleo_website_base_url="MIDLEO_BASE_URL" midleo_website_base_url_ssl="y" group_id="middleware_team" update_interval_minutes="5"
+linuxhost1 group_id="middleware_team" 
 
 
 [windows:vars]
@@ -13,8 +13,16 @@ ansible_winrm_transport='ntlm'
 ansible_winrm_server_cert_validation='ignore'
 ansible_user='{{win_user}}'
 ansible_password='{{win_pass}}'
+midleo_website_base_url="MIDLEO_BASE_URL"
+midleo_website_base_url_ssl="n"
+update_interval_minutes="5"
+midleo_mwuser="mwadmin"
 
 [linux:vars]
+midleo_website_base_url="MIDLEO_BASE_URL"
+midleo_website_base_url_ssl="n"
+update_interval_minutes="5"
+midleo_mwuser="mwadmin"
 
 [middleware:children]
 linux

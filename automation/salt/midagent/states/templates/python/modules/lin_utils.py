@@ -64,13 +64,27 @@ def getMemory():
 def getDiskPartitions():
     try:
         partitions = []
-        for disk in psutil.disk_partitions():
+        for disk in psutil.disk_partitions(all=True):
             partition = {}
-            for field in disk._fields:
-                partition[field] = getattr(disk, field)
+            try:
+               fields=disk._fields
+               for field in fields:
+                  try:
+                      partition[field] = getattr(disk, field)
+                  except:
+                      pass
+            except:
+                pass
             disk_usage = {}
-            for field in psutil.disk_usage(disk.mountpoint)._fields:
-                disk_usage[field] = getattr(psutil.disk_usage(disk.mountpoint), field)
+            try:
+                fields=psutil.disk_usage(disk.mountpoint)._fields
+                for field in fields:
+                   try:
+                       disk_usage[field] = getattr(psutil.disk_usage(disk.mountpoint), field)
+                   except:
+                       pass
+            except:
+                pass
             partition['disk_usage'] = disk_usage
             partitions.append(partition)
         return partitions

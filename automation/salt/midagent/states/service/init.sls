@@ -2,6 +2,7 @@
 
 {% set agent_install_dir = salt['pillar.get']('midagent_vars:agent_install_dir') %}
 {% set python_install_dir = salt['pillar.get']('midagent_vars:python_install_dir') %}
+{% set mwuser = salt['pillar.get']('midagent_vars:mwuser') %}
 {% set midleo_website_base_url = salt['pillar.get']('INPUT:midleo_website_base_url') %}
 {% set midleo_website_base_url_ssl = salt['pillar.get']('INPUT:midleo_website_base_url_ssl') %}
 {% set group_id = salt['pillar.get']('INPUT:group_id') %}
@@ -10,11 +11,31 @@
 
 {% set agent_unique_id = salt['random.get_str'](length=16,chars='abcdefABCDEF0123456789') %}
 
+midagent_create_group:
+   group.present:
+      - name: {{mwuser}}
+
+midagent_create_user:
+   user.present:
+      - name: {{mwuser}}
+      - fullname: "Middleware admin local user"
+      - createhome: True
+      - shell: /bin/bash
+      - groups:
+         - {{mwuser}}
+
+#add aditional groups if exist
+midagent_add_docker:
+  user.present:
+    - optional_groups:
+      - docker
+    - remove_groups: False
+
 {{agent_install_dir}}:
   file.directory:
     - name: {{agent_install_dir}}
-    - user: root
-    - group: root
+    - user: {{mwuser}}
+    - group: {{mwuser}}
     - dir_mode: 755
     - makedirs: True
 
@@ -22,16 +43,16 @@
 {{agent_install_dir}}{{ dir }}:
   file.directory:
     - name: {{agent_install_dir}}{{ dir }}
-    - user: root
-    - group: root
+    - user: {{mwuser}}
+    - group: {{mwuser}}
     - dir_mode: 755
     - makedirs: True
 {% endfor %}
 
 midagent_create_client:
   file.managed:
-    - user: root
-    - group: root
+    - user: {{mwuser}}
+    - group: {{mwuser}}
     - mode: '0755'
     - template: jinja
     - names:
@@ -40,8 +61,8 @@ midagent_create_client:
 
 midagent_create_script:
   file.managed:
-    - user: root
-    - group: root
+    - user: {{mwuser}}
+    - group: {{mwuser}}
     - mode: '0755'
     - template: jinja
     - names:
@@ -50,8 +71,8 @@ midagent_create_script:
 
 midagent_create_scriptcron:
   file.managed:
-    - user: root
-    - group: root
+    - user: {{mwuser}}
+    - group: {{mwuser}}
     - mode: '0755'
     - template: jinja
     - names:
@@ -60,8 +81,8 @@ midagent_create_scriptcron:
 
 midagent_create_client_modules:
   file.recurse:
-    - user: root
-    - group: root
+    - user: {{mwuser}}
+    - group: {{mwuser}}
     - dir_mode: 2775
     - file_mode: '0644'
     - makedirs: True
@@ -71,8 +92,8 @@ midagent_create_client_modules:
 
 midagent_create_client_resources:
   file.recurse:
-    - user: root
-    - group: root
+    - user: {{mwuser}}
+    - group: {{mwuser}}
     - dir_mode: 2775
     - file_mode: '0644'
     - makedirs: True
@@ -83,8 +104,8 @@ midagent_create_client_resources:
 {% if not salt['file.file_exists'](agent_install_dir+'config/agentConfig.json') %}
 midagent_create_config:
   file.managed:
-    - user: root
-    - group: root
+    - user: {{mwuser}}
+    - group: {{mwuser}}
     - mode: '0755'
     - template: jinja
     - names:
@@ -100,8 +121,8 @@ midagent_create_config:
 
 midagent_create_service:
   file.managed:
-    - user: root
-    - group: root
+    - user: {{mwuser}}
+    - group: {{mwuser}}
     - mode: '0755'
     - template: jinja
     - names:
@@ -110,6 +131,7 @@ midagent_create_service:
     - context:
         agent_install_dir: "{{agent_install_dir}}"
         python_install_dir: "{{python_install_dir}}"
+        mwuser: "{{mwuser}}"
 
 midagent.service:
    service.running:
@@ -129,7 +151,7 @@ midagent.cron:
 midagent.cronjob:
   cron.present:
     - name: {{agent_install_dir}}cronjobs.sh \;
-    - user: root
+    - user: {{mwuser}}
     - minute: '*'
     - hour: '*'
     - daymonth: '*'
