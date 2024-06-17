@@ -21,6 +21,8 @@ midagent_create_user:
       - fullname: "Middleware admin local user"
       - createhome: True
       - shell: /bin/bash
+      - gid: {{mwuser}}
+      - allow_gid_change: True
       - groups:
          - {{mwuser}}
 
