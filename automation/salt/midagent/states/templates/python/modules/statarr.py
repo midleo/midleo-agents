@@ -26,4 +26,6 @@ def avlCheck(thisapp):
     arr["ibmmq"]="echo 'DISPLAY QMSTATUS' | "+os.environ['RUNMQSC']+" "+thisapp+" | grep RUNNING | wc -l"
     arr["ibmace"]="su "+os.environ['ACEUSR']+" -c '. "+os.environ['MQSIPROFILE']+" && mqsilist' | grep "+thisapp+" | grep running | wc -l"
     arr["ibmacedocker"]="/usr/bin/docker exec -t ibmace /bin/bash -c '. "+os.environ['MQSIPROFILE']+" &&  mqsilist' | grep "+thisapp+" | grep running | wc -l"
+    arr["axwaycft"]="ps -ef|grep CFTMAIN | wc -l"
+    arr["axwayst"]=""
     return arr
