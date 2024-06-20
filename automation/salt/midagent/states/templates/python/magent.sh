@@ -226,6 +226,7 @@ else:
 USR="$USR"
 APPSRV="$1"
 APPSRVTYPE="$2"
+DOCKERCONT="$3"
 
 def createAvlJson():
    try:
@@ -236,7 +237,8 @@ def createAvlJson():
    avl_data[APPSRV] = {
      "type": APPSRVTYPE,
      "enabled": "yes",
-     "monid": "applavlmon"
+     "monid": "monapplavl",
+     "dockercont": DOCKERCONT
    }
 
    with open(os.getcwd()+"/config/confavl.json", 'w+') as avl_file:
@@ -513,7 +515,7 @@ case "$1" in
         $0
         exit 1
       fi
-      enableavl $2 $3
+      enableavl $2 $3 $4
       ;;
    disableavl )
       if [ -z "$2" ]
@@ -586,7 +588,7 @@ case "$1" in
       echo "   -  $0 delcert LABEL"
       echo "   -  $0 addstat"
       echo "   -  $0 delstat FILE_PATH"
-      echo "   -  $0 enableavl APP_SERVER SERVER_TYPE"
+      echo "   -  $0 enableavl APP_SERVER SERVER_TYPE DOCKER_CONTAINER(In case it is working on Docker)"
       echo "   -  $0 disableavl APP_SERVER"
       echo "   -  $0 stopavl APP_SERVER comment"
       echo "   -  $0 startavl APP_SERVER"

@@ -71,11 +71,14 @@ try:
    uid = config_data['uid']
    if len(avl_data)>0:
       for k,item in avl_data.items():
-         ret=statarr.avlCheck(k)
+         if("dockercont" in item):
+            ret=statarr.avlCheck(k,item["dockercont"])
+         else:
+            ret=statarr.avlCheck(k)
          if(item["enabled"]=='yes'):
            ret=ret[item["type"]]
            try:
-             output = subprocess.run(ret,shell=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+             output = subprocess.run(ret,shell=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
              output = output.stdout.decode()
              if(int(output)==1):
                classes.WriteData("online","avl_"+k+".csv")
@@ -87,7 +90,7 @@ try:
                   req["monid"]=item["monid"]
                   req["srvid"]=uid
                   req["srvtype"]=item["type"]
-                  req["errormessage"]="Server not available"
+                  req["message"]="Server not available"
                   req["alerttime"]=current_time
                   makerequest.postMonAl(webssl,website,json.dumps(req))
            except subprocess.CalledProcessError as e:

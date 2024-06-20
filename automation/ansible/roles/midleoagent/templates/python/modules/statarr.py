@@ -21,11 +21,13 @@ def ibmaceODBC():
     arr["keys"]["used"]=8
     return arr
 
-def avlCheck(thisapp):
+def avlCheck(thisapp,dcont=""):
     arr={}
     arr["ibmmq"]="echo 'DISPLAY QMSTATUS' | "+os.environ['RUNMQSC']+" "+thisapp+" | grep RUNNING | wc -l"
     arr["ibmace"]="su "+os.environ['ACEUSR']+" -c '. "+os.environ['MQSIPROFILE']+" && mqsilist' | grep "+thisapp+" | grep running | wc -l"
-    arr["ibmacedocker"]="/usr/bin/docker exec -t ibmace /bin/bash -c '. "+os.environ['MQSIPROFILE']+" &&  mqsilist' | grep "+thisapp+" | grep running | wc -l"
+    arr["ibmacedocker"]="/usr/bin/docker exec -t "+dcont+" /bin/bash -c '. "+os.environ['MQSIPROFILE']+" &&  mqsilist' | grep "+thisapp+" | grep running | wc -l"
+    arr["ibmiib"]="su "+os.environ['ACEUSR']+" -c '. "+os.environ['MQSIPROFILE']+" && mqsilist' | grep "+thisapp+" | grep running | wc -l"
+    arr["ibmiibdocker"]="/usr/bin/docker exec -t "+dcont+" /bin/bash -c '. "+os.environ['MQSIPROFILE']+" &&  mqsilist' | grep "+thisapp+" | grep running | wc -l"
     arr["axwaycft"]="ps -ef|grep CFTMAIN | wc -l"
     arr["axwayst"]=""
     return arr
