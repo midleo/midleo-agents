@@ -9,3 +9,5 @@ automation/ansible/roles/midleoagent/templates/python/config/
 automation/ansible/roles/midleoagent/templates/python/logs/
 automation/salt/midagent/states/templates/python/logs/midleoagent.log
 automation/salt/midagent/states/templates/python/__pycache__/
+automation/salt/midagent/states/templates/python/modules/base/__pycache__/
+automation/salt/midagent/states/templates/python/modules/statistics/__pycache__/

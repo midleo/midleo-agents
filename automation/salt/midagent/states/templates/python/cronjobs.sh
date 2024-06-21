@@ -14,6 +14,7 @@ RUNMQSC=/opt/mqm/bin/runmqsc
 AMQSEVT=/opt/mqm/bin/amqsevt
 ACEUSR=mqbrk
 MQSIPROFILE=/opt/ibm/ace/server/bin/mqsiprofile
+PYTHON=/usr/bin/python3
 
 export DSPMQ
 export DSPMQVER
@@ -48,7 +49,7 @@ fi
 
 runappavl(){
 if [ -e "$HOMEDIR/confavl.json" ]; then
-  /var/mqm/python/venv/bin/python3 << EOF
+  $PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs,statarr
@@ -104,7 +105,7 @@ fi
 
 resetappavl (){
 if [ -e "$HOMEDIR/confavl.json" ]; then
-  /var/mqm/python/venv/bin/python3 << EOF
+  $PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs,statarr,file_utils
@@ -145,7 +146,7 @@ fi
 
 runmqtracker (){
 if [ -f $HOMEDIR"/conftrack.json" ]; then
-    /var/mqm/python/venv/bin/python3 << EOF
+    $PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
@@ -205,7 +206,7 @@ fi
 }
 
 runmqmon(){
-/var/mqm/python/venv/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
@@ -239,7 +240,7 @@ EOF
 }
 
 runmqweb(){
-/var/mqm/python/venv/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,requests
 from datetime import datetime
 from modules.base import makerequest,classes,configs
@@ -276,7 +277,7 @@ EOF
 
 runappstat(){
 if [ -f $HOMEDIR"/statlist.json" ]; then
-   /var/mqm/python/venv/bin/python3 << EOF
+   $PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,glob
 from datetime import datetime
 from modules.base import makerequest,classes,configs,file_utils,statarr

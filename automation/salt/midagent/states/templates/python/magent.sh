@@ -14,6 +14,7 @@ RUNMQSC=/opt/mqm/bin/runmqsc
 AMQSEVT=/opt/mqm/bin/amqsevt
 ACEUSR=mqbrk
 MQSIPROFILE=/opt/ibm/ace/server/bin/mqsiprofile
+PYTHON=/usr/bin/python3
 
 export DSPMQ
 export DSPMQVER
@@ -72,7 +73,7 @@ create_config (){
 }
 
 addcert(){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,decrypt,classes,configs
@@ -116,7 +117,7 @@ EOF
 }
 
 delcert(){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
@@ -142,7 +143,7 @@ EOF
 }
 
 addstat(){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
@@ -187,7 +188,7 @@ EOF
 }
 
 delstat(){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
@@ -213,7 +214,7 @@ EOF
 }
 
 enableavl(){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
 from modules.base import classes,configs
@@ -253,7 +254,7 @@ EOF
 }
 
 disableavl(){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
 from modules.base import classes,configs
@@ -281,7 +282,7 @@ EOF
 }
 
 stopavl(){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
 from modules.base import classes,configs
@@ -314,7 +315,7 @@ EOF
 }
 
 startavl(){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
 from modules.base import classes,configs
@@ -346,7 +347,7 @@ EOF
 }
 
 enabletrackqm (){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
@@ -381,7 +382,7 @@ EOF
 }
 
 disabletrackqm (){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
@@ -407,7 +408,7 @@ EOF
 }
 
 addmon(){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
@@ -452,7 +453,7 @@ EOF
 }
 
 delmon(){
-/usr/bin/python3 << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
