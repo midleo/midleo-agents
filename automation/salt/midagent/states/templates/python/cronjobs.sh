@@ -39,24 +39,24 @@ load_config ()
 
 runmqjob (){
 JAVA_OPTS="-Djava.library.path=$ibmmqlibpath"
-if [ -n "$mainver" ] && [ $mainver -gt 8 ]; then
-  runmqweb $ibmmqwebssl $mqwebhost $mqwebport $ibmmqwebusr $ibmmqwebusrpwd
-else
+if [ -n "$mqclienttype" ] && [ $mqclienttype == "bindings" ]; then
   runmqmon $JAVA_OPTS
+else
+  runmqweb $ibmmqwebssl $mqwebhost $mqwebport $ibmmqwebusr $ibmmqwebusrpwd
 fi
 }
 
 runappavl(){
 if [ -e "$HOMEDIR/confavl.json" ]; then
-  /usr/bin/python3 << EOF
+  /var/mqm/python/venv/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs,statarr
+from modules.base import makerequest,classes,configs,statarr
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -104,15 +104,15 @@ fi
 
 resetappavl (){
 if [ -e "$HOMEDIR/confavl.json" ]; then
-  /usr/bin/python3 << EOF
+  /var/mqm/python/venv/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs,statarr,file_utils
+from modules.base import makerequest,classes,configs,statarr,file_utils
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -145,15 +145,15 @@ fi
 
 runmqtracker (){
 if [ -f $HOMEDIR"/conftrack.json" ]; then
-    /usr/bin/python3 << EOF
+    /var/mqm/python/venv/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs
+from modules.base import makerequest,classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -205,14 +205,15 @@ fi
 }
 
 runmqmon(){
-/usr/bin/python3 << EOF
+/var/mqm/python/venv/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs
+from modules.base import makerequest,classes,configs
+from modules.statistics.ibmmq import getstat
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -226,8 +227,10 @@ try:
    for qm in mon_data:
       value = mon_data[qm]
       for q,val in value.items():
-         qinfo=makerequest.getJQstat(JAVA_OPTS,qm,q,val["thres"])
-         if(qinfo!="{}" and qinfo is not None):
+#         qinfo=makerequest.getJQstat(JAVA_OPTS,qm,q,val["thres"])
+         qinfo=getstat.getStat(qm,q)
+         print(qinfo)
+         if(qinfo!="{}" and qinfo!="" and qinfo is not None):
            makerequest.postQData(webssl,website,qm,q,qinfo)
 except Exception as err:
    classes.Err("MQMON not configured err:"+err)
@@ -236,14 +239,14 @@ EOF
 }
 
 runmqweb(){
-/usr/bin/python3 << EOF
+/var/mqm/python/venv/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,requests
 from datetime import datetime
-from modules import makerequest,classes,configs
+from modules.base import makerequest,classes,configs
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -273,15 +276,15 @@ EOF
 
 runappstat(){
 if [ -f $HOMEDIR"/statlist.json" ]; then
-   /usr/bin/python3 << EOF
+   /var/mqm/python/venv/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,glob
 from datetime import datetime
-from modules import makerequest,classes,configs,file_utils,statarr
+from modules.base import makerequest,classes,configs,file_utils,statarr
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit() 
 

@@ -1,16 +1,16 @@
 import base64,platform,json,re,time,subprocess,socket,os,zlib, glob
 from multiprocessing import Process
 from datetime import datetime
-from modules import makerequest,decrypt,classes,certcheck,configs,file_utils,statarr
+from modules.base import makerequest,decrypt,classes,certcheck,configs,file_utils,statarr
 
 PORT_NUMBER = 5550
 SIZE = 1024
-AGENT_VER = "1.24.07"
+AGENT_VER = "1.24.08"
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 

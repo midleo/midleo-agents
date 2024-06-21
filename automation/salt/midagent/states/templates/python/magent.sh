@@ -48,6 +48,7 @@ create_config (){
        rm $HOMEDIR/"midleoclient.conf"
     else
        echo ibmmqlibpath=$ibmmqlibpath >> $HOMEDIR/"midleoclient.conf"
+       echo mqclienttype=bindings >> $HOMEDIR/"midleoclient.conf"
     fi
     if test -f "$DSPMQVER"; then
       mainver=`$DSPMQVER | grep Version | awk '{print $2}' | cut -d '.' -f 1`
@@ -74,12 +75,12 @@ addcert(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,decrypt,classes,configs
+from modules.base import makerequest,decrypt,classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -118,12 +119,12 @@ delcert(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs
+from modules.base import makerequest,classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -144,12 +145,12 @@ addstat(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs
+from modules.base import makerequest,classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -189,12 +190,12 @@ delstat(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs
+from modules.base import makerequest,classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -215,12 +216,12 @@ enableavl(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
-from modules import classes,configs
+from modules.base import classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 USR="$USR"
@@ -255,12 +256,12 @@ disableavl(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
-from modules import classes,configs
+from modules.base import classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -283,12 +284,12 @@ stopavl(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
-from modules import classes,configs
+from modules.base import classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -316,12 +317,12 @@ startavl(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
-from modules import classes,configs
+from modules.base import classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -348,12 +349,12 @@ enabletrackqm (){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs
+from modules.base import makerequest,classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -383,12 +384,12 @@ disabletrackqm (){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs
+from modules.base import makerequest,classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -409,12 +410,12 @@ addmon(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs
+from modules.base import makerequest,classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
@@ -454,12 +455,12 @@ delmon(){
 /usr/bin/python3 << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
-from modules import makerequest,classes,configs
+from modules.base import makerequest,classes,configs
 
 if platform.system()=="Linux":
-   from modules import lin_utils,lin_packages
+   from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
-   from modules import win_utils
+   from modules.base import win_utils
 else:
    exit()
 
