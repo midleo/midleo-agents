@@ -27,7 +27,7 @@ def postQData(webssl,website,qm,q,data):
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
 
-def getQStat(webssl,website,webport,qmgr,queue,usr,passwd):
+def getQRestStat(webssl,website,webport,qmgr,queue,usr,passwd):
     headers = {'Content-Type': 'text/plain', 'charset':'utf-8', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
     try:
         res = requests.get('http'+('s' if webssl=="y" else '')+'://'+website+':'+webport+'/ibmmq/rest/v1/admin/qmgr/'+qmgr+'/queue/'+queue+'?type=local&attributes=storage.maximumDepth&status=status', verify=False, headers=headers, auth=(usr, base64.b64decode(passwd).decode('utf-8').rstrip()))
@@ -37,14 +37,6 @@ def getQStat(webssl,website,webport,qmgr,queue,usr,passwd):
           return '{}'
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
-
-def getJQstat(JAVA_OPTS,qmgr,queue,thres):
-    try:
-       qinfo = subprocess.run("java "+JAVA_OPTS+" -jar "+os.getcwd()+"/resources/midleomon.jar"+" '{\"function\":\"QSTAT\",\"qmanager\":\""+qmgr+"\",\"alertnum\":\""+thres+"\"}' \""+queue+"\"", shell=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
-       output = qinfo.stdout.decode()
-       return output
-    except subprocess.CalledProcessError as e:
-       classes.Err("Exception:"+str(e.output))
 
 def postTrackData(webssl,website,thisdata):
     headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'User-Agent': 'MWAdmin v.'+AGENT_VER}

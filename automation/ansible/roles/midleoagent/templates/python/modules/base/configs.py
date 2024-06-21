@@ -10,7 +10,7 @@ def getcfgData():
    
 def getmonData():
    try:
-      with open(os.getcwd()+"/config/confmon.json", 'r') as mon_file:
+      with open(os.getcwd()+"/config/confapplstat.json", 'r') as mon_file:
          mon_data=json.load(mon_file)
    except:
       mon_data={}

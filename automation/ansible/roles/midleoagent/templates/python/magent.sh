@@ -27,51 +27,6 @@ YM=$(date '+%Y-%m')
 WD=$(date '+%d')
 HOUR=$(date '+%H%M')
 
-load_config ()
-{
-   if [ -e "$HOMEDIR/midleoclient.conf" ]; then
-      . $HOMEDIR/midleoclient.conf
-   else
-      create_config
-   fi
-}
-create_config (){
-    echo "Midleo DNS server name:"
-    read midleodns
-    if [ -z "${midleodns}" ]; then
-       rm $HOMEDIR/"midleoclient.conf"
-    else
-       echo "midleodns=$midleodns" > $HOMEDIR/"midleoclient.conf"
-    fi
-    echo "IBM MQ library path(example - /opt/mqm/java/lib64):"
-    read ibmmqlibpath
-    if [ -z "${ibmmqlibpath}" ]; then
-       rm $HOMEDIR/"midleoclient.conf"
-    else
-       echo ibmmqlibpath=$ibmmqlibpath >> $HOMEDIR/"midleoclient.conf"
-       echo mqclienttype=bindings >> $HOMEDIR/"midleoclient.conf"
-    fi
-    if test -f "$DSPMQVER"; then
-      mainver=`$DSPMQVER | grep Version | awk '{print $2}' | cut -d '.' -f 1`
-      echo mainver=$mainver >> $HOMEDIR/"midleoclient.conf"
-    fi
-    if [ -n "$mainver" ] && [ $mainver -gt 8 ]; then
-      echo mqwebhost=`hostname -f` >> $HOMEDIR/"midleoclient.conf"
-      echo "IBM MQWeb user:"
-      read ibmmqwebusr
-      echo ibmmqwebusr=$ibmmqwebusr >> $HOMEDIR/"midleoclient.conf"
-      echo "IBM MQWeb password:"
-      read -s ibmmqwebusrpwd
-      echo ibmmqwebusrpwd=`echo $ibmmqwebusrpwd | base64`  >> $HOMEDIR/"midleoclient.conf"
-      echo "IBM MQWeb SSL enabled(y/n):"
-      read ibmmqwebssl
-      echo ibmmqwebssl=$ibmmqwebssl >> $HOMEDIR/"midleoclient.conf"
-      echo "IBM MQWeb port:"
-      read mqwebport
-      echo mqwebport=$mqwebport >> $HOMEDIR/"midleoclient.conf"
-    fi
-}
-
 addcert(){
 $PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
@@ -407,7 +362,7 @@ print(QMGR+" configuration deleted")
 EOF
 }
 
-addmon(){
+addappstat(){
 $PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
@@ -420,10 +375,9 @@ elif platform.system()=="Windows":
 else:
    exit()
 
-QMGR="$1"
-QUEUE="$2"
-TMON="$3"
-THRES="$4"
+SRVTYPE="$1"
+APPSRV="$2"
+STDATA='$3'
 
 def createMonJson():
    try:
@@ -431,20 +385,24 @@ def createMonJson():
    except Exception as err:
       mon_data = {}
    try:
-     mon_data[QMGR][QUEUE] = {
-      "type": TMON,
-      "thres": THRES
-     }
+      STJSDATA=json.loads(STDATA)
+   except Exception as err:
+      STJSDATA={}
+   try:
+     for k,item in STJSDATA.items():
+         mon_data[SRVTYPE][APPSRV][k] = item
    except Exception as err: 
-     mon_data[QMGR] = {}
-     mon_data[QMGR][QUEUE] = {
-      "type": TMON,
-      "thres": THRES
-     }
+     try:
+        mon_data[SRVTYPE][APPSRV] = {}
+     except Exception as err:
+        mon_data[SRVTYPE] = {}
+        mon_data[SRVTYPE][APPSRV] = {}
+     for k,item in STJSDATA.items():
+         mon_data[SRVTYPE][APPSRV][k] = item
 
-   with open(os.getcwd()+"/config/confmon.json", 'w+') as mon_file:
+   with open(os.getcwd()+"/config/confapplstat.json", 'w+') as mon_file:
       json.dump(mon_data, mon_file)
-   print(QUEUE+" on "+QMGR+" have been added")
+   print(APPSRV+" of type "+SRVTYPE+" have been added")
     
 if __name__ == "__main__":
    createMonJson()
@@ -452,7 +410,7 @@ if __name__ == "__main__":
 EOF
 }
 
-delmon(){
+delappstat(){
 $PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
@@ -465,17 +423,17 @@ elif platform.system()=="Windows":
 else:
    exit()
 
-QMGR="$1"
-QUEUE="$2"
+SRVTYPE="$1"
+APPSRV="$2"
 
 try:
    mon_data = configs.getmonData()
 except Exception as err:
-   print("No such configuration file - config/confmon.json")
-mon_data[QMGR].pop(QUEUE, None)
-with open(os.getcwd()+"/config/confmon.json", 'w+') as mon_file:
+   print("No such configuration file - config/confapplstat.json")
+mon_data[SRVTYPE].pop(APPSRV, None)
+with open(os.getcwd()+"/config/confapplstat.json", 'w+') as mon_file:
    json.dump(mon_data, mon_file)
-print(QUEUE+" configuration deleted")
+print(APPSRV+" configuration deleted")
 EOF
 }
 
@@ -543,27 +501,16 @@ case "$1" in
       fi
       startavl $2
       ;;
-   addmonq )
-      addmon $2 $3 $4 $5
+   addappstat )
+      addappstat $2 $3 $4
       ;;
-   addmonchl )
-      addmon $2 $3 "CHANNELS"
-      ;;
-   delmonq )
+   delappstat )
       if [ -z "$2" ]
       then
         $0
         exit 1
       fi
-      delmon $2 $3
-      ;;
-   delmonchl )
-      if [ -z "$2" ]
-      then
-        $0
-        exit 1
-      fi
-      delmon $2 $3
+      delappstat $2 $3
       ;;
    enabletrackqm )
       if [ -z "$2" ]
@@ -594,13 +541,10 @@ case "$1" in
       echo "   -  $0 disableavl APP_SERVER"
       echo "   -  $0 stopavl APP_SERVER comment"
       echo "   -  $0 startavl APP_SERVER"
-      echo "   -  $0 addconf QMGR WebUser(Optional) WebPassword(Optional)"
-      echo "   -  $0 addmonq QMGR QUEUE TYPE_OF_MON THRESHOLD"
-      echo "   -  $0 delmonq QMGR QUEUE"
+      echo "   -  $0 addappstat SRV_TYPE APPSRV '{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\"}'"
+      echo "   -  $0 delappstat SRV_TYPE APPSRV"
       echo "   -  $0 enabletrackqm QMGR # Transfer the mqat.ini file to /var/mqm/qmgr/QMGR/ folder"
       echo "   -  $0 disabletrackqm QMGR"
-      echo "   -  $0 addmonchl QMGR CHANNEL"
-      echo "   -  $0 delmonchl QMGR CHANNEL"
       echo ""
       echo "Parameters:"
       echo "   -  TYPE_OF_MON: QAGE - monitor queue age, QFULL - monitor percentage of maxdepth/curdepth"

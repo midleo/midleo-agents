@@ -31,22 +31,6 @@ if [[ ! -e $HOMEDIR ]]; then
     mkdir $HOMEDIR
 fi
 
-load_config ()
-{
-   if [ -e "$HOMEDIR/midleoclient.conf" ]; then
-      . $HOMEDIR/midleoclient.conf
-   fi
-}
-
-runmqjob (){
-JAVA_OPTS="-Djava.library.path=$ibmmqlibpath"
-if [ -n "$mqclienttype" ] && [ $mqclienttype == "bindings" ]; then
-  runmqmon $JAVA_OPTS
-else
-  runmqweb $ibmmqwebssl $mqwebhost $mqwebport $ibmmqwebusr $ibmmqwebusrpwd
-fi
-}
-
 runappavl(){
 if [ -e "$HOMEDIR/confavl.json" ]; then
   $PYTHON << EOF
@@ -145,8 +129,7 @@ fi
 }
 
 runmqtracker (){
-if [ -f $HOMEDIR"/conftrack.json" ]; then
-    $PYTHON << EOF
+$PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
@@ -202,15 +185,18 @@ except Exception as err:
    classes.Err("No such configuration file - config/conftrack.json."+err) 
 
 EOF
-fi
 }
 
-runmqmon(){
+getapplstat(){
 $PYTHON << EOF
 import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
 from datetime import datetime
 from modules.base import makerequest,classes,configs
-from modules.statistics.ibmmq import getstat
+for entry in os.scandir('modules/statistics'):
+    if entry.is_dir() and entry.name!='__pycache__':
+       string = f'from modules.statistics.{entry.name} import {entry.name}'
+       exec (string)
+
 if platform.system()=="Linux":
    from modules.base import lin_utils,lin_packages
 elif platform.system()=="Windows":
@@ -218,62 +204,27 @@ elif platform.system()=="Windows":
 else:
    exit()
 
-JAVA_OPTS="$1"
-
 try:
    mon_data = configs.getmonData()
    config_data = configs.getcfgData()
    website = config_data['website']
    webssl = config_data['webssl']
-   for qm in mon_data:
-      value = mon_data[qm]
-      for q,val in value.items():
-#         qinfo=makerequest.getJQstat(JAVA_OPTS,qm,q,val["thres"])
-         qinfo=getstat.getStat(qm,q)
-         print(qinfo)
-         if(qinfo!="{}" and qinfo!="" and qinfo is not None):
-           makerequest.postQData(webssl,website,qm,q,qinfo)
+   for k,item in mon_data.items():
+       for q,val in item.items():
+          qinfo=eval(k+'.getStat(q,json.dumps(val))')
+          print(qinfo)
+ #         if(qinfo!="{}" and qinfo!="" and qinfo is not None):
+ #          makerequest.postQData(webssl,website,qm,q,qinfo)
+       exit()
+       
+
+  
 except Exception as err:
    classes.Err("MQMON not configured err:"+err)
 
 EOF
 }
 
-runmqweb(){
-$PYTHON << EOF
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,requests
-from datetime import datetime
-from modules.base import makerequest,classes,configs
-if platform.system()=="Linux":
-   from modules.base import lin_utils,lin_packages
-elif platform.system()=="Windows":
-   from modules.base import win_utils
-else:
-   exit()
-
-SSL="$1"
-HOST="$2"
-PORT="$3"
-USR="$4"
-PASS="$5"
-
-try:
-   mon_data = configs.getmonData()
-   config_data = configs.getcfgData()
-   website = config_data['website']
-   webssl = config_data['webssl']
-
-   for qm in mon_data:
-     value = mon_data[qm]
-     for q,val in value.items():
-       qinfo=makerequest.getQStat(SSL,HOST,PORT,qm,q,USR,PASS)
-       if(qinfo!="{}" and qinfo is not None):
-         makerequest.postQData(webssl,website,qm,q,qinfo)
-except Exception as err:
-   classes.Err("MQWEB not configured err:"+err)
-   
-EOF
-}
 
 runappstat(){
 if [ -f $HOMEDIR"/statlist.json" ]; then
@@ -320,9 +271,10 @@ case "$1" in
       echo "Used for background processes"
       ;;
     * )
-      load_config
-      if [ -n "$mainver" ]; then
-         runmqjob
+      if [ -f $HOMEDIR"/confapplstat.json" ]; then
+         getapplstat
+      fi
+      if [ -f $HOMEDIR"/conftrack.json" ]; then
          runmqtracker
       fi
       runappstat
