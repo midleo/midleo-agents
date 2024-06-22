@@ -1,5 +1,6 @@
 import pymqi, json
-from modules.base import classes
+from modules.base import classes, file_utils
+from datetime import datetime
 
 def qmConn(thisqm):
     try:
@@ -24,9 +25,12 @@ def qStat(thisqm,q,queues):
         pcf = pymqi.PCFExecute(thisqm, response_wait_interval=5000)
         response = pcf.MQCMD_INQUIRE_Q(args, filters)
         for queue_info in response:
+            now = datetime.now()
             qname = queue_info[pymqi.CMQC.MQCA_Q_NAME].decode('utf-8').strip()
             if(qname):
                queues[qname]={}
+               queues[qname]["name"] = qname
+               queues[qname]["now"] = now.strftime("%Y-%m-%d %H:%M:%S")
                queues[qname]["curdepth"] = queue_info[pymqi.CMQC.MQIA_CURRENT_Q_DEPTH]
                queues[qname]["maxdepth"] = queue_info[pymqi.CMQC.MQIA_MAX_Q_DEPTH]
                queues[qname]["percfull"] = depthperc(queue_info)
@@ -81,7 +85,6 @@ def qResStat(thisqm,q,queues):
         args.append(pymqi.CFST(Parameter=pymqi.CMQC.MQCA_Q_NAME,
                                 String=q.encode('utf-8')))
         filters = []
-
         pcf = pymqi.PCFExecute(thisqm, response_wait_interval=5000)
         response = pcf.MQCMD_RESET_Q_STATS(args, filters)
         for queue_info in response:
@@ -98,34 +101,95 @@ def qResStat(thisqm,q,queues):
     except pymqi.MQMIError as ex:
         classes.Err("Exception:"+str(ex))
 
+def chStat(thisqm,ch,chls):
+    try:
+      args = []
+      args.append(pymqi.CFST(Parameter=pymqi.CMQCFC.MQCACH_CHANNEL_NAME,
+                                String=ch.encode('utf-8')))
+      args.append(pymqi.CFIL(Parameter=pymqi.CMQCFC.MQIACH_CHANNEL_INSTANCE_ATTRS,
+                                Values=[pymqi.CMQCFC.MQCACH_CHANNEL_NAME,
+                                 pymqi.CMQCFC.MQCACH_CONNECTION_NAME,
+                                 pymqi.CMQCFC.MQIACH_MSGS,
+                                 pymqi.CMQCFC.MQIACH_CHANNEL_STATUS,
+                                 pymqi.CMQCFC.MQIACH_BYTES_SENT,
+                                 pymqi.CMQCFC.MQIACH_BYTES_RECEIVED,
+                                 pymqi.CMQCFC.MQIACH_BUFFERS_SENT,
+                                 pymqi.CMQCFC.MQIACH_BUFFERS_RECEIVED,
+                                 pymqi.CMQCFC.MQIACH_INDOUBT_STATUS,
+                                 pymqi.CMQCFC.MQIACH_CHANNEL_SUBSTATE,
+                                 pymqi.CMQCFC.MQCACH_CHANNEL_START_DATE,
+                                 pymqi.CMQCFC.MQCACH_CHANNEL_START_TIME]))
+      
+      filters = []
+      pcf = pymqi.PCFExecute(thisqm, response_wait_interval=5000)
+      response = pcf.MQCMD_INQUIRE_CHANNEL_STATUS(args, filters)
+      for chl_info in response:
+          now = datetime.now()
+          chlname = chl_info[pymqi.CMQCFC.MQCACH_CHANNEL_NAME].decode('utf-8').strip()
+          if chlname:
+             chls[chlname]={}
+             chls[chlname]["name"] = chlname
+             chls[chlname]["now"] = now.strftime("%Y-%m-%d %H:%M:%S")
+             chls[chlname]["conname"] = chl_info[pymqi.CMQCFC.MQCACH_CONNECTION_NAME].decode('utf-8').strip()
+             chls[chlname]["status"] = chl_st.get(chl_info[pymqi.CMQCFC.MQIACH_CHANNEL_STATUS], "unknown")
+             chls[chlname]["stat"]={}
+             chls[chlname]["stat"].update(chl_info[pymqi.CMQCFC.MQGACF_CHL_STATISTICS_DATA])
+
+
+      return chls
+    except pymqi.MQMIError as ex:
+        classes.Err("Exception:"+str(ex))
+
+chl_st = {
+    pymqi.CMQCFC.MQCHS_INACTIVE: 'inactive',
+    pymqi.CMQCFC.MQCHS_BINDING: 'binding',
+    pymqi.CMQCFC.MQCHS_RETRYING: 'retrying',
+    pymqi.CMQCFC.MQCHS_STARTING: 'starting',
+    pymqi.CMQCFC.MQCHS_RUNNING: 'running',
+    pymqi.CMQCFC.MQCHS_STOPPING: 'stopping',
+    pymqi.CMQCFC.MQCHS_STOPPED: 'stopped',
+    pymqi.CMQCFC.MQCHS_REQUESTING: 'requesting',
+    pymqi.CMQCFC.MQCHS_PAUSED: 'paused',
+    pymqi.CMQCFC.MQCHS_DISCONNECTED: 'disconnected',
+    pymqi.CMQCFC.MQCHS_INITIALIZING: 'initializing',
+    pymqi.CMQCFC.MQCHS_SWITCHING: 'switching',
+}
+
 def getStat(thisqm,inpdata):
-    qminfo={}
     try:
         inpdata=json.loads(inpdata)
         try:
            q=inpdata["queues"]
+           q=q.split(',')
         except:
            q={}
         try:
            chl=inpdata["channels"]
+           chl=chl.split(',')
         except:
            chl={}
         qmgr = qmConn(thisqm)
         if(qmgr!=None):
-            queues={}
-            allq={}
-            q=q.split(',')
+            qdict=[]
+            qdkeys=[]
             for qn in q:
+              queues={}
               queues=qStat(qmgr,qn,queues)
               queues=qStatInfo(qmgr,qn,queues)
               queues=qResStat(qmgr,qn,queues)
               if queues!=None:
-                 allq.update(queues)
+                 for k,v in queues.items():
+                    qdict.append(v)
+                    qdkeys=v.keys()
+                 file_utils.WriteCSV("ibmmq_"+thisqm+"_queues",qdict,qdkeys,'a')
+            for ch in chl:
+                chls={}
+                chls=chStat(qmgr,ch,chls)
+                print(chls)
+
             qmDisc(qmgr)
-            qminfo["queues"]=allq
     except pymqi.MQMIError as ex:
         classes.Err("Exception:"+str(ex))
-    return qminfo
 
 def depthperc(queue_info):
     if pymqi.CMQC.MQIA_CURRENT_Q_DEPTH not in queue_info or pymqi.CMQC.MQIA_MAX_Q_DEPTH not in queue_info:
@@ -134,3 +198,6 @@ def depthperc(queue_info):
     depthmax = queue_info[pymqi.CMQC.MQIA_MAX_Q_DEPTH]
     depthperc = (depthcur / depthmax) * 100
     return depthperc
+
+def resetStat(thisqm):
+    print("ok")

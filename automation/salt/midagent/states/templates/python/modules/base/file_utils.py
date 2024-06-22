@@ -85,3 +85,11 @@ def ReadAvl(logfile):
     else:
       ret={}
     return ret
+
+def WriteCSV(filename,dict,header,type="w"):
+    if dict:
+       with open(os.getcwd()+"/logs/"+filename+".csv", type, newline='') as file:
+          writer = csv.DictWriter(file, fieldnames = header)
+          if type=="w":
+            writer.writeheader()
+          writer.writerows(dict)

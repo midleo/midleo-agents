@@ -16,6 +16,7 @@ ACEUSR=mqbrk
 MQSIPROFILE=/opt/ibm/ace/server/bin/mqsiprofile
 PYTHON=/usr/bin/python3
 
+
 export DSPMQ
 export DSPMQVER
 export AMQSEVT
@@ -26,6 +27,7 @@ export MQSIPROFILE
 YM=$(date '+%Y-%m')
 WD=$(date '+%d')
 HOUR=$(date '+%H%M')
+CM=$(date +%M)
 
 if [[ ! -e $HOMEDIR ]]; then
     mkdir $HOMEDIR
@@ -189,20 +191,12 @@ EOF
 
 getapplstat(){
 $PYTHON << EOF
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
-from datetime import datetime
-from modules.base import makerequest,classes,configs
+import json,os
+from modules.base import classes,configs
 for entry in os.scandir('modules/statistics'):
     if entry.is_dir() and entry.name!='__pycache__':
        string = f'from modules.statistics.{entry.name} import {entry.name}'
        exec (string)
-
-if platform.system()=="Linux":
-   from modules.base import lin_utils,lin_packages
-elif platform.system()=="Windows":
-   from modules.base import win_utils
-else:
-   exit()
 
 try:
    mon_data = configs.getmonData()
@@ -211,59 +205,41 @@ try:
    webssl = config_data['webssl']
    for k,item in mon_data.items():
        for q,val in item.items():
-          qinfo=eval(k+'.getStat(q,json.dumps(val))')
-          print(qinfo)
- #         if(qinfo!="{}" and qinfo!="" and qinfo is not None):
- #          makerequest.postQData(webssl,website,qm,q,qinfo)
-       exit()
+          runstat=eval(k+'.getStat(q,json.dumps(val))')
        
-
-  
 except Exception as err:
-   classes.Err("MQMON not configured err:"+err)
+   classes.Err("MQSTAT not configured err:"+err)
 
 EOF
 }
 
 
-runappstat(){
-if [ -f $HOMEDIR"/statlist.json" ]; then
-   $PYTHON << EOF
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,glob
-from datetime import datetime
-from modules.base import makerequest,classes,configs,file_utils,statarr
+resetapplstat(){
+$PYTHON << EOF
+import os
+from modules.base import classes,configs
+for entry in os.scandir('modules/statistics'):
+    if entry.is_dir() and entry.name!='__pycache__':
+       string = f'from modules.statistics.{entry.name} import {entry.name}'
+       exec (string)
 
-if platform.system()=="Linux":
-   from modules.base import lin_utils,lin_packages
-elif platform.system()=="Windows":
-   from modules.base import win_utils
-else:
-   exit() 
 
 try:
-   stat_data = configs.getstatData()
+   mon_data = configs.getmonData()
    config_data = configs.getcfgData()
    website = config_data['website']
    webssl = config_data['webssl']
-   if len(stat_data)>0:
-      for k,item in stat_data.items():
-         func = getattr(statarr, item["function"], None)
-         files = glob.glob(item["file"])
-         for file in files:
-            ret=file_utils.csv_json(file,func(),item["line"],item["clean"])
-            retarr=json.loads(ret)
-            if len(retarr)>0:
-               ret={}
-               ret["type"]=item["type"]
-               ret["subtype"]=item["function"].replace(item["type"],"")
-               ret["data"]=retarr
-               makerequest.postStatData(webssl,website,json.dumps(ret))   
-except OSError as err:
-   classes.Err("Error opening the file statlist:"+str(err))
+   for k,item in mon_data.items():
+       for q,val in item.items():
+          resstat=eval(k+'.resetStat(q)')
+       exit()
+       
+except Exception as err:
+   classes.Err("MQSTAT not configured err:"+err)
 
 EOF
-fi
 }
+
 
 case "$1" in
     help )
@@ -272,12 +248,15 @@ case "$1" in
       ;;
     * )
       if [ -f $HOMEDIR"/confapplstat.json" ]; then
-         getapplstat
+         if [[ $CM == "30" || $CM == "00" ]]; then
+            resetapplstat
+         else
+            getapplstat
+         fi
       fi
       if [ -f $HOMEDIR"/conftrack.json" ]; then
          runmqtracker
       fi
-      runappstat
       if [ $HOUR == "2359" ]; then
         resetappavl
       else
