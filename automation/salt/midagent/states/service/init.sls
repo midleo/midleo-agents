@@ -70,16 +70,10 @@ midagent_create_script:
     - names:
       - {{agent_install_dir}}magent.sh:
         - source: salt://midagent/templates/python/magent.sh
-
-midagent_create_scriptcron:
-  file.managed:
-    - user: {{mwuser}}
-    - group: {{mwuser}}
-    - mode: '0755'
-    - template: jinja
-    - names:
       - {{agent_install_dir}}cronjobs.sh:
         - source: salt://midagent/templates/python/cronjobs.sh
+    - context:
+        python_install_dir: "{{python_install_dir}}"
 
 midagent_create_client_modules:
   file.recurse:

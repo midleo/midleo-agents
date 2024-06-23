@@ -14,7 +14,12 @@ RUNMQSC=/opt/mqm/bin/runmqsc
 AMQSEVT=/opt/mqm/bin/amqsevt
 ACEUSR=mqbrk
 MQSIPROFILE=/opt/ibm/ace/server/bin/mqsiprofile
-PYTHON=/usr/bin/python3
+
+if [[ ! -z "${PYTHON_PATH}" ]]; then
+  PYTHON=${PYTHON_PATH}
+else
+  PYTHON="{{python_install_dir}}"
+fi
 
 export DSPMQ
 export DSPMQVER
