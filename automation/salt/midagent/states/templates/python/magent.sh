@@ -457,8 +457,5 @@ case "$1" in
       echo "   -  $0 enabletrackqm QMGR # Transfer the mqat.ini file to /var/mqm/qmgr/QMGR/ folder"
       echo "   -  $0 disabletrackqm QMGR"
       echo ""
-      echo "Parameters:"
-      echo "   -  TYPE_OF_MON: QAGE - monitor queue age, QFULL - monitor percentage of maxdepth/curdepth"
-      echo "   -  THRESHOLD: threshold in percent for QFULL/seconds for QAGE (more than this value will be taken in the report)"
-      
+  
    esac

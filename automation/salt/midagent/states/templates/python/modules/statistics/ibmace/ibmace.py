@@ -19,3 +19,6 @@ def resetStat(thisnode,website,webssl,stat_data):
 
     except OSError as err:
        classes.Err("Error opening the file statlist:"+str(err))
+
+def getStat(thisqm,inpdata):
+   return
