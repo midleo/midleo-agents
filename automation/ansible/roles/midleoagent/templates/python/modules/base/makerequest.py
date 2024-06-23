@@ -19,10 +19,10 @@ def postStatData(webssl,website,thisdata):
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
 
-def postQData(webssl,website,qm,q,data):
+def postQData(webssl,website,qm,data):
     headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
     try:
-        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateqstat/'+qm+'/'+q, data=data, headers=headers, verify=False)
+        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateqstat/'+qm, data=data, headers=headers, verify=False)
         classes.Err("postQdata HTTPResponse:"+res.content.decode())
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))

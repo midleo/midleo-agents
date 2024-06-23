@@ -231,7 +231,7 @@ try:
    webssl = config_data['webssl']
    for k,item in mon_data.items():
        for q,val in item.items():
-          resstat=eval(k+'.resetStat(q)')
+          resstat=eval(k+'.resetStat(q,website,webssl)')
        exit()
        
 except Exception as err:
