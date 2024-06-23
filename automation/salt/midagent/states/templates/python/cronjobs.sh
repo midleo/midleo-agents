@@ -231,8 +231,7 @@ try:
    webssl = config_data['webssl']
    for k,item in mon_data.items():
        for q,val in item.items():
-          resstat=eval(k+'.resetStat(q,website,webssl)')
-       exit()
+          resstat=eval(k+'.resetStat(q,website,webssl,val)')
        
 except Exception as err:
    classes.Err("MQSTAT not configured err:"+err)

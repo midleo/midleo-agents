@@ -206,7 +206,7 @@ def depthperc(queue_info):
     depthperc = (depthcur / depthmax) * 100
     return depthperc
 
-def resetStat(thisqm,website,webssl):
+def resetStat(thisqm,website,webssl,thisdata):
     try:
       files = glob.glob(os.getcwd()+"/logs/ibmmq_"+thisqm+"*.csv")
       for file in files:
