@@ -39,14 +39,6 @@ def getcertData():
    except:
       cert_data={}
    return cert_data
-   
-def getstatData():
-    try:
-       with open(os.getcwd()+"/config/statlist.json", 'r') as stat_file:
-          stat_data=json.load(stat_file)
-    except:
-       stat_data={}
-    return stat_data
     
 def gettrackData():
    try:
