@@ -17,12 +17,14 @@ midleo_website_base_url="MIDLEO_BASE_URL"
 midleo_website_base_url_ssl="n"
 update_interval_minutes="5"
 midleo_mwuser="mwadmin"
+inttoken=""
 
 [linux:vars]
 midleo_website_base_url="MIDLEO_BASE_URL"
 midleo_website_base_url_ssl="n"
 update_interval_minutes="5"
 midleo_mwuser="mwadmin"
+inttoken=""
 
 [middleware:children]
 linux

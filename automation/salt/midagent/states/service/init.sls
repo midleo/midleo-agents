@@ -6,6 +6,7 @@
 {% set midleo_website_base_url = salt['pillar.get']('INPUT:midleo_website_base_url') %}
 {% set midleo_website_base_url_ssl = salt['pillar.get']('INPUT:midleo_website_base_url_ssl') %}
 {% set group_id = salt['pillar.get']('INPUT:group_id') %}
+{% set int_token = salt['pillar.get']('INPUT:int_token') %}
 {% set update_interval_minutes = salt['pillar.get']('INPUT:update_interval_minutes') %}
 {% set mwtoken = salt['pillar.get']('midagent_vars:mwtoken') %}
 
@@ -112,6 +113,7 @@ midagent_create_config:
         midleo_website_base_url: "{{midleo_website_base_url}}"
         midleo_website_base_url_ssl: "{{midleo_website_base_url_ssl}}"
         group_id: "{{group_id}}"
+        inttoken: "{{int_token}}"
         update_interval_minutes: "{{update_interval_minutes}}"
 {% endif %}
 
