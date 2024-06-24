@@ -66,7 +66,6 @@ def qStatInfo(thisqm,q,queues):
             if qname not in queues:
                queues[qname]={}
             if qname:
-               queues[qname]["curdepth"] = queue_info[pymqi.CMQC.MQIA_CURRENT_Q_DEPTH]
                queues[qname]["opincount"] = queue_info[pymqi.CMQC.MQIA_OPEN_INPUT_COUNT]
                queues[qname]["opoutcount"] = queue_info[pymqi.CMQC.MQIA_OPEN_OUTPUT_COUNT]
                queues[qname]["uncmess"] = queue_info[pymqi.CMQCFC.MQIACF_UNCOMMITTED_MSGS]
