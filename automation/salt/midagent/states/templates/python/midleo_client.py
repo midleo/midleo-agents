@@ -5,7 +5,7 @@ from modules.base import makerequest,decrypt,classes,certcheck,configs,file_util
 
 PORT_NUMBER = 5550
 SIZE = 1024
-AGENT_VER = "1.24.08"
+AGENT_VER = "1.24.10"
 
 if platform.system()=="Linux":
    from modules.base import lin_utils,lin_packages
@@ -21,12 +21,14 @@ def create():
         uid = config_data['uid']
         groupid = config_data['groupid']
         updint = config_data['updint']
+        inttoken = config_data['inttoken']
+        
 
         if platform.system()=="Windows":
             cpu = classes.CPU(win_utils.getCPUName(), win_utils.getCPUCoreCount())
             hw_config = classes.HWConfig(win_utils.getName(), win_utils.getOS(), win_utils.getArchitecture(), win_utils.getMachineType(), cpu.__dict__, win_utils.getMemory(), win_utils.getDiskPartitions(), win_utils.getLBTS())
             net_config = classes.NetConfig(win_utils.getIP())
-            config = classes.Config(uid,groupid,AGENT_VER,updint, hw_config.__dict__, net_config.__dict__, win_utils.getSoftware()) 
+            config = classes.Config(uid,inttoken,groupid,AGENT_VER,updint, hw_config.__dict__, net_config.__dict__, win_utils.getSoftware()) 
         elif platform.system()=="Linux":
             cpu = classes.CPU(lin_utils.getCPUName(), lin_utils.getCPUCoreCount())
             hw_config = classes.HWConfig(lin_utils.getName(), lin_utils.getOS(), lin_utils.getArchitecture(), lin_utils.getMachineType(), cpu.__dict__, lin_utils.getMemory(), lin_utils.getDiskPartitions(), lin_utils.getLBTS())
@@ -35,7 +37,7 @@ def create():
                cert_check = certcheck.Run(uid+uid+uid+uid)
             else:
                cert_check = []
-            config = classes.Config(uid,groupid,AGENT_VER,updint, hw_config.__dict__, net_config.__dict__, lin_packages.getSoftware(), cert_check) 
+            config = classes.Config(uid,inttoken,groupid,AGENT_VER,updint, hw_config.__dict__, net_config.__dict__, lin_packages.getSoftware(), cert_check) 
         else:
             exit()
 

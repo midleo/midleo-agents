@@ -26,7 +26,8 @@ def createConfigJson():
             "website": input("Please provide midleo DNS:"),
             "webssl": input("SSL enabled ? (y/n):"),
             "groupid": input("Please provide responsible GroupID:"),
-            "updint": input("Update interval (in minutes):")
+            "updint": input("Update interval (in minutes):"),
+            "inttoken": input("Internal API Token:")
         }
 
         with open(os.getcwd()+"/config/agentConfig.json", 'w+') as config_file:

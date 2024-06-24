@@ -37,8 +37,9 @@ class NetConfig:
         self.dns = dns
         
 class Config:
-    def __init__(self, uid, groupid, agtver, updint, hw, net, geo, certs):
+    def __init__(self, uid, inttoken, groupid, agtver, updint, hw, net, geo, certs):
         self.uid = uid
+        self.inttoken = inttoken
         self.groupid = groupid
         self.agtver = agtver
         self.updint = updint

@@ -34,9 +34,9 @@ HOUR=$(date '+%H%M')
 
 addcert(){
 $PYTHON << EOF
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
-from modules.base import makerequest,decrypt,classes,configs
+from modules.base import decrypt,classes,configs
 
 if platform.system()=="Linux":
    from modules.base import lin_utils,lin_packages
@@ -78,9 +78,9 @@ EOF
 
 delcert(){
 $PYTHON << EOF
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
-from modules.base import makerequest,classes,configs
+from modules.base import classes,configs
 
 if platform.system()=="Linux":
    from modules.base import lin_utils,lin_packages
@@ -237,9 +237,9 @@ EOF
 
 enabletrackqm (){
 $PYTHON << EOF
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
-from modules.base import makerequest,classes,configs
+from modules.base import classes,configs
 
 if platform.system()=="Linux":
    from modules.base import lin_utils,lin_packages
@@ -272,9 +272,9 @@ EOF
 
 disabletrackqm (){
 $PYTHON << EOF
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
-from modules.base import makerequest,classes,configs
+from modules.base import classes,configs
 
 if platform.system()=="Linux":
    from modules.base import lin_utils,lin_packages
@@ -298,9 +298,9 @@ EOF
 
 addappstat(){
 $PYTHON << EOF
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
-from modules.base import makerequest,classes,configs
+from modules.base import classes,configs
 
 if platform.system()=="Linux":
    from modules.base import lin_utils,lin_packages
@@ -346,9 +346,9 @@ EOF
 
 delappstat(){
 $PYTHON << EOF
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os
+import base64,platform,json,re,uuid,time,sys,os
 from datetime import datetime
-from modules.base import makerequest,classes,configs
+from modules.base import classes,configs
 
 if platform.system()=="Linux":
    from modules.base import lin_utils,lin_packages

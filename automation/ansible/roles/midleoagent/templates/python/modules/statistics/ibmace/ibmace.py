@@ -1,7 +1,7 @@
 import json,glob
 from modules.base import makerequest,classes,configs,file_utils,statarr
 
-def resetStat(thisnode,website,webssl,stat_data):
+def resetStat(thisnode,website,webssl,inttoken,stat_data):
     try:
        if len(stat_data)>0:
           for k,item in stat_data.items():
@@ -13,6 +13,7 @@ def resetStat(thisnode,website,webssl,stat_data):
                 if len(retarr)>0:
                    ret={}
                    ret["type"]="ibmace"
+                   ret["inttoken"]=inttoken
                    ret["subtype"]=k
                    ret["data"]=retarr
                    makerequest.postStatData(webssl,website,json.dumps(ret))  

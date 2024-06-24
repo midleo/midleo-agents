@@ -60,6 +60,7 @@ try:
    config_data = configs.getcfgData()
    website = config_data['website']
    webssl = config_data['webssl']
+   inttoken = config_data['inttoken']
    uid = config_data['uid']
    if len(avl_data)>0:
       for k,item in avl_data.items():
@@ -84,6 +85,7 @@ try:
                   req["srvtype"]=item["type"]
                   req["message"]="Server not available"
                   req["alerttime"]=current_time
+                  req["inttoken"]=inttoken
                   makerequest.postMonAl(webssl,website,json.dumps(req))
            except subprocess.CalledProcessError as e:
              classes.Err("avlCheck err:"+str(e.output))
@@ -116,6 +118,7 @@ try:
    config_data = configs.getcfgData()
    website = config_data['website']
    webssl = config_data['webssl']
+   inttoken = config_data['inttoken']
    uid = config_data['uid']
    if len(avl_data)>0:
       for k,item in avl_data.items():
@@ -123,6 +126,7 @@ try:
          if 'navl' in ret:
             ret["appsrv"]=k
             ret["srvid"]=uid
+            ret["inttoken"]=inttoken
             ret["srvtype"]=item["type"]
             ret["thismonth"]=YM
             ret["thisdate"]=WD
@@ -155,6 +159,7 @@ try:
    config_data = configs.getcfgData()
    website = config_data['website']
    webssl = config_data['webssl']
+   inttoken = config_data['inttoken']
    if len(track_data)>0:
       for k,item in track_data.items():
          try:
@@ -182,6 +187,7 @@ try:
                             ret["channelName"]= channelName
                             ret["connectionName"] = connectionName
                             ret["trackdata"]=act
+                            ret["inttoken"]=inttoken
                             makerequest.postTrackData(webssl,website,json.dumps(ret))
             except:
                classes.Err("Return error:"+output)
@@ -234,9 +240,10 @@ try:
    config_data = configs.getcfgData()
    website = config_data['website']
    webssl = config_data['webssl']
+   inttoken = config_data['inttoken']
    for k,item in mon_data.items():
        for q,val in item.items():
-          resstat=eval(k+'.resetStat(q,website,webssl,val)')
+          resstat=eval(k+'.resetStat(q,website,webssl,inttoken,val)')
        
 except Exception as err:
    classes.Err("MQSTAT not configured err:"+err)

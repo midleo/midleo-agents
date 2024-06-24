@@ -204,7 +204,7 @@ def depthperc(queue_info):
     depthperc = (depthcur / depthmax) * 100
     return depthperc
 
-def resetStat(thisqm,website,webssl,thisdata):
+def resetStat(thisqm,website,webssl,inttoken,thisdata):
     try:
       files = glob.glob(os.getcwd()+"/logs/ibmmq_"+thisqm+"*.csv")
       for file in files:
@@ -212,6 +212,7 @@ def resetStat(thisqm,website,webssl,thisdata):
             with open(file) as f:
                 reader_obj = csv.reader(f, delimiter = ',')
                 statlist={}
+                statlist["inttoken"]=inttoken
                 for linearr in reader_obj:
                     if linearr[0] not in statlist:
                        statlist[linearr[0]]={}
