@@ -154,9 +154,7 @@ chl_st = {
     pymqi.CMQCFC.MQCHS_STOPPED: 'stopped',
     pymqi.CMQCFC.MQCHS_REQUESTING: 'requesting',
     pymqi.CMQCFC.MQCHS_PAUSED: 'paused',
-    pymqi.CMQCFC.MQCHS_DISCONNECTED: 'disconnected',
     pymqi.CMQCFC.MQCHS_INITIALIZING: 'initializing',
-    pymqi.CMQCFC.MQCHS_SWITCHING: 'switching',
 }
 
 def getStat(thisqm,inpdata):
