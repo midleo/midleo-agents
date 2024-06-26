@@ -1,6 +1,10 @@
-import pymqi, json, glob, os, csv
+import json, glob, os, csv
 from modules.base import classes, file_utils, makerequest
 from datetime import datetime
+try:
+   import pymqi
+except:
+   pass
 
 def qmConn(thisqm):
     try:
@@ -143,7 +147,8 @@ def chStat(thisqm,ch,chls):
     except pymqi.MQMIError as ex:
         classes.Err("Exception:"+str(ex))
 
-chl_st = {
+def chl_st():
+    return{
     pymqi.CMQCFC.MQCHS_INACTIVE: 'inactive',
     pymqi.CMQCFC.MQCHS_BINDING: 'binding',
     pymqi.CMQCFC.MQCHS_RETRYING: 'retrying',
@@ -154,7 +159,7 @@ chl_st = {
     pymqi.CMQCFC.MQCHS_REQUESTING: 'requesting',
     pymqi.CMQCFC.MQCHS_PAUSED: 'paused',
     pymqi.CMQCFC.MQCHS_INITIALIZING: 'initializing',
-}
+    }
 
 def getStat(thisqm,inpdata):
     try:
