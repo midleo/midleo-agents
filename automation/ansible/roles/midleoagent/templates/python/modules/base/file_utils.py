@@ -1,7 +1,7 @@
 import json, os, csv
 from modules.base import classes
 
-def csv_json(file,array,check=False,cleanit=False):
+def csv_json(file,array,check=False,cleanit=True):
     if os.path.isfile(file):
         if len(array) > 0:
             try:
