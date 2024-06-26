@@ -10,7 +10,7 @@
 {% set update_interval_minutes = salt['pillar.get']('INPUT:update_interval_minutes') %}
 {% set mwtoken = salt['pillar.get']('midagent_vars:mwtoken') %}
 
-{% set agent_unique_id = salt['random.get_str'](length=16,chars='abcdefABCDEF0123456789') %}
+{% set agent_unique_id = salt['cmd.run'](cmd="head -c 8 /dev/urandom | xxd -p", python_shell=True) %}
 
 midagent_create_group:
    group.present:
@@ -116,6 +116,19 @@ midagent_create_config:
         inttoken: "{{int_token}}"
         update_interval_minutes: "{{update_interval_minutes}}"
 {% endif %}
+
+midagent_create_sudoer:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: '0440'
+    - template: jinja
+    - names:
+      - /etc/sudoers.d/{{mwuser}}.conf:
+        - source: salt://midagent/templates/mwadmin.sudo.j2
+    - context:
+        mwuser: "{{mwuser}}"
+
 
 midagent_create_service:
   file.managed:

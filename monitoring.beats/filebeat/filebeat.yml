@@ -5,6 +5,12 @@ filebeat.modules:
     var.paths: ["/var/mqm/qmgrs/*/errors/*.json"]
     json.keys_under_root: true
     json.message_key: message
-    
+
+processors:
+  - add_fields:
+      target: message
+      fields:
+        srvid: UNIQUE_ID
+
 output.logstash:
    hosts: ["${LOGSTASH_HOST}:5044"]
