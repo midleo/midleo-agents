@@ -13,6 +13,7 @@ DSPMQ=/opt/mqm/bin/dspmq
 RUNMQSC=/opt/mqm/bin/runmqsc
 AMQSEVT=/opt/mqm/bin/amqsevt
 ACEUSR=mqbrk
+MQSIPROFILE=/opt/ibm/ace-12/server/bin/mqsiprofile
 
 if [[ ! -z "${PYTHON_PATH}" ]]; then
   PYTHON=${PYTHON_PATH}

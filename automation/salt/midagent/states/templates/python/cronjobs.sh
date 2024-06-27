@@ -13,6 +13,7 @@ DSPMQ=/opt/mqm/bin/dspmq
 RUNMQSC=/opt/mqm/bin/runmqsc
 AMQSEVT=/opt/mqm/bin/amqsevt
 ACEUSR=mqbrk
+MQSIPROFILE=/opt/ibm/ace-12/server/bin/mqsiprofile
 
 if [[ ! -z "${PYTHON_PATH}" ]]; then
   PYTHON=${PYTHON_PATH}
@@ -41,10 +42,10 @@ LRFILE=$HOMEDIR"/nextrun.txt"
 if [ -e "$LRFILE" ]; then
   TST=$(head -n 1 $LRFILE)
   if [ -z "$TST" ]; then
-     TST=$(date '+%Y-%m-%dT%H:%M')
+     TST=$(date '+%s')
   fi
 else
-  TST=$(date '+%Y-%m-%dT%H:%M')
+  TST=$(date '+%s')
 fi
 
 runappavl(){
@@ -324,7 +325,7 @@ def main():
         timenow=datetime.now() + timedelta(minutes=updint)
 
         with open(os.getcwd()+"/config/nextrun.txt", 'w+') as log_file:
-            log_file.write(str(timenow.strftime('%Y-%m-%dT%H:%M')))
+            log_file.write(str(timenow.strftime('%s')))
 
     except OSError as err:
         classes.Err("Error in main:"+str(err))
@@ -358,7 +359,7 @@ case "$1" in
       else
         runappavl
       fi
-      if [ $TST == $(date '+%Y-%m-%dT%H:%M') ]; then
+      if [ $TST -le $(date '+%s') ]; then
          getsrvdata
       fi
       ;;
