@@ -19,11 +19,19 @@ def postStatData(webssl,website,thisdata):
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
 
-def postQData(webssl,website,qm,data):
+def postibmmqQData(webssl,website,qm,data):
     headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
     try:
-        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateqstat/'+qm, data=data, headers=headers, verify=False)
-        classes.Err("postQdata HTTPResponse:"+res.content.decode())
+        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateibmmqqstat/'+qm, data=data, headers=headers, verify=False)
+        classes.Err("postibmmqQData HTTPResponse:"+res.content.decode())
+    except requests.exceptions.RequestException as ex:  
+        classes.Err("Exception:"+str(ex))
+
+def postibmmqCHData(webssl,website,qm,data):
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
+    try:
+        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/updateibmmqchstat/'+qm, data=data, headers=headers, verify=False)
+        classes.Err("postibmmqCHdata HTTPResponse:"+res.content.decode())
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
 

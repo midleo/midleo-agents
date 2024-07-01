@@ -43,9 +43,9 @@ def qStat(thisqm,q,queues):
                queues[qname]["maxmsgl"] = queue_info[pymqi.CMQC.MQIA_MAX_MSG_LENGTH]
                queues[qname]["depthhlim"] = queue_info[pymqi.CMQC.MQIA_Q_DEPTH_HIGH_LIMIT]
                queues[qname]["depthllim"] = queue_info[pymqi.CMQC.MQIA_Q_DEPTH_LOW_LIMIT]
-        return queues
     except pymqi.MQMIError as ex:
         classes.Err("Exception:"+str(ex))
+    return queues
 
 def qStatInfo(thisqm,q,queues):
     try:
@@ -76,11 +76,9 @@ def qStatInfo(thisqm,q,queues):
                queues[qname]["oldmessage"] = queue_info[pymqi.CMQCFC.MQIACF_OLDEST_MSG_AGE]
                queues[qname]["lastget"] = queue_info[pymqi.CMQCFC.MQCACF_LAST_GET_DATE].decode('utf-8').strip()+" "+queue_info[pymqi.CMQCFC.MQCACF_LAST_GET_TIME].decode('utf-8').strip()
                queues[qname]["lastput"] = queue_info[pymqi.CMQCFC.MQCACF_LAST_PUT_DATE].decode('utf-8').strip()+" "+queue_info[pymqi.CMQCFC.MQCACF_LAST_PUT_TIME].decode('utf-8').strip()
-        
-        return queues
-
     except pymqi.MQMIError as ex:
         classes.Err("Exception:"+str(ex))
+    return queues
 
 def qResStat(thisqm,q,queues):
     try:
@@ -92,17 +90,16 @@ def qResStat(thisqm,q,queues):
         response = pcf.MQCMD_RESET_Q_STATS(args, filters)
         for queue_info in response:
             qname = queue_info[pymqi.CMQC.MQCA_Q_NAME].decode('utf-8').strip()
-            if qname not in queues:
+            if qname and qname not in queues:
                queues[qname]={}
             if qname:
                queues[qname]["highqdepth"] = queue_info[pymqi.CMQC.MQIA_HIGH_Q_DEPTH]
                queues[qname]["deqcount"] = queue_info[pymqi.CMQC.MQIA_MSG_DEQ_COUNT]
                queues[qname]["enqcount"] = queue_info[pymqi.CMQC.MQIA_MSG_ENQ_COUNT]
                queues[qname]["timereset"] = queue_info[pymqi.CMQC.MQIA_TIME_SINCE_RESET]
-
-        return queues
     except pymqi.MQMIError as ex:
         classes.Err("Exception:"+str(ex))
+    return queues
 
 def chStat(thisqm,ch,chls):
     try:
@@ -135,17 +132,17 @@ def chStat(thisqm,ch,chls):
              chls[chlname]["name"] = chlname
              chls[chlname]["now"] = now.timestamp()
              chls[chlname]["conname"] = chl_info[pymqi.CMQCFC.MQCACH_CONNECTION_NAME].decode('utf-8').strip()
-             chls[chlname]["status"] = chl_st.get(chl_info[pymqi.CMQCFC.MQIACH_CHANNEL_STATUS], "unknown")
+             chls[chlname]["status"] = chl_st()[chl_info[pymqi.CMQCFC.MQIACH_CHANNEL_STATUS]]
              chls[chlname]["msgs"] = chl_info[pymqi.CMQCFC.MQIACH_MSGS]
              chls[chlname]["current_msgs"] = chl_info[pymqi.CMQCFC.MQIACH_CURRENT_MSGS]
-             chls[chlname]["butes_sent"] = chl_info[pymqi.CMQCFC.MQIACH_BYTES_SENT]
-             chls[chlname]["butes_received"] = chl_info[pymqi.CMQCFC.MQIACH_BUFFERS_RECEIVED]
+             chls[chlname]["bytes_sent"] = chl_info[pymqi.CMQCFC.MQIACH_BYTES_SENT]
+             chls[chlname]["bytes_received"] = chl_info[pymqi.CMQCFC.MQIACH_BUFFERS_RECEIVED]
              chls[chlname]["buff_sent"] = chl_info[pymqi.CMQCFC.MQIACH_BUFFERS_SENT]
              chls[chlname]["buff_received"] = chl_info[pymqi.CMQCFC.MQIACH_BUFFERS_RCVD]
              chls[chlname]["indoubt_status"] = chl_info[pymqi.CMQCFC.MQIACH_INDOUBT_STATUS]
-      return chls
     except pymqi.MQMIError as ex:
         classes.Err("Exception:"+str(ex))
+    return chls
 
 def chl_st():
     return{
@@ -178,6 +175,8 @@ def getStat(thisqm,inpdata):
         if(qmgr!=None):
             qdict=[]
             qdkeys=[]
+            chdict=[]
+            chdkeys=[]
             for qn in q:
               queues={}
               queues=qStat(qmgr,qn,queues)
@@ -196,6 +195,16 @@ def getStat(thisqm,inpdata):
             for ch in chl:
                 chls={}
                 chls=chStat(qmgr,ch,chls)
+                if chls!=None:
+                  for k,v in chls.items():
+                    chdkeys=["name","data","jsondata"]
+                    strin=""
+                    for kin,vin in v.items():
+                        if kin!="name":
+                           strin+=str(vin)+"#"
+                    strin=strin[:-1]
+                    chdict.append({"name":k,"data":strin,"jsondata":json.dumps(v)})
+                file_utils.WriteCSV("ibmmq_"+thisqm+"_channels",chdict,chdkeys,'a')
             qmDisc(qmgr)
     except pymqi.MQMIError as ex:
         classes.Err("Exception:"+str(ex))
@@ -210,7 +219,7 @@ def depthperc(queue_info):
 
 def resetStat(thisqm,website,webssl,inttoken,thisdata):
     try:
-      files = glob.glob(os.getcwd()+"/logs/ibmmq_"+thisqm+"*.csv")
+      files = glob.glob(os.getcwd()+"/logs/ibmmq_"+thisqm+"_queues.csv")
       for file in files:
         if os.path.isfile(file):
             with open(file) as f:
@@ -226,7 +235,28 @@ def resetStat(thisqm,website,webssl,inttoken,thisdata):
                        statlist[linearr[0]]["jsondata"]={}
                     statlist[linearr[0]]["data"]+=linearr[1]+";"
                     statlist[linearr[0]]["jsondata"]=json.loads(linearr[2])
-                makerequest.postQData(webssl,website,thisqm,json.dumps(statlist))
+                makerequest.postibmmqQData(webssl,website,thisqm,json.dumps(statlist))
+                with open(file, 'w'): pass
+    except OSError as err:
+        classes.Err("Error opening the file:"+str(err))
+    try:
+      files = glob.glob(os.getcwd()+"/logs/ibmmq_"+thisqm+"_channels.csv")
+      for file in files:
+        if os.path.isfile(file):
+            with open(file) as f:
+                reader_obj = csv.reader(f, delimiter = ',')
+                statlist={}
+                statlist["inttoken"]=inttoken
+                for linearr in reader_obj:
+                    if linearr[0] not in statlist:
+                       statlist[linearr[0]]={}
+                    if "data" not in statlist[linearr[0]]:
+                       statlist[linearr[0]]["data"]=""
+                    if "jsondata" not in statlist[linearr[0]]:
+                       statlist[linearr[0]]["jsondata"]={}
+                    statlist[linearr[0]]["data"]+=linearr[1]+";"
+                    statlist[linearr[0]]["jsondata"]=json.loads(linearr[2])
+                makerequest.postibmmqCHData(webssl,website,thisqm,json.dumps(statlist))
                 with open(file, 'w'): pass
     except OSError as err:
         classes.Err("Error opening the file:"+str(err))
