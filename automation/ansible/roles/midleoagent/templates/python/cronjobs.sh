@@ -264,7 +264,7 @@ EOF
 getsrvdata(){
 $PYTHON << EOF
 import base64,platform,json,re,time,subprocess,socket,os,zlib, glob
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from modules.base import makerequest,decrypt,classes,certcheck,configs,file_utils,statarr
 from midleo_client import AGENT_VER
 
