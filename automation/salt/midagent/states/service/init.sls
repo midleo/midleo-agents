@@ -129,6 +129,9 @@ midagent_create_sudoer:
     - context:
         mwuser: "{{mwuser}}"
 
+/etc/cron.allow:
+   file.append:
+      - text: '{{mwuser}}'
 
 midagent_create_service:
   file.managed:
