@@ -34,7 +34,6 @@
     - "{{agent_install_dir}}modules"
     - "{{agent_install_dir}}logs"
     - "{{agent_install_dir}}config"
-    - "{{agent_install_dir}}resources"
 - name: "creage agent"
   template:
     src: templates/python/midleo_client.py
@@ -69,15 +68,6 @@
     mode: 'a+x'
     force: yes
   with_filetree: templates/python/modules
-- name: "upload resources scripts"
-  file:
-    src: '{{ item.src }}'
-    dest: "{{agent_install_dir}}resources/{{ item.path }}"
-    owner: "{{midleo_mwuser}}"
-    group: "{{midleo_mwuser}}"
-    mode: 'a+x'
-    force: yes
-  with_filetree: templates/python/resources
 - name: Update apt repo and cache on all Debian/Ubuntu boxes
   apt: 
     update_cache: yes 

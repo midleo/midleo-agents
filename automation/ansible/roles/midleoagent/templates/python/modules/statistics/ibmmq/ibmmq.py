@@ -131,7 +131,7 @@ def chStat(thisqm,ch,chls):
              chls[chlname]={}
              chls[chlname]["name"] = chlname
              chls[chlname]["now"] = now.timestamp()
-             chls[chlname]["conname"] = chl_info[pymqi.CMQCFC.MQCACH_CONNECTION_NAME].decode('utf-8').strip()
+             chls[chlname]["conname"] = chl_info[pymqi.CMQCFC.MQCACH_CONNECTION_NAME].decode('utf-8').strip().replace('\u0000','')
              chls[chlname]["status"] = chl_st()[chl_info[pymqi.CMQCFC.MQIACH_CHANNEL_STATUS]]
              chls[chlname]["msgs"] = chl_info[pymqi.CMQCFC.MQIACH_MSGS]
              chls[chlname]["current_msgs"] = chl_info[pymqi.CMQCFC.MQIACH_CURRENT_MSGS]
