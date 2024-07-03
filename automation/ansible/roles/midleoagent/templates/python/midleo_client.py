@@ -59,11 +59,13 @@ def listenfordata():
             elif 'command' in data:
                data["command"]=base64.b64decode(data["command"]).decode('utf-8')
                try:
-                 output = subprocess.check_output(data["command"], shell=True,stderr=subprocess.STDOUT)
+                 process = subprocess.Popen(data["command"], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                 stdout, stderr = process.communicate()
+                 output = stdout.decode('utf-8').strip()
+                 conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:"+data["command"]+"<br>"+"Output:"+str(output)))
                except subprocess.CalledProcessError as e:
                  output=e.output
                classes.Err("Command:"+data["command"])
-               conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:"+data["command"]+"<br>"+"Output:"+str(output.decode('utf-8'))))
                conn.close()
             else:
                classes.Err("Command:empty")
