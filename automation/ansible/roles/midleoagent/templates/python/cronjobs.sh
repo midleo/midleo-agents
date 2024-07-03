@@ -83,7 +83,7 @@ try:
            try:
              output = subprocess.run(ret,shell=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
              output = output.stdout.decode()
-             if(int(output)==1):
+             if(int(output)>=1):
                classes.WriteData("online","avl_"+k+".csv")
              else:
                classes.WriteData("offline","avl_"+k+".csv")
