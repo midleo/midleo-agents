@@ -42,7 +42,7 @@ midagent_add_docker:
     - dir_mode: 755
     - makedirs: True
 
-{% for dir in 'modules', 'logs', 'config', 'resources' %}
+{% for dir in 'modules', 'logs', 'runable', 'config' %}
 {{agent_install_dir}}{{ dir }}:
   file.directory:
     - name: {{agent_install_dir}}{{ dir }}
@@ -71,6 +71,8 @@ midagent_create_script:
     - names:
       - {{agent_install_dir}}magent.sh:
         - source: salt://midagent/templates/python/magent.sh
+      - {{agent_install_dir}}magent.bat:
+        - source: salt://midagent/templates/python/magent.bat
       - {{agent_install_dir}}cronjobs.sh:
         - source: salt://midagent/templates/python/cronjobs.sh
     - context:
@@ -87,7 +89,7 @@ midagent_create_client_modules:
       - {{agent_install_dir}}modules:
         - source: salt://midagent/templates/python/modules
 
-midagent_create_client_resources:
+midagent_create_client_runable:
   file.recurse:
     - user: {{mwuser}}
     - group: {{mwuser}}
@@ -95,8 +97,8 @@ midagent_create_client_resources:
     - file_mode: '0644'
     - makedirs: True
     - names:
-      - {{agent_install_dir}}resources:
-        - source: salt://midagent/templates/python/resources
+      - {{agent_install_dir}}runable:
+        - source: salt://midagent/templates/python/runable
 
 {% if not salt['file.file_exists'](agent_install_dir+'config/agentConfig.json') %}
 midagent_create_config:
