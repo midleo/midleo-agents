@@ -7,13 +7,13 @@ setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
 set USR=%USERNAME%
-set HOMEDIR="%cd%\config"
-set DSPMQVER="D:\apps\IBM\MQ\bin\dspmqver"
-set DSPMQ="D:\apps\IBM\MQ\bin\dspmq"
-set RUNMQSC="D:\apps\IBM\MQ\bin\runmqsc"
-set AMQSEVT="D:\apps\IBM\MQ\bin\amqsevt"
-set ACEUSR="mqbrk"
-set MQSIPROFILE="D:\apps\IBM\ACE\server\bin\mqsiprofile"
+set HOMEDIR=%cd%\config
+set DSPMQVER=D:\apps\IBM\MQ\bin\dspmqver
+set DSPMQ=D:\apps\IBM\MQ\bin\dspmq
+set RUNMQSC=D:\apps\IBM\MQ\bin\runmqsc
+set AMQSEVT=D:\apps\IBM\MQ\bin\amqsevt
+set ACEUSR=mqbrk
+set MQSIPROFILE=D:\apps\IBM\ACE\server\bin\mqsiprofile
 
 IF "%1"=="addcert" (
   goto addcert
@@ -113,7 +113,6 @@ if NOT "%2"=="" (
 EXIT /B 0
 
 :usage
-echo 
 echo usage:
 echo    -  %~nx0 addcert
 echo    -  %~nx0 delcert LABEL
