@@ -14,6 +14,52 @@ elif platform.system()=="Windows":
 else:
    exit()
 
+try:
+    from subprocess import CompletedProcess
+    from subprocess import run as sp_run
+except:
+    class CompletedProcess:
+        _custom_impl = True
+
+        def __init__(self, args, returncode, stdout=None, stderr=None):
+            self.args = args
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+        def check_returncode(self):
+            if self.returncode != 0:
+                err = subprocess.CalledProcessError(self.returncode,
+                                                    self.args,
+                                                    output=self.stdout)
+                raise err
+            return self.returncode
+
+    def sp_run(*popenargs, **kwargs):
+        this_input = kwargs.pop("input", None)
+        check = kwargs.pop("handle", False)
+
+        if this_input is not None:
+            if 'stdin' in kwargs:
+                raise ValueError('stdin and input arguments may not '
+                                 'both be used.')
+            kwargs['stdin'] = subprocess.PIPE
+
+        process = subprocess.Popen(*popenargs, **kwargs)
+        try:
+            outs, errs = process.communicate(this_input)
+        except Exception as ex:
+            process.kill()
+            process.wait()
+            raise ex
+        returncode = process.poll()
+        if check and returncode:
+            raise subprocess.CalledProcessError(returncode, popenargs,
+                                                output=outs)
+        return CompletedProcess(popenargs, returncode, stdout=outs,
+                                stderr=errs)
+    subprocess.run = sp_run
+
 now = datetime.now()
 current_time = now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -33,7 +79,7 @@ try:
          if(item["enabled"]=='yes'):
            ret=ret[item["type"]]
            try:
-             output = subprocess.run(ret,shell=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
+             output = sp_run(ret,shell=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
              output = output.stdout.decode()
              if(int(output)>=1):
                classes.WriteData("online","avl_"+k+".csv")
