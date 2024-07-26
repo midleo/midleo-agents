@@ -20,10 +20,18 @@
   win_template:
     src: templates/python/magent.bat
     dest: "{{agent_install_dir}}magent.bat"
+- name: "creage agent cronjob"
+  win_template:
+    src: templates/python/cronjobs.bat
+    dest: "{{agent_install_dir}}cronjobs.bat"
 - name: "creage agentconfig"
   win_template:
     src: templates/agentConfig.json.j2
     dest: "{{agent_install_dir}}config/agentConfig.json"
+- name: "creage bashconfig"
+  win_template:
+    src: templates/mwagent.config
+    dest: "{{agent_install_dir}}config/mwagent.config"
 - name: "upload python scripts"
   win_template:
     src: '{{ item.src }}'

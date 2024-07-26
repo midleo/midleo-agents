@@ -6,19 +6,13 @@
 
 cd $(dirname $0)
 USR=`whoami`
-
 HOMEDIR=$(pwd)"/config"
-DSPMQVER=/opt/mqm/bin/dspmqver
-DSPMQ=/opt/mqm/bin/dspmq
-RUNMQSC=/opt/mqm/bin/runmqsc
-AMQSEVT=/opt/mqm/bin/amqsevt
-ACEUSR=mqbrk
-MQSIPROFILE=/opt/ibm/ace-12/server/bin/mqsiprofile
 
-if [[ ! -z "${PYTHON_PATH}" ]]; then
-  PYTHON=${PYTHON_PATH}
+if [ ! -f $HOMEDIR"/mwagent.config" ]
+then
+  echo "no mwagent.config file found"
 else
-  PYTHON="{{python_install_dir}}"
+. $HOMEDIR"/mwagent.config"
 fi
 
 export DSPMQ

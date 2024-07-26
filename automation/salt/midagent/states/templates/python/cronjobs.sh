@@ -6,21 +6,16 @@
 
 cd $(dirname $0)
 USR=`whoami`
-
 HOMEDIR=$(pwd)"/config"
-DSPMQVER=/opt/mqm/bin/dspmqver
-DSPMQ=/opt/mqm/bin/dspmq
-RUNMQSC=/opt/mqm/bin/runmqsc
-AMQSEVT=/opt/mqm/bin/amqsevt
-ACEUSR=mqbrk
-MQSIPROFILE=/opt/ibm/ace-12/server/bin/mqsiprofile
-
-if [[ ! -z "${PYTHON_PATH}" ]]; then
-  PYTHON=${PYTHON_PATH}
-else
-  PYTHON="{{python_install_dir}}"
+if [[ ! -e $HOMEDIR ]]; then
+    mkdir $HOMEDIR
 fi
-
+if [ ! -f $HOMEDIR"/mwagent.config" ]
+then
+  echo "no mwagent.config file found"
+else
+. $HOMEDIR"/mwagent.config"
+fi
 
 export DSPMQ
 export DSPMQVER
@@ -33,10 +28,6 @@ YM=$(date '+%Y-%m')
 WD=$(date '+%d')
 HOUR=$(date '+%H%M')
 CM=$(date +%M)
-
-if [[ ! -e $HOMEDIR ]]; then
-    mkdir $HOMEDIR
-fi
 
 LRFILE=$HOMEDIR"/nextrun.txt"
 TST=$(date '+%s')
