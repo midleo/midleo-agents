@@ -1,18 +1,10 @@
-import base64,platform,json,re,uuid,time,subprocess,socket,sys,os,inspect
-from datetime import datetime
+import json,sys,os,inspect
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 
-from modules.base import makerequest,classes,configs,statarr,file_utils
-
-if platform.system()=="Linux":
-   from modules.base import lin_utils,lin_packages
-elif platform.system()=="Windows":
-   from modules.base import win_utils
-else:
-   exit()
+from modules.base import makerequest,classes,configs,file_utils
 
 YM=sys.argv[1]
 WD=sys.argv[2]

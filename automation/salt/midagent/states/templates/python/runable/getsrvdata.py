@@ -1,11 +1,11 @@
-import base64,platform,json,re,time,subprocess,socket,os,zlib, glob,inspect, sys
+import platform,json,re,os,inspect, sys
 from datetime import datetime, timedelta
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 
-from modules.base import makerequest,decrypt,classes,certcheck,configs,file_utils,statarr
+from modules.base import makerequest,classes,certcheck,configs
 from midleo_client import AGENT_VER
 
 if platform.system()=="Linux":

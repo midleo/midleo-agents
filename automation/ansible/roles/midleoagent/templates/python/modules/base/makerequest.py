@@ -1,4 +1,4 @@
-import requests, json, base64, urllib3, subprocess, os
+import requests, json, base64, urllib3
 from midleo_client import AGENT_VER
 from modules.base import classes
 urllib3.disable_warnings()

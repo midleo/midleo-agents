@@ -31,7 +31,6 @@ def getInstalledSW(hive, flag):
 
     return software_list
 
-# config functions
 def getName():
     try:
         return platform.node()
@@ -108,7 +107,6 @@ def getLBTS():
         classes.Err("Exception:"+str(err)+" at getLBTS()")
         return 0
 
-# net functions
 def getIP():
     try:
         hostname = socket.gethostname()
@@ -170,7 +168,7 @@ def getIFAddresses():
                 }
             }
             interface['name'] = net
-            for x in addr: # family: -1 -> MAC | 2 -> IPv4 | 23 -> IPv6
+            for x in addr:
                 if x.family == -1:
                     interface['MAC']['addr'] = x.address
                     interface['MAC']['netmask'] = x.netmask
@@ -186,8 +184,6 @@ def getIFAddresses():
         classes.Err("Exception:"+str(err)+" at getIFAddresses()")
         return []
 
-# installed software
 def getSoftware():
-    #software_list = getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY) + getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY) + getInstalledSW(winreg.HKEY_CURRENT_USER, 0)
     software_list = getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY) + getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY)
     return software_list
