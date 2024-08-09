@@ -178,6 +178,7 @@ midagent.cronjob:
     - month: '*'
     - dayweek: '*'
 
+#register appserver on mwadmin
 midagent_registerappsrv:
   mwagent_ext.register_appsrv:
      - token: {{ mwtoken }}
@@ -190,3 +191,10 @@ midagent_registerappsrv:
          appuser: "username"    #in case user is used for the app server access
          apppass: "pass"        #in case password is used for the app server access
          
+#enable availability
+midagent_enableavl:
+  cmd.run:
+     - runas: {{mwuser}}
+     - name: |
+         {{agent_install_dir}}magent.sh enableavl {{srvname}} {{appsrv_type}}
+        
