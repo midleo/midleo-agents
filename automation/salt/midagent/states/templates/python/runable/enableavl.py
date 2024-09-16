@@ -9,7 +9,7 @@ from modules.base import configs
 USR=sys.argv[1]
 APPSRV=sys.argv[2]
 APPSRVTYPE=sys.argv[3]
-DOCKERCONT=sys.argv[4]
+DOCKERCONT = sys.argv[4] if len(sys.argv) >= 5 else ''
 
 def createAvlJson():
    try:
