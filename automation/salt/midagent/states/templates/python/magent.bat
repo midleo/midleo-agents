@@ -45,6 +45,9 @@ IF "%1"=="enabletrackqm" (
 IF "%1"=="disabletrackqm" (
   goto disabletrackqm
 )
+IF "%1"=="createconfig" (
+  goto createconfig
+)
 
 goto usage
 
@@ -107,10 +110,10 @@ if NOT "%2"=="" (
 EXIT /B 0
 
 :disabletrackqm
-if NOT "%2"=="" (
-  python "runable\disabletrackqm.py" %2
-)
-EXIT /B 0
+python "runable\createconfig.py"
+:createconfig
+
+
 
 :usage
 echo usage:
@@ -124,4 +127,5 @@ echo    -  %~nx0 addappstat SRV_TYPE APPSRV '{"queues":"TEST.*,VVV.*","channels"
 echo    -  %~nx0 delappstat SRV_TYPE APPSRV
 echo    -  %~nx0 enabletrackqm QMGR # Transfer the mqat.ini file to /var/mqm/qmgr/QMGR/ folder
 echo    -  %~nx0 disabletrackqm QMGR
+echo    -  %~nx0 createconfig
 EXIT /B 0

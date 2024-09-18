@@ -19,8 +19,8 @@ def getmonData():
 def createConfigJson():
     try:
         config_data = getcfgData()
+        uid=config_data["uid"]
     except Exception as err:
-
         config_data = {
             "uid": str(uuid.uuid4().hex[:16]),
             "website": input("Please provide midleo DNS:"),

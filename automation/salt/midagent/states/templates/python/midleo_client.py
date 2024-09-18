@@ -4,9 +4,7 @@ from modules.base import decrypt,classes,configs
 
 PORT_NUMBER = 5550
 SIZE = 1024
-AGENT_VER = "1.24.13"
-
-configs.createConfigJson()
+AGENT_VER = "1.24.14"
 
 def listenfordata():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

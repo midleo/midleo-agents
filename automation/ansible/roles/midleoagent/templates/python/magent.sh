@@ -104,6 +104,14 @@ case "$1" in
       sudo su - mqm -c "echo 'ALTER QMGR ACTVTRC(OFF)' | $RUNMQSC $2"
       $PYTHON "runable/disabletrackqm.py" $2
       ;;
+   createconfig )
+      if [ -f $HOMEDIR"/agentConfig.json" ]
+      then
+         echo "file config/agentConfig.json already exist"
+      else
+        $PYTHON "runable/createconfig.py"
+      fi
+      ;;
    * )
       echo ""
       echo "usage:"
@@ -117,6 +125,7 @@ case "$1" in
       echo "   -  $0 delappstat SRV_TYPE APPSRV"
       echo "   -  $0 enabletrackqm QMGR # Transfer the mqat.ini file to /var/mqm/qmgr/QMGR/ folder"
       echo "   -  $0 disabletrackqm QMGR"
+      echo "   -  $0 createconfig"
       echo ""
   
    esac
