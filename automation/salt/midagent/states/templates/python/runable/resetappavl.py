@@ -12,10 +12,10 @@ WD=sys.argv[2]
 try:
    avl_data = configs.getAvlData()
    config_data = configs.getcfgData()
-   website = config_data['website']
-   webssl = config_data['webssl']
-   inttoken = config_data['inttoken']
-   uid = config_data['uid']
+   website = config_data['MWADMIN']
+   webssl = config_data['SSLENABLED']
+   inttoken = config_data['INTTOKEN']
+   uid = config_data['SRVUID']
    if len(avl_data)>0:
       for k,item in avl_data.items():
          ret=file_utils.ReadAvl("avl_"+k+".csv")

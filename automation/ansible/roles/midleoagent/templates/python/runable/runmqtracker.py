@@ -57,9 +57,9 @@ AMQSEVT=sys.argv[1]
 try:
    track_data = configs.gettrackData()
    config_data = configs.getcfgData()
-   website = config_data['website']
-   webssl = config_data['webssl']
-   inttoken = config_data['inttoken']
+   website = config_data['MWADMIN']
+   webssl = config_data['SSLENABLED']
+   inttoken = config_data['INTTOKEN']
    if len(track_data)>0:
       for k,item in track_data.items():
          try:

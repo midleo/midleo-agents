@@ -59,10 +59,10 @@ current_time = now.strftime("%Y-%m-%d %H:%M:%S")
 try:
    avl_data = configs.getAvlData()
    config_data = configs.getcfgData()
-   website = config_data['website']
-   webssl = config_data['webssl']
-   inttoken = config_data['inttoken']
-   uid = config_data['uid']
+   website = config_data['MWADMIN']
+   webssl = config_data['SSLENABLED']
+   inttoken = config_data['INTTOKEN']
+   uid = config_data['SRVUID']
    if len(avl_data)>0:
       for k,item in avl_data.items():
          if("dockercont" in item):

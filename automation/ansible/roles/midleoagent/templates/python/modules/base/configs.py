@@ -1,12 +1,15 @@
 import json, os, uuid
 
 def getcfgData():
+    parser={}
     try:
-       with open(os.getcwd()+"/config/agentConfig.json", 'r') as config_file:
-          config_data=json.load(config_file)
+       with open(file=os.getcwd()+"/config/mwagent.config", mode='r') as f:
+          for line in f:
+            key, value = line.strip().split('=', 1)
+            parser[key]=value
     except:
-      config_data={}      
-    return config_data
+      parser={}      
+    return parser
    
 def getmonData():
    try:
@@ -19,7 +22,7 @@ def getmonData():
 def createConfigJson():
     try:
         config_data = getcfgData()
-        uid=config_data["uid"]
+        uid=config_data["SRVUID"]
     except Exception as err:
         config_data = {
             "uid": str(uuid.uuid4().hex[:16]),

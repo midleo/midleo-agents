@@ -33,7 +33,7 @@ LRFILE=$HOMEDIR"/nextrun.txt"
 TST=$(date '+%s')
 if [ -e "$LRFILE" ]; then
   T=$(head -n 1 $LRFILE)
-  if [ -z "$T" ]; then
+  if [ "$T" ]; then
      TST=$T
   fi  
 fi

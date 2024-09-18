@@ -77,8 +77,6 @@ midagent_create_script:
         - source: salt://midagent/templates/python/cronjobs.sh
       - {{agent_install_dir}}cronjobs.bat:
         - source: salt://midagent/templates/python/cronjobs.bat
-      - {{agent_install_dir}}config/mwagent.config:
-        - source: salt://midagent/templates/mwagent.config
     - context:
         python_install_dir: "{{python_install_dir}}"
 
@@ -104,7 +102,7 @@ midagent_create_client_runable:
       - {{agent_install_dir}}runable:
         - source: salt://midagent/templates/python/runable
 
-{% if not salt['file.file_exists'](agent_install_dir+'config/agentConfig.json') %}
+{% if not salt['file.file_exists'](agent_install_dir+'config/mwagent.config') %}
 midagent_create_config:
   file.managed:
     - user: {{mwuser}}
@@ -112,8 +110,8 @@ midagent_create_config:
     - mode: '0755'
     - template: jinja
     - names:
-      - {{agent_install_dir}}config/agentConfig.json:
-        - source: salt://midagent/templates/agentConfig.json.j2
+      - {{agent_install_dir}}config/mwagent.config:
+        - source: salt://midagent/templates/mwagent.config.j2
     - context:
         agent_unique_id: "{{agent_unique_id}}"
         midleo_website_base_url: "{{midleo_website_base_url}}"
@@ -121,6 +119,7 @@ midagent_create_config:
         group_id: "{{group_id}}"
         inttoken: "{{int_token}}"
         update_interval_minutes: "{{update_interval_minutes}}"
+        python_install_dir: "{{python_install_dir}}"
 {% endif %}
 
 midagent_create_sudoer:

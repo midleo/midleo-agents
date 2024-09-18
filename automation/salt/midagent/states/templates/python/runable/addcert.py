@@ -10,7 +10,7 @@ CERT=sys.argv[1]
 print(CERT)
 def createCertJson():
    config_data = configs.getcfgData()
-   uid = config_data['uid']
+   uid = config_data['SRVUID']
 
    if not uid:
       pass

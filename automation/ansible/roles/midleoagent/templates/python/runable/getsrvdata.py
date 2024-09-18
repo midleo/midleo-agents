@@ -19,10 +19,10 @@ else:
 def create():
     try:
         config_data = configs.getcfgData()
-        uid = config_data['uid']
-        groupid = config_data['groupid']
-        updint = config_data['updint']
-        inttoken = config_data['inttoken']
+        uid = config_data['SRVUID']
+        groupid = config_data['GROUPID']
+        updint = config_data['UPDINT']
+        inttoken = config_data['INTTOKEN']
         
         if platform.system()=="Windows":
             cpu = classes.CPU(win_utils.getCPUName(), win_utils.getCPUCoreCount())
@@ -50,9 +50,9 @@ def create():
 def main():
     config = create()
     config_data = configs.getcfgData()
-    website = config_data['website']
-    webssl = config_data['webssl']
-    updint = int(config_data['updint'])
+    website = config_data['MWADMIN']
+    webssl = config_data['SSLENABLED']
+    updint = int(config_data['UPDINT'])
 
     if 'error' in config.__dict__.keys():
         return

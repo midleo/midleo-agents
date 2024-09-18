@@ -110,10 +110,13 @@ if NOT "%2"=="" (
 EXIT /B 0
 
 :disabletrackqm
-python "runable\createconfig.py"
+if NOT "%2"=="" (
+  python "runable\disabletrackqm.py" %2
+)
+EXIT /B 0
 :createconfig
-
-
+python "runable\createconfig.py"
+EXIT /B 0
 
 :usage
 echo usage:

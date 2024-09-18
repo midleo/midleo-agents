@@ -49,12 +49,12 @@
     group: "{{midleo_mwuser}}"
     mode: '0755'
 - name: "check exist agentconfig"
-  stat: "path={{agent_install_dir}}config/agentConfig.json"
+  stat: "path={{agent_install_dir}}config/mwagent.config"
   register: st_agcfg
 - name: "creage agentconfig"
   template:
-    src: templates/agentConfig.json.j2
-    dest: "{{agent_install_dir}}config/agentConfig.json"
+    src: templates/mwagent.config.j2
+    dest: "{{agent_install_dir}}config/mwagent.config"
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
     mode: '0644'

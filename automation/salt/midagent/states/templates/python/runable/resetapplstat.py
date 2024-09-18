@@ -13,9 +13,9 @@ for entry in os.scandir('modules/statistics'):
 try:
    mon_data = configs.getmonData()
    config_data = configs.getcfgData()
-   website = config_data['website']
-   webssl = config_data['webssl']
-   inttoken = config_data['inttoken']
+   website = config_data['MWADMIN']
+   webssl = config_data['SSLENABLED']
+   inttoken = config_data['INTTOKEN']
    for k,item in mon_data.items():
        for q,val in item.items():
           resstat=eval(k+'.resetStat(q,website,webssl,inttoken,val)')

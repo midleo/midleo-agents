@@ -9,7 +9,7 @@ AGENT_VER = "1.24.14"
 def listenfordata():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
       config_data = configs.getcfgData()
-      uid = config_data['uid']
+      uid = config_data['SRVUID']
       uid = uid+uid+uid+uid
       s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
       s.bind(('', PORT_NUMBER))

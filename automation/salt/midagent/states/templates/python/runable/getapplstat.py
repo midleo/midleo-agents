@@ -13,8 +13,8 @@ for entry in os.scandir('modules/statistics'):
 try:
    mon_data = configs.getmonData()
    config_data = configs.getcfgData()
-   website = config_data['website']
-   webssl = config_data['webssl']
+   website = config_data['MWADMIN']
+   webssl = config_data['SSLENABLED']
    for k,item in mon_data.items():
        for q,val in item.items():
           runstat=eval(k+'.getStat(q,json.dumps(val))')
