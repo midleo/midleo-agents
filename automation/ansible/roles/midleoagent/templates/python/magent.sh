@@ -24,11 +24,7 @@ export MQSIPROFILE
 
 case "$1" in
 	addcert )
-      read -p "Tool (keytool or runmqakm):" -e TOOL
-      read -p "keystore (ex /var/tmp/key.jks):" -e KEYSTORE
-      read -p "Label (ex democert):" -e LABEL
-      read -p "Password:" -s -e PWD
-      $PYTHON "runable/addcert.py" "${TOOL}#${KEYSTORE}#${LABEL}#${PWD}"
+      $PYTHON "runable/addcert.py" $2
       ;;
    delcert )
       if [ -z "$2" ]
@@ -115,7 +111,7 @@ case "$1" in
    * )
       echo ""
       echo "usage:"
-      echo "   -  $0 addcert"
+      echo "   -  $0 addcert '{\"tool\":\"keytool\",\"keystore\":\"/var/tmp/key.jks\",\"label\":\"demolabel\",\"password\":\"testpass\"}'"
       echo "   -  $0 delcert LABEL"
       echo "   -  $0 enableavl APP_SERVER SERVER_TYPE DOCKER_CONTAINER(In case it is working on Docker)"
       echo "   -  $0 disableavl APP_SERVER"

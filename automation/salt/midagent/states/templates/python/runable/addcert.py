@@ -6,8 +6,9 @@ sys.path.insert(0, parentdir)
 
 from modules.base import decrypt,configs
 
-CERT=sys.argv[1]
-print(CERT)
+CERTDATA=sys.argv[1]
+
+print(CERTDATA)
 def createCertJson():
    config_data = configs.getcfgData()
    uid = config_data['SRVUID']
@@ -16,21 +17,25 @@ def createCertJson():
       pass
 
    try:
+      CERTINP=json.loads(CERTDATA)
+   except Exception as err:
+      CERTINP={}
+
+   try:
       cert_data = configs.getcertData()
    except Exception as err:
-
       cert_data = {}
 
-   cert_data[CERT.split("#")[2]] = {
-      "command": CERT.split("#")[0],
-      "cfile": CERT.split("#")[1],
-      "clabel": CERT.split("#")[2],
-      "cpass": decrypt.encrypt(CERT.split("#")[3],uid+uid+uid+uid)
+   cert_data[CERTINP["label"]] = {
+      "command": CERTINP["tool"],
+      "cfile": CERTINP["keystore"],
+      "clabel": CERTINP["label"],
+      "cpass": decrypt.encrypt(CERTINP["password"],uid+uid+uid+uid)
    }
 
    with open(os.getcwd()+"/config/certs.json", 'w+') as cert_file:
       json.dump(cert_data, cert_file)
-   print(CERT.split("#")[2]+" configuration added")
+   print(CERTINP["label"]+" configuration added")
     
 if __name__ == "__main__":
    createCertJson()

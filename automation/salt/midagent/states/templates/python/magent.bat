@@ -53,11 +53,8 @@ goto usage
 
 
 :addcert
-set /P TOOL=Tool (keytool or runmqakm):
-set /P KEYSTORE=keystore (ex /var/tmp/key.jks):
-set /P LABEL=Label (ex democert):
-set /P PWD=Password:
-python "runable\addcert.py" %TOOL%#%KEYSTORE%#%LABEL%#%PWD%
+set "json=%~2"
+python "runable\addcert.py" !json!
 EXIT /B 0
 
 :delcert
@@ -120,7 +117,7 @@ EXIT /B 0
 
 :usage
 echo usage:
-echo    -  %~nx0 addcert
+echo    -  %~nx0 addcert '{"tool":"keytool","keystore":"/var/tmp/key.jks","label":"demolabel","password":"testpass"}'
 echo    -  %~nx0 delcert LABEL
 echo    -  %~nx0 enableavl APP_SERVER SERVER_TYPE DOCKER_CONTAINER(In case it is working on Docker)
 echo    -  %~nx0 disableavl APP_SERVER
