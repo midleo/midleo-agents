@@ -123,5 +123,5 @@ case "$1" in
       echo "   -  $0 disabletrackqm QMGR"
       echo "   -  $0 createconfig"
       echo ""
-  
+      
    esac
