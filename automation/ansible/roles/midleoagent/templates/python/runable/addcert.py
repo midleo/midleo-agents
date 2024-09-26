@@ -8,7 +8,6 @@ from modules.base import decrypt,configs
 
 CERTDATA=sys.argv[1]
 
-print(CERTDATA)
 def createCertJson():
    config_data = configs.getcfgData()
    uid = config_data['SRVUID']
