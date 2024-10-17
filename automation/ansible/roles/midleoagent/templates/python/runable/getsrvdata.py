@@ -28,7 +28,11 @@ def create():
             cpu = classes.CPU(win_utils.getCPUName(), win_utils.getCPUCoreCount())
             hw_config = classes.HWConfig(win_utils.getName(), win_utils.getOS(), win_utils.getArchitecture(), win_utils.getMachineType(), cpu.__dict__, win_utils.getMemory(), win_utils.getDiskPartitions(), win_utils.getLBTS())
             net_config = classes.NetConfig(win_utils.getIP())
-            config = classes.Config(uid,inttoken,groupid,AGENT_VER,updint, hw_config.__dict__, net_config.__dict__, win_utils.getSoftware()) 
+            if os.path.isfile(os.getcwd()+"/config/certs.json"):
+               cert_check = certcheck.Run(uid+uid+uid+uid)
+            else:
+               cert_check = []
+            config = classes.Config(uid,inttoken,groupid,AGENT_VER,updint, hw_config.__dict__, net_config.__dict__, win_utils.getSoftware(), cert_check) 
         elif platform.system()=="Linux":
             cpu = classes.CPU(lin_utils.getCPUName(), lin_utils.getCPUCoreCount())
             hw_config = classes.HWConfig(lin_utils.getName(), lin_utils.getOS(), lin_utils.getArchitecture(), lin_utils.getMachineType(), cpu.__dict__, lin_utils.getMemory(), lin_utils.getDiskPartitions(), lin_utils.getLBTS())
