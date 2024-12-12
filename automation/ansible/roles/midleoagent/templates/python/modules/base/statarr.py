@@ -24,6 +24,7 @@ def ibmaceODBC():
 def avlCheck(thisapp,dcont=""):
     arr={}
     arr["ibmmq"]="echo 'DISPLAY QMSTATUS' | "+os.environ['RUNMQSC']+" "+thisapp+" | grep RUNNING | wc -l"
+    arr["ibmmqdocker"]="/usr/bin/docker exec -t "+dcont+" /bin/bash -c 'echo \"DISPLAY QMSTATUS\" | "+os.environ['RUNMQSC']+" "+thisapp+"' | grep RUNNING | wc -l"
     arr["ibmace"]="sudo -u "+os.environ['ACEUSR']+" -i 'mqsilist' | grep "+thisapp+" | grep running | wc -l"
     arr["ibmacedocker"]="/usr/bin/docker exec -t "+dcont+" /bin/bash -c '. "+os.environ['MQSIPROFILE']+" &&  mqsilist' | grep "+thisapp+" | grep running | wc -l"
     arr["ibmiib"]="sudo -u "+os.environ['ACEUSR']+" -i 'mqsilist' | grep "+thisapp+" | grep running | wc -l"
