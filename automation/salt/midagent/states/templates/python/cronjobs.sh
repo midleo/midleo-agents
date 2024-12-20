@@ -23,6 +23,7 @@ export AMQSEVT
 export RUNMQSC
 export ACEUSR
 export MQSIPROFILE
+export IIBMQSIPROFILE
 
 YM=$(date '+%Y-%m')
 WD=$(date '+%d')

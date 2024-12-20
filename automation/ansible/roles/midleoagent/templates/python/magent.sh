@@ -21,6 +21,7 @@ export AMQSEVT
 export RUNMQSC
 export ACEUSR
 export MQSIPROFILE
+export IIBMQSIPROFILE
 
 case "$1" in
 	addcert )

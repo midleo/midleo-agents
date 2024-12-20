@@ -28,7 +28,7 @@ def avlCheck(thisapp,dcont=""):
     arr["ibmace"]="sudo -u "+os.environ['ACEUSR']+" -i 'mqsilist' | grep "+thisapp+" | grep running | wc -l"
     arr["ibmacedocker"]="/usr/bin/docker exec -t "+dcont+" /bin/bash -c '. "+os.environ['MQSIPROFILE']+" &&  mqsilist' | grep "+thisapp+" | grep running | wc -l"
     arr["ibmiib"]="sudo -u "+os.environ['ACEUSR']+" -i 'mqsilist' | grep "+thisapp+" | grep running | wc -l"
-    arr["ibmiibdocker"]="/usr/bin/docker exec -t "+dcont+" /bin/bash -c '. "+os.environ['MQSIPROFILE']+" &&  mqsilist' | grep "+thisapp+" | grep running | wc -l"
+    arr["ibmiibdocker"]="/usr/bin/docker exec -t "+dcont+" /bin/bash -c '. "+os.environ['IIBMQSIPROFILE']+" &&  mqsilist' | grep "+thisapp+" | grep running | wc -l"
     arr["axwaycft"]="ps -ef|grep CFTMAIN | wc -l"
     arr["axwayst"]="ps -ef|grep Axway | grep catalina | wc -l"
     return arr

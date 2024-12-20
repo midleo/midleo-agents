@@ -14,6 +14,7 @@ set RUNMQSC=D:\apps\IBM\MQ\bin\runmqsc
 set AMQSEVT=D:\apps\IBM\MQ\bin\amqsevt
 set ACEUSR=mqbrk
 set MQSIPROFILE=D:\apps\IBM\ACE\server\bin\mqsiprofile
+set IIBMQSIPROFILE=D:\apps\IBM\IIB\server\bin\mqsiprofile
 
 for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /format:list') do set datetime=%%I
 
