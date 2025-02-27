@@ -21,6 +21,26 @@ def ibmaceODBC():
     arr["keys"]["used"]=8
     return arr
 
+def kafkaBrokerTopicMetricsBytesInPerSec():
+    arr={}
+    arr["noteq"]="key"
+    arr["node"]=1
+    arr["server"]=1
+    arr["keys"]={}
+    arr["keys"]["timestamp"]=2
+    arr["keys"]["count"]=3
+    return arr
+
+def kafkaBrokerTopicMetricsBytesOutPerSec():
+    arr={}
+    arr["noteq"]="key"
+    arr["node"]=1
+    arr["server"]=1
+    arr["keys"]={}
+    arr["keys"]["timestamp"]=2
+    arr["keys"]["count"]=3
+    return arr
+
 def avlCheck(thisapp,dcont=""):
     arr={}
     arr["ibmmq"]="echo 'DISPLAY QMSTATUS' | "+os.environ['RUNMQSC']+" "+thisapp+" | grep RUNNING | wc -l"
