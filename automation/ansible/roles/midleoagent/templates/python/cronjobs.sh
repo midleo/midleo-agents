@@ -6,6 +6,7 @@
 
 cd $(dirname $0)
 USR=`whoami`
+MWAGTDIR=$(pwd)
 HOMEDIR=$(pwd)"/config"
 if [[ ! -e $HOMEDIR ]]; then
     mkdir $HOMEDIR
@@ -24,6 +25,7 @@ export RUNMQSC
 export ACEUSR
 export MQSIPROFILE
 export IIBMQSIPROFILE
+export MWAGTDIR
 
 YM=$(date '+%Y-%m')
 WD=$(date '+%d')

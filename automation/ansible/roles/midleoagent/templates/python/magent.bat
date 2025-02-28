@@ -7,6 +7,7 @@ setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
 set USR=%USERNAME%
+set MWAGTDIR=%cd%
 set HOMEDIR=%cd%\config
 set DSPMQVER=D:\apps\IBM\MQ\bin\dspmqver
 set DSPMQ=D:\apps\IBM\MQ\bin\dspmq
