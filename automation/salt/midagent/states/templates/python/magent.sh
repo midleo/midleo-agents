@@ -41,7 +41,7 @@ case "$1" in
         $0
         exit 1
       fi
-      $PYTHON "runable/enableavl.py" $USR $2 $3 $4 $5 $6
+      $PYTHON "runable/enableavl.py" $2 $3 $4
       ;;
    disableavl )
       if [ -z "$2" ]
@@ -49,7 +49,7 @@ case "$1" in
         $0
         exit 1
       fi
-      $PYTHON "runable/disableavl.py" $USR $2 $3
+      $PYTHON "runable/disableavl.py" $2 $3
       ;;
    stopavl )
       if [ -z "$3" ]
@@ -114,7 +114,7 @@ case "$1" in
       echo "usage:"
       echo "   -  $0 addcert '{\"tool\":\"keytool\",\"keystore\":\"/var/tmp/key.jks\",\"label\":\"demolabel\",\"password\":\"testpass\"}'"
       echo "   -  $0 delcert LABEL"
-      echo "   -  $0 enableavl APP_SERVER SERVER_TYPE DOCKER_CONTAINER(In case it is working on Docker) USER(optional) PASSWORD(optional)"
+      echo "   -  $0 enableavl APP_SERVER SERVER_TYPE '{\"docker\":\"DOCKER_CONTAINER_NAME\",\"user\":\"USERNAME_FOR_APPLICATION_SERVER_ACCESS\",\"pass\":\"PASSWORD_FOR_APPLICATION_SERVER_ACCESS\"}'"
       echo "   -  $0 disableavl APP_SERVER SERVER_TYPE"
       echo "   -  $0 stopavl APP_SERVER comment"
       echo "   -  $0 startavl APP_SERVER"

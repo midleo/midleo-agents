@@ -6,9 +6,8 @@ sys.path.insert(0, parentdir)
 
 from modules.base import configs
 
-USR=sys.argv[1]
-APPSRV=sys.argv[2]
-APPSRVTYPE=sys.argv[3]
+APPSRV=sys.argv[1]
+APPSRVTYPE=sys.argv[2]
 
 try:
    avl_data = configs.getAvlData()

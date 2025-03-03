@@ -67,13 +67,13 @@ EXIT /B 0
 
 :enableavl
 if NOT "%3"=="" (
-  python "runable\enableavl.py" %USR% %2 %3 %4 %5 %6
+  python "runable\enableavl.py" %2 %3 %4 %5 %6
 )
 EXIT /B 0
 
 :disableavl
 if NOT "%2"=="" (
-  python "runable\disableavl.py" %USR% %2 %3
+  python "runable\disableavl.py" %2 %3
 )
 EXIT /B 0
 
