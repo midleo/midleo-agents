@@ -8,12 +8,14 @@ from modules.base import configs
 
 USR=sys.argv[1]
 APPSRV=sys.argv[2]
+APPSRVTYPE=sys.argv[3]
 
 try:
    avl_data = configs.getAvlData()
 except Exception as err:
    print("No such configuration file - config/confavl.json")
-avl_data.pop(APPSRV, None)
+if APPSRVTYPE in avl_data:
+   avl_data[APPSRVTYPE].pop(APPSRV, None)
 with open(os.getcwd()+"/config/confavl.json", 'w+') as avl_file:
    json.dump(avl_data, avl_file)
 print("Availability check for "+APPSRV+" have been disabled")

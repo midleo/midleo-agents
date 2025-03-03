@@ -18,7 +18,7 @@ try:
    uid = config_data['SRVUID']
    if len(avl_data)>0:
       for k,item in avl_data.items():
-         ret=file_utils.ReadAvl("avl_"+k+".csv")
+         ret=file_utils.ReadAvl("avl_"+item["type"]+"_"+k+".csv")
          if 'navl' in ret:
             ret["appsrv"]=k
             ret["srvid"]=uid

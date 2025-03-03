@@ -64,31 +64,40 @@ try:
    inttoken = config_data['INTTOKEN']
    uid = config_data['SRVUID']
    if len(avl_data)>0:
-      for k,item in avl_data.items():
-         if("dockercont" in item):
-            ret=statarr.avlCheck(k,item["dockercont"])
-         else:
-            ret=statarr.avlCheck(k)
-         if(item["enabled"]=='yes'):
-           ret=ret[item["type"]]
-           try:
+    for srvtype,srvinfo in avl_data.items():
+      if len(srvinfo.items())>0: 
+        for k,item in srvinfo.items():
+          cred = {}
+
+          if("usr" in item and item["usr"] != ""):
+            cred["usr"] = item["usr"]
+          if("pwd" in item and item["pwd"] != ""):
+            cred["pwd"] = item["pwd"]
+
+          if("dockercont" in item):
+            ret=statarr.avlCheck(k,item["dockercont"],cred)
+          else:
+            ret=statarr.avlCheck(k,"",cred)
+          if(item["enabled"]=='yes'):
+            ret=ret[srvtype]
+            try:
              output = sp_run(ret,shell=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
              output = output.stdout.decode()
              if(int(output)>=1):
-               classes.WriteData("online","avl_"+k+".csv")
+               classes.WriteData("online","avl_"+srvtype+"_"+k+".csv")
              else:
-               classes.WriteData("offline","avl_"+k+".csv")
+               classes.WriteData("offline","avl_"+srvtype+"_"+k+".csv")
                if("monid" in item):
                   req={}
                   req["appsrv"]=k
                   req["monid"]=item["monid"]
                   req["srvid"]=uid
-                  req["srvtype"]=item["type"]
+                  req["srvtype"]=srvtype
                   req["message"]="Server not available"
                   req["alerttime"]=current_time
                   req["inttoken"]=inttoken
                   makerequest.postMonAl(webssl,website,json.dumps(req))
-           except subprocess.CalledProcessError as e:
+            except subprocess.CalledProcessError as e:
              classes.Err("avlCheck err:"+str(e.output))
 except Exception as err:
    classes.Err("error in runappavl:"+str(err)) 

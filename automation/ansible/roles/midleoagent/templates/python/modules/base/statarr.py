@@ -41,7 +41,11 @@ def kafkaBrokerTopicMetricsBytesOutPerSec():
     arr["keys"]["count"]=3
     return arr
 
-def avlCheck(thisapp,dcont=""):
+def avlCheck(thisapp,dcont="",cred=None):
+    if(cred is None):
+       cred = {}
+    default_usr = ""
+    default_pwd = ""
     arr={}
     arr["ibmmq"]="echo 'DISPLAY QMSTATUS' | "+os.environ['RUNMQSC']+" "+thisapp+" | grep RUNNING | wc -l"
     arr["ibmmqdocker"]="/usr/bin/docker exec -t "+dcont+" /bin/bash -c 'echo \"DISPLAY QMSTATUS\" | "+os.environ['RUNMQSC']+" "+thisapp+"' | grep RUNNING | wc -l"
@@ -51,5 +55,6 @@ def avlCheck(thisapp,dcont=""):
     arr["ibmiibdocker"]="/usr/bin/docker exec -t "+dcont+" /bin/bash -c '. "+os.environ['IIBMQSIPROFILE']+" &&  mqsilist' | grep "+thisapp+" | grep running | wc -l"
     arr["axwaycft"]="ps -ef|grep CFTMAIN | wc -l"
     arr["axwayst"]="ps -ef|grep Axway | grep catalina | wc -l"
-    arr["kafka"]="java -jar "+os.environ['MWAGTDIR']+"/modules/statistics/kafka/resources/midleo_kafka.jar '{""\"function\""":""\"srvcheck\""",""\"server\""":""\""+thisapp+"\"""}' | grep "+thisapp+" | wc -l"
+    arr["kafka"]="java -jar "+os.environ['MWAGTDIR']+"/modules/statistics/kafka/resources/midleo_kafka.jar '{\"function\":\"srvcheck\",\"server\":\""+thisapp+"\"}' | grep "+thisapp+" | wc -l"
+    arr["jboss"]="java -jar "+os.environ['MWAGTDIR']+"/modules/statistics/jboss/resources/midleo_jboss.jar '{\"function\":\"srvcheck\",\"server\":\""+thisapp+"\",\"usr\":\""+cred.get("usr", default_usr)+"\",\"pwd\":\""+cred.get("pwd", default_pwd)+"\"}' | grep "+thisapp+" | wc -l"
     return arr
