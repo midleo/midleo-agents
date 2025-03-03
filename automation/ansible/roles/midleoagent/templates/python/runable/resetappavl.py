@@ -17,16 +17,18 @@ try:
    inttoken = config_data['INTTOKEN']
    uid = config_data['SRVUID']
    if len(avl_data)>0:
-      for k,item in avl_data.items():
-         ret=file_utils.ReadAvl("avl_"+item["type"]+"_"+k+".csv")
-         if 'navl' in ret:
-            ret["appsrv"]=k
-            ret["srvid"]=uid
-            ret["inttoken"]=inttoken
-            ret["srvtype"]=item["type"]
-            ret["thismonth"]=YM
-            ret["thisdate"]=WD
-            makerequest.postAvlData(webssl,website,json.dumps(ret))
+      for srvtype,srvinfo in avl_data.items():
+        if len(srvinfo.items())>0: 
+          for k,item in srvinfo.items():
+            ret=file_utils.ReadAvl("avl_"+srvtype+"_"+k+".csv")
+            if 'navl' in ret:
+              ret["appsrv"]=k
+              ret["srvid"]=uid
+              ret["inttoken"]=inttoken
+              ret["srvtype"]=srvtype
+              ret["thismonth"]=YM
+              ret["thisdate"]=WD
+              makerequest.postAvlData(webssl,website,json.dumps(ret))
 
 except Exception as err:
-   classes.Err("No such configuration file - config/conftrack.json."+err)
+   classes.Err("No such configuration file - config/confavl.json."+err)
