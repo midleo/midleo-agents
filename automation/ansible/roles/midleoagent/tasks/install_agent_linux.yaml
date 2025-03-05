@@ -91,6 +91,7 @@
       - requests
       - pycryptodome
       - netifaces
+      - pymqi
 - name: copy agent service
   template:
     src: "templates/agent_linux_service.j2"

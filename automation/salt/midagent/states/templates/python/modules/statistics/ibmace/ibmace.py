@@ -19,7 +19,7 @@ def resetStat(thisnode,website,webssl,inttoken,stat_data):
                    makerequest.postStatData(webssl,website,json.dumps(ret))  
 
     except OSError as err:
-       classes.Err("Error opening the file statlist:"+str(err))
+       classes.Err("Error opening the file ibmace:"+str(err))
 
 def getStat(thisqm,inpdata):
    return
