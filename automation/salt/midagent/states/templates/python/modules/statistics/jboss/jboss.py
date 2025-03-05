@@ -17,7 +17,7 @@ def getStat(thisqm,inpdata):
          pwd_value = inpdata["pwd"]
          del inpdata["pwd"]
       for kin,vin in inpdata.items():
-         java_arg = json.dumps({"logdir": vin, "mbean": kin, "function": "getstat", "usr": usr_value, "pwd": pwd_value})
+         java_arg = json.dumps({"logdir": vin, "server": thisqm, "mbean": kin, "function": "getstat", "usr": usr_value, "pwd": pwd_value})
          command = ["java", "-jar", jar_path, java_arg]
          result = subprocess.run(command, capture_output=True, text=True)
          if result.stdout:
@@ -35,4 +35,21 @@ def getStat(thisqm,inpdata):
 
 
 def resetStat(thisnode,website,webssl,inttoken,stat_data):
-   return
+    try:
+       if len(stat_data)>0:
+          for k,item in stat_data.items():
+             func = getattr(statarr, "jboss", None)
+             files = glob.glob(item+"Statistics_"+k+".csv")
+             for file in files:
+                ret=file_utils.csv_json(file,func(),"",True)
+                retarr=json.loads(ret)
+                if len(retarr)>0:
+                   ret={}
+                   ret["type"]="jboss"
+                   ret["inttoken"]=inttoken
+                   ret["subtype"]=k
+                   ret["data"]=retarr
+                   makerequest.postStatData(webssl,website,json.dumps(ret))  
+
+    except OSError as err:
+       classes.Err("Error opening the file statlist:"+str(err))

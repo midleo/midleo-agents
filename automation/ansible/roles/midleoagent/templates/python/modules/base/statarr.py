@@ -21,7 +21,7 @@ def ibmaceODBC():
     arr["keys"]["used"]=8
     return arr
 
-def kafkaBrokerTopicMetricsBytesInPerSec():
+def kafka():
     arr={}
     arr["noteq"]="key"
     arr["node"]=1
@@ -31,7 +31,7 @@ def kafkaBrokerTopicMetricsBytesInPerSec():
     arr["keys"]["count"]=3
     return arr
 
-def kafkaBrokerTopicMetricsBytesOutPerSec():
+def jboss():
     arr={}
     arr["noteq"]="key"
     arr["node"]=1

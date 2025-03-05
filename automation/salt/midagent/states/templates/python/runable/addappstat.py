@@ -1,3 +1,4 @@
+import base64
 import json,sys,os,inspect
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -21,7 +22,8 @@ def createMonJson():
       STJSDATA={}
    try:
      for k,item in STJSDATA.items():
-         mon_data[SRVTYPE][APPSRV][k] = item
+         mon_data[SRVTYPE][APPSRV][k] = base64.b64encode(item.encode()).decode('ascii') if k=='pwd' else item
+
    except Exception as err: 
      try:
         mon_data[SRVTYPE][APPSRV] = {}
@@ -29,7 +31,7 @@ def createMonJson():
         mon_data[SRVTYPE] = {}
         mon_data[SRVTYPE][APPSRV] = {}
      for k,item in STJSDATA.items():
-         mon_data[SRVTYPE][APPSRV][k] = item
+         mon_data[SRVTYPE][APPSRV][k] = base64.b64encode(item.encode()).decode('ascii') if k=='pwd' else item
 
    with open(os.getcwd()+"/config/confapplstat.json", 'w+') as mon_file:
       json.dump(mon_data, mon_file)

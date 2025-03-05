@@ -29,7 +29,7 @@ def resetStat(thisnode,website,webssl,inttoken,stat_data):
     try:
        if len(stat_data)>0:
           for k,item in stat_data.items():
-             func = getattr(statarr, "kafka"+k, None)
+             func = getattr(statarr, "kafka", None)
              files = glob.glob(item+"Statistics_"+k+".csv")
              for file in files:
                 ret=file_utils.csv_json(file,func(),"",True)
