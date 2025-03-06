@@ -11,7 +11,7 @@ def getStat(thisqm,inpdata):
         if "container" in inpdata:
           container = inpdata["container"]
           del inpdata["container"]
-        thisscript=os.environ['MWAGTDIR']+"/magent_docker.sh getibmmqdockerstat "+thisqm+" '"+json.dumps(inpdata)+"'"
+        thisscript=os.environ['MWAGTDIR']+"/magent_docker.sh getdockerstat ibmmq "+thisqm+" '"+json.dumps(inpdata)+"'"
         command = ["docker", "exec", container, "bash", "-c", thisscript]
         result = subprocess.run(command, capture_output=True, text=True)
         if result.stdout:

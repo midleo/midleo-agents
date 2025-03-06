@@ -24,18 +24,18 @@ export MQSIPROFILE
 export IIBMQSIPROFILE
 
 case "$1" in
-   getibmmqdockerstat )
+   getdockerstat )
       if [ -z "$2" ]
       then
         $0
         exit 1
       fi
-      $PYTHON "runable/ibmmqdocker.py" $2 "${3}"
+      $PYTHON "runable/getdockerstat.py" $2 "${3}"
       ;;
    * )
       echo ""
       echo "usage:"
-      echo "   -  $0 getibmmqdockerstat APPSRV '{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\"}'"
+      echo "   -  $0 getdockerstat SRV_TYPE APPSRV 'JSON'"
       echo ""
       
    esac
