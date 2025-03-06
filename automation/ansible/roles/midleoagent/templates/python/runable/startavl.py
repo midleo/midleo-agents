@@ -8,16 +8,17 @@ from modules.base import classes,configs
 
 USR=sys.argv[1]
 APPSRV=sys.argv[2]
+APPSRVTYPE=sys.argv[3]
 
 try:
    avl_data = configs.getAvlData()
 except Exception as err:
    print("No such configuration file - config/confavl.json")
 try:
-   avl_data[APPSRV]["enabled"]="yes"
+   avl_data[APPSRVTYPE][APPSRV]["enabled"]="yes"
    with open(os.getcwd()+"/config/confavl.json", 'w+') as avl_file:
       json.dump(avl_data, avl_file)
-   classes.WriteData("started,"+USR,"avl_"+APPSRV+".csv")
+   classes.WriteData("started,"+USR,"avl_"+APPSRVTYPE+"_"+APPSRV+".csv")
    print("Availability check for "+APPSRV+" have been started")
 except Exception as err:
    print("No such availability for:"+APPSRV)

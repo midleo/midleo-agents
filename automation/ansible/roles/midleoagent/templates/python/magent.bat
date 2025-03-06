@@ -79,13 +79,13 @@ EXIT /B 0
 
 :stopavl
 if NOT "%3"=="" (
-  python "runable\stopavl.py" %USR% %2 %3
+  python "runable\stopavl.py" %USR% %2 %3 %4
 )
 EXIT /B 0
 
 :startavl
 if NOT "%2"=="" (
-  python "runable\startavl.py" %USR% %2
+  python "runable\startavl.py" %USR% %2 %3
 )
 EXIT /B 0
 
@@ -123,8 +123,8 @@ echo    -  %~nx0 addcert '{"tool":"keytool","keystore":"/var/tmp/key.jks","label
 echo    -  %~nx0 delcert LABEL
 echo    -  %~nx0 enableavl APP_SERVER SERVER_TYPE DOCKER_CONTAINER(In case it is working on Docker) USER(password) PASS(password)
 echo    -  %~nx0 disableavl APP_SERVER SERVER_TYPE
-echo    -  %~nx0 stopavl APP_SERVER comment
-echo    -  %~nx0 startavl APP_SERVER
+echo    -  %~nx0 stopavl APP_SERVER SERVER_TYPE comment
+echo    -  %~nx0 startavl APP_SERVER SERVER_TYPE
 echo    -  %~nx0 addappstat SRV_TYPE APPSRV '{"queues":"TEST.*,VVV.*","channels":"SDR.*,CHL.*"}'
 echo    -  %~nx0 delappstat SRV_TYPE APPSRV
 echo    -  %~nx0 enabletrackqm QMGR # Transfer the mqat.ini file to /var/mqm/qmgr/QMGR/ folder

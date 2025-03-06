@@ -57,7 +57,7 @@ case "$1" in
         $0
         exit 1
       fi
-      $PYTHON "runable/stopavl.py" $USR $2 "${3}"
+      $PYTHON "runable/stopavl.py" $USR $2 $3 "${4}"
       ;;
    startavl )
       if [ -z "$2" ]
@@ -65,7 +65,7 @@ case "$1" in
         $0
         exit 1
       fi
-      $PYTHON "runable/startavl.py" $USR $2
+      $PYTHON "runable/startavl.py" $USR $2 $3
       ;;
    addappstat )
       if [ -z "$3" ]
@@ -116,8 +116,8 @@ case "$1" in
       echo "   -  $0 delcert LABEL"
       echo "   -  $0 enableavl APP_SERVER SERVER_TYPE '{\"docker\":\"DOCKER_CONTAINER_NAME\",\"user\":\"USERNAME_FOR_APPLICATION_SERVER_ACCESS\",\"pass\":\"PASSWORD_FOR_APPLICATION_SERVER_ACCESS\"}'"
       echo "   -  $0 disableavl APP_SERVER SERVER_TYPE"
-      echo "   -  $0 stopavl APP_SERVER comment"
-      echo "   -  $0 startavl APP_SERVER"
+      echo "   -  $0 stopavl APP_SERVER SERVER_TYPE comment"
+      echo "   -  $0 startavl APP_SERVER SERVER_TYPE"
       echo "   -  $0 addappstat SRV_TYPE APPSRV '{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\"}'"
       echo "   -  $0 delappstat SRV_TYPE APPSRV"
       echo "   -  $0 enabletrackqm QMGR # Transfer the mqat.ini file to /var/mqm/qmgr/QMGR/ folder"
