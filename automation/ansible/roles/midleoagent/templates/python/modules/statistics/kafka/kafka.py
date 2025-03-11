@@ -8,16 +8,19 @@ def getStat(thisqm,inpdata):
       inpdata=json.loads(inpdata)
       script_dir = os.path.dirname(os.path.abspath(__file__))
       jar_path = os.path.join(script_dir, "resources", "midleo_kafka.jar")
-      for kin,vin in inpdata.items():
-         java_arg = json.dumps({"logdir": vin, "mbean": kin, "function": "localstat", "localbrk":thisqm})
-         command = ["java", "-jar", jar_path, java_arg]
-         result = subprocess.run(command, capture_output=True, text=True)
-         if result.stdout:
-            classes.Err("Output:"+result.stdout)
-         if result.stderr:
-            classes.Err("Error:"+result.stderr)
-         if result.returncode != 0:
-            classes.Err("Command failed with exit code "+result.returncode)
+      mbean_list = [kin for kin in inpdata.keys()]
+      mbeans_combined = ",".join(mbean_list)
+      logdir = next(iter(inpdata.values()))
+
+      java_arg = json.dumps({"logdir": logdir, "mbean": mbeans_combined, "function": "localstat", "localbrk":thisqm})
+      command = ["java", "-jar", jar_path, java_arg]
+      result = subprocess.run(command, capture_output=True, text=True)
+      if result.stdout:
+         classes.Err("Output:"+result.stdout)
+      if result.stderr:
+         classes.Err("Error:"+result.stderr)
+      if result.returncode != 0:
+         classes.Err("Command failed with exit code "+result.returncode)
 
    
    except json.JSONDecodeError as e:
