@@ -52,7 +52,7 @@ except:
                                 stderr=errs)
     subprocess.run = sp_run
 
-AMQSEVT=sys.argv[1]
+AMQSEVT=os.environ['AMQSEVT']
 
 try:
    track_data = configs.gettrackData()

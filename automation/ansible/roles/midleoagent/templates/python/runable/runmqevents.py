@@ -1,3 +1,5 @@
+#https://www.ibm.com/docs/en/ibm-mq/9.4?topic=events-enabling-queue-depth
+
 import json,subprocess,sys,os,inspect
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -55,43 +57,48 @@ except:
 AMQSEVT=os.environ['AMQSEVT']
 
 try:
-   track_data = configs.gettrackData()
+   avl_data = configs.getAvlData()
    config_data = configs.getcfgData()
    website = config_data['MWADMIN']
    webssl = config_data['SSLENABLED']
    inttoken = config_data['INTTOKEN']
-   if len(track_data)>0:
-      for k,item in track_data.items():
-         try:
-            output = sp_run("sudo su - mqm -c '"+AMQSEVT+" -m "+k+" -q SYSTEM.ADMIN.TRACE.ACTIVITY.QUEUE -w 1 -o json | jq . -c --slurp'",shell=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
-            output = output.stdout.decode()
+   uid = config_data['SRVUID']
+
+
+   if len(avl_data)>0:
+    for srvtype,srvinfo in avl_data.items():
+     if len(srvinfo.items()) > 0 and (srvtype == "ibmmq" or srvtype == "ibmmqdocker"):
+        for k,item in srvinfo.items():
+          try:
+            if srvtype == "ibmmqdocker":
+              container=item["dockercont"]
+              thisscript=AMQSEVT+" -m "+k+" -q SYSTEM.ADMIN.PERFM.EVENT -w 1 -o json | jq . -c --slurp"
+              command = ["docker", "exec", container, "bash", "-c", thisscript]
+              output = subprocess.run(command, capture_output=True, text=True)
+              output = output.stdout
+            else:
+              output = sp_run("sudo su - mqm -c '"+AMQSEVT+" -m "+k+" -q SYSTEM.ADMIN.PERFM.EVENT -w 1 -o json | jq . -c --slurp'",shell=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+              output = output.stdout.decode() 
             try:
                out = json.loads(output)
                if len(out)>0:
                   for event in out:
                      eventData = event["eventData"]
-                     if "channelName" in eventData: 
-                         channelName = eventData["channelName"]
-                         connectionName = eventData["connectionName"]
-                     else:     
-                          channelName = "Local"
-                          connectionName = "Local     "
-                     app = eventData["applName"]
-                     actTr = eventData["activityTrace"]
-                     for act in actTr:
-                         if act["operationId"] in ["Put1","Put","Get","Cb","Callback"] and act["objectName"]!="SYSTEM.ADMIN.TRACE.ACTIVITY.QUEUE":
-                            ret={}
-                            ret["qmgr"]=k
-                            ret["objectName"]=act["objectName"]
-                            ret["applName"] = app
-                            ret["channelName"]= channelName
-                            ret["connectionName"] = connectionName
-                            ret["trackdata"]=act
-                            ret["inttoken"]=inttoken
-                            makerequest.postTrackData(webssl,website,json.dumps(ret))
+                     if eventData["baseObjectName"]!="SYSTEM.ADMIN.PERFM.EVENT":
+                        ret={}
+                        ret["appsrv"]=eventData["queueMgrName"]
+                        ret["monid"]="MQRC" + str(event["eventReason"]["value"])
+                        ret["srvid"]=uid
+                        ret["srvtype"]=srvtype
+                        ret["alerttime"]=event["eventCreation"]["timeStamp"]
+                        ret["message"]=event["eventReason"]["name"]
+                        ret["inttoken"]=inttoken
+                        ret["object"]=eventData["baseObjectName"]
+                        makerequest.postMonAl(webssl,website,json.dumps(ret))
+
             except:
                classes.Err("Return error:"+output)
-         except subprocess.CalledProcessError as e:
+          except subprocess.CalledProcessError as e:
             classes.Err("amqsevt err:"+e.output)
    
 except Exception as err:

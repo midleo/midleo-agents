@@ -61,7 +61,7 @@ if exist %HOMEDIR%\confapplstat.json (
   EXIT /B 0
 )
 if exist %HOMEDIR%\conftrack.json (
-  python "runable\runmqtracker.py" %AMQSEVT%
+  python "runable\runmqtracker.py"
 )
 if exist %HOMEDIR%\confavl.json (
   if %HOUR%=="2359" (

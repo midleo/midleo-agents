@@ -55,7 +55,7 @@ case "$1" in
          fi
       fi
       if [ -f $HOMEDIR"/conftrack.json" ]; then
-         $PYTHON "runable/runmqtracker.py" $AMQSEVT
+         $PYTHON "runable/runmqtracker.py"
       fi
       if [ -e "$HOMEDIR/confavl.json" ]; then
          if [ $HOUR == "2359" ]; then
@@ -63,6 +63,7 @@ case "$1" in
          else
             $PYTHON "runable/runappavllin.py"
          fi
+         $PYTHON "runable/runmqevents.py"
       fi
       if [ $TST -le $(date '+%s') ]; then
          $PYTHON "runable/getsrvdata.py"
