@@ -1,5 +1,3 @@
-#https://www.ibm.com/docs/en/ibm-mq/9.4?topic=events-enabling-queue-depth
-
 import json,subprocess,sys,os,inspect
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -85,13 +83,16 @@ try:
                   for event in out:
                      eventData = event["eventData"]
                      if eventData["baseObjectName"]!="SYSTEM.ADMIN.PERFM.EVENT":
+                        event_table = "\n"
+                        for key, val in eventData.items():
+                           event_table += f"{key}: {val}\n"
                         ret={}
                         ret["appsrv"]=eventData["queueMgrName"]
                         ret["monid"]="MQRC" + str(event["eventReason"]["value"])
                         ret["srvid"]=uid
                         ret["srvtype"]=srvtype
                         ret["alerttime"]=event["eventCreation"]["timeStamp"]
-                        ret["message"]=event["eventReason"]["name"]
+                        ret["message"]=event["eventReason"]["name"]+event_table
                         ret["inttoken"]=inttoken
                         ret["object"]=eventData["baseObjectName"]
                         makerequest.postMonAl(webssl,website,json.dumps(ret))
