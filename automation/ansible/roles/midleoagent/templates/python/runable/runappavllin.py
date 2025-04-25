@@ -73,6 +73,8 @@ try:
             cred["usr"] = item["usr"]
           if("pwd" in item and item["pwd"] != ""):
             cred["pwd"] = item["pwd"]
+          if("mngmport" in item and item["mngmport"] != ""):
+            cred["mngmport"] = item["mngmport"]
 
           if("dockercont" in item):
             ret=statarr.avlCheck(k,item["dockercont"],cred)

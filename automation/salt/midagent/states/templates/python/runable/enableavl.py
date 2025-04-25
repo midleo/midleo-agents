@@ -28,6 +28,7 @@ def createAvlJson():
        "monid": "monapplavl",
        "dockercont": MONJSDATA['docker'] if 'docker' in MONJSDATA else '',
        "usr": MONJSDATA['user'] if 'user' in MONJSDATA else '',
+       "mngmport": MONJSDATA['mngmport'] if 'mngmport' in MONJSDATA else '',
        "pwd":  base64.b64encode(MONJSDATA['pass'].encode()).decode('ascii') if 'pass' in MONJSDATA else ''
       }
    except:
@@ -37,6 +38,7 @@ def createAvlJson():
        "monid": "monapplavl",
        "dockercont": MONJSDATA['docker'] if 'docker' in MONJSDATA else '',
        "usr": MONJSDATA['user'] if 'user' in MONJSDATA else '',
+       "mngmport": MONJSDATA['mngmport'] if 'mngmport' in MONJSDATA else '',
        "pwd":  base64.b64encode(MONJSDATA['pass'].encode()).decode('ascii') if 'pass' in MONJSDATA else ''
       }
 
