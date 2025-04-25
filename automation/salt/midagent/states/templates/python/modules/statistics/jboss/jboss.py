@@ -10,17 +10,21 @@ def getStat(thisqm,inpdata):
       jar_path = os.path.join(script_dir, "resources", "midleo_jboss.jar")
       usr_value = ""
       pwd_value = ""
+      mngm_port = ""
       if "usr" in inpdata:
          usr_value = inpdata["usr"]
          del inpdata["usr"]
       if "pwd" in inpdata:
          pwd_value = inpdata["pwd"]
          del inpdata["pwd"]
+      if "mngmport" in inpdata:
+         mngm_port = inpdata["mngmport"]
+         del inpdata["mngmport"]
       mbean_list = [kin for kin in inpdata.keys()]
       mbeans_combined = ",".join(mbean_list)
       logdir = next(iter(inpdata.values()))
 
-      java_arg = json.dumps({"logdir": logdir, "server": thisqm, "mbean": mbeans_combined, "function": "getstat", "usr": usr_value, "pwd": pwd_value})
+      java_arg = json.dumps({"logdir": logdir, "server": thisqm, "mbean": mbeans_combined, "function": "getstat", "usr": usr_value, "pwd": pwd_value, "mngmport": mngm_port})
       command = ["java", "-jar", jar_path, java_arg]
       result = subprocess.run(command, capture_output=True, text=True)
       if result.stdout:

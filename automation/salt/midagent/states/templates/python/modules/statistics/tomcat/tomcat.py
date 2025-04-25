@@ -7,7 +7,7 @@ def getStat(thisqm,inpdata):
    try:
       inpdata=json.loads(inpdata)
       script_dir = os.path.dirname(os.path.abspath(__file__))
-      jar_path = os.path.join(script_dir, "resources", "midleo_jboss.jar")
+      jar_path = os.path.join(script_dir, "resources", "midleo_tomcat.jar")
       usr_value = ""
       pwd_value = ""
       mngm_port = ""
@@ -45,14 +45,14 @@ def resetStat(thisnode,website,webssl,inttoken,stat_data):
     try:
        if len(stat_data)>0:
           for k,item in stat_data.items():
-             func = getattr(statarr, "jboss", None)
+             func = getattr(statarr, "tomcat", None)
              files = glob.glob(item+"Statistics_"+k+".csv")
              for file in files:
                 ret=file_utils.csv_json(file,func(),"",True)
                 retarr=json.loads(ret)
                 if len(retarr)>0:
                    ret={}
-                   ret["type"]="jboss"
+                   ret["type"]="tomcat"
                    ret["inttoken"]=inttoken
                    ret["subtype"]=k
                    ret["data"]=retarr
