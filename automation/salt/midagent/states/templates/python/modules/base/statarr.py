@@ -41,6 +41,16 @@ def jboss():
     arr["keys"]["count"]=3
     return arr
 
+def tomcat():
+    arr={}
+    arr["noteq"]="key"
+    arr["node"]=1
+    arr["server"]=1
+    arr["keys"]={}
+    arr["keys"]["timestamp"]=2
+    arr["keys"]["count"]=3
+    return arr
+
 def avlCheck(thisapp,dcont="",cred=None):
     if(cred is None):
        cred = {}
