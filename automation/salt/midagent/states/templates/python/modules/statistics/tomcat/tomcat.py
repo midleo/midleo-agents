@@ -24,8 +24,16 @@ def getStat(thisqm,inpdata):
       mbeans_combined = ",".join(mbean_list)
       logdir = next(iter(inpdata.values()))
 
-      java_arg = json.dumps({"logdir": logdir, "server": thisqm, "mbean": mbeans_combined, "function": "getstat", "usr": usr_value, "pwd": pwd_value, "mngmport": mngm_port})
-      command = ["java", "-jar", jar_path, java_arg]
+      java_arg = json.dumps({
+        "logdir": logdir,
+        "server": thisqm,
+        "mbean": mbeans_combined,
+        "function": "getstat",
+        "usr": usr_value,
+        "pwd": pwd_value,
+        "mngmport": mngm_port
+      })
+      command = ["java", "-cp", "/midleolibs/libs/*:" + jar_path, "midleo_tomcat.midleo_tomcat", java_arg]      
       result = subprocess.run(command, capture_output=True, text=True)
       if result.stdout:
          classes.Err("Output:"+result.stdout)

@@ -12,8 +12,15 @@ def getStat(thisqm,inpdata):
       mbeans_combined = ",".join(mbean_list)
       logdir = next(iter(inpdata.values()))
 
-      java_arg = json.dumps({"logdir": logdir, "mbean": mbeans_combined, "function": "localstat", "localbrk":thisqm})
-      command = ["java", "-jar", jar_path, java_arg]
+      java_arg = json.dumps({
+        "logdir": logdir,
+        "mbean": mbeans_combined,
+        "function": "localstat",
+        "localbrk": thisqm
+      })
+
+      command = ["java", "-cp", "/midleolibs/libs/*:" + jar_path, "midleo_kafka.kafka_main", java_arg]
+      
       result = subprocess.run(command, capture_output=True, text=True)
       if result.stdout:
          classes.Err("Output:"+result.stdout)
