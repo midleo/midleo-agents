@@ -61,12 +61,23 @@ def activemq():
     arr["keys"]["count"]=3
     return arr
 
+def ibmwas():
+    arr={}
+    arr["noteq"]="key"
+    arr["node"]=1
+    arr["server"]=1
+    arr["keys"]={}
+    arr["keys"]["timestamp"]=2
+    arr["keys"]["count"]=3
+    return arr
+
 def avlCheck(thisapp,dcont="",cred=None):
     if(cred is None):
        cred = {}
     default_usr = ""
     default_pwd = ""
     default_mngmport = ""
+    default_ssl = "no"
     arr={}
     arr["ibmmq"]="echo 'DISPLAY QMSTATUS' | "+os.environ['RUNMQSC']+" "+thisapp+" | grep RUNNING | wc -l"
     arr["ibmmqdocker"]="/usr/bin/docker exec -t "+dcont+" /bin/bash -c 'echo \"DISPLAY QMSTATUS\" | "+os.environ['RUNMQSC']+" "+thisapp+"' | grep RUNNING | wc -l"
@@ -100,6 +111,14 @@ def avlCheck(thisapp,dcont="",cred=None):
       "/modules/statistics/activemq/resources/midleo_activemq.jar' midleo_activemq.activemq_main " +
       "'{\"function\":\"srvinfo\",\"server\":\"" + thisapp + "\",\"usr\":\"" + cred.get("usr", default_usr) +
       "\",\"pwd\":\"" + cred.get("pwd", default_pwd) + "\",\"mngmport\":\"" + cred.get("jmxport", default_mngmport) +
+      "\"}' | grep " + thisapp + " | wc -l"
+    )
+    arr["ibmwas"] = (
+      "java -cp '/midleolibs/libs/*:/midleolibs/vendor/*:" + os.environ['MWAGTDIR'] +
+      "/modules/statistics/ibmwas/resources/midleo_ibmwas.jar' midleo_ibmwas.ibmwas_main " +
+      "'{\"function\":\"srvcheck\",\"server\":\"" + thisapp + "\",\"usr\":\"" + cred.get("usr", default_usr) +
+      "\",\"ssl\":\"" + cred.get("ssl", default_ssl) +
+      "\",\"pwd\":\"" + cred.get("pwd", default_pwd) + "\",\"soapport\":\"" + cred.get("soapport", default_mngmport) +
       "\"}' | grep " + thisapp + " | wc -l"
     )
     return arr
