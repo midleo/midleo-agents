@@ -119,6 +119,6 @@ def avlCheck(thisapp,dcont="",cred=None):
       "'{\"function\":\"srvcheck\",\"server\":\"" + thisapp + "\",\"usr\":\"" + cred.get("usr", default_usr) +
       "\",\"ssl\":\"" + cred.get("ssl", default_ssl) +
       "\",\"pwd\":\"" + cred.get("pwd", default_pwd) + "\",\"soapport\":\"" + cred.get("mngmport", default_mngmport) +
-      "\"}' | grep " + thisapp + " | wc -l"
+      "\"}' | grep STARTED | wc -l"
     )
     return arr
