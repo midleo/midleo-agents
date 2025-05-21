@@ -110,7 +110,7 @@ def avlCheck(thisapp,dcont="",cred=None):
       "java -cp '/midleolibs/libs/*:" + os.environ['MWAGTDIR'] +
       "/modules/statistics/activemq/resources/midleo_activemq.jar' midleo_activemq.activemq_main " +
       "'{\"function\":\"srvinfo\",\"server\":\"" + thisapp + "\",\"usr\":\"" + cred.get("usr", default_usr) +
-      "\",\"pwd\":\"" + cred.get("pwd", default_pwd) + "\",\"mngmport\":\"" + cred.get("jmxport", default_mngmport) +
+      "\",\"pwd\":\"" + cred.get("pwd", default_pwd) + "\",\"mngmport\":\"" + cred.get("mngmport", default_mngmport) +
       "\"}' | grep " + thisapp + " | wc -l"
     )
     arr["ibmwas"] = (
@@ -118,7 +118,7 @@ def avlCheck(thisapp,dcont="",cred=None):
       "/modules/statistics/ibmwas/resources/midleo_ibmwas.jar' midleo_ibmwas.ibmwas_main " +
       "'{\"function\":\"srvcheck\",\"server\":\"" + thisapp + "\",\"usr\":\"" + cred.get("usr", default_usr) +
       "\",\"ssl\":\"" + cred.get("ssl", default_ssl) +
-      "\",\"pwd\":\"" + cred.get("pwd", default_pwd) + "\",\"soapport\":\"" + cred.get("soapport", default_mngmport) +
+      "\",\"pwd\":\"" + cred.get("pwd", default_pwd) + "\",\"soapport\":\"" + cred.get("mngmport", default_mngmport) +
       "\"}' | grep " + thisapp + " | wc -l"
     )
     return arr
