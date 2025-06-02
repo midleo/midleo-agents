@@ -71,6 +71,16 @@ def ibmwas():
     arr["keys"]["count"]=3
     return arr
 
+def weblogic():
+    arr={}
+    arr["noteq"]="key"
+    arr["node"]=1
+    arr["server"]=1
+    arr["keys"]={}
+    arr["keys"]["timestamp"]=2
+    arr["keys"]["count"]=3
+    return arr
+
 def avlCheck(thisapp,dcont="",cred=None):
     if(cred is None):
        cred = {}
@@ -120,5 +130,15 @@ def avlCheck(thisapp,dcont="",cred=None):
       "\",\"ssl\":\"" + cred.get("ssl", default_ssl) +
       "\",\"pwd\":\"" + cred.get("pwd", default_pwd) + "\",\"soapport\":\"" + cred.get("mngmport", default_mngmport) +
       "\"}' | grep STARTED | wc -l"
+    )
+    arr["weblogic"] = (
+      "java --add-opens java.base/java.io=ALL-UNNAMED "
+      "-cp '/midleolibs/libs/*:/midleolibs/vendor/*:" + os.environ['MWAGTDIR'] +
+      "/modules/statistics/weblogic/resources/midleo_weblogic.jar' "
+      "midleo_weblogic.weblogic_main " +
+      "'{\"function\":\"srvcheck\",\"server\":\"" + thisapp + "\",\"usr\":\"" + cred.get("usr", default_usr) +
+      "\",\"ssl\":\"" + cred.get("ssl", default_ssl) +
+      "\",\"pwd\":\"" + cred.get("pwd", default_pwd) + "\",\"mngmport\":\"" + cred.get("mngmport", default_mngmport) +
+      "\"}' | grep RUNNING | wc -l"
     )
     return arr
