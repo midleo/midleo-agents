@@ -90,8 +90,10 @@
       - dnspython
       - requests
       - pycryptodome
+      - pywinrm
       - netifaces
       - pymqi
+    state: latest
 - name: copy agent service
   template:
     src: "templates/agent_linux_service.j2"

@@ -81,6 +81,16 @@ def weblogic():
     arr["keys"]["count"]=3
     return arr
 
+def msiis():
+    arr={}
+    arr["noteq"]="metric"
+    arr["node"]=1
+    arr["server"]=2
+    arr["keys"]={}
+    arr["keys"]["timestamp"]=3
+    arr["keys"]["count"]=4
+    return arr
+
 def avlCheck(thisapp,dcont="",cred=None):
     if(cred is None):
        cred = {}

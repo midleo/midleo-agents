@@ -9,4 +9,5 @@ midagent_install_packages:
       - python3-setuptools
       - python3-requests
       - python3-pycryptodome
+      - python3-pywinrm
       - python3-psutil
