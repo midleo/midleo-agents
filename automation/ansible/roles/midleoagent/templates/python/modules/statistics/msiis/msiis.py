@@ -55,8 +55,7 @@ def getStat(thisqm,inpdata):
               ps_script = ps_script.format(serverName=thisqm)
               result = session.run_ps(ps_script)
               output = result.std_out.decode('utf-8', errors='ignore')
-              error = result.std_err.decode('utf-8', errors='ignore')
-              print(output)
+#             error = result.std_err.decode('utf-8', errors='ignore')
               try:
                 json_data = json.loads(output)
                 if isinstance(json_data, list):
