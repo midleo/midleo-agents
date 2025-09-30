@@ -4,21 +4,21 @@
     agent_install_dir: "/var/midleoagent/"
     python_install_dir: "/usr/bin/python3"
 
-- name: "Create {{midleo_mwuser}} group"
-  ansible.group:
-    name: "{{midleo_mwuser}}"
+- name: "Create {{ midleo_mwuser }} group"
+  group:
+    name: "{{ midleo_mwuser }}"
     state: present
 
-- name: "Create {{midleo_mwuser}} user"
-  ansible.user:
-    name: "{{midleo_mwuser}}"
+- name: "Create {{ midleo_mwuser }} user"
+  user:
+    name: "{{ midleo_mwuser }}"
     shell: /bin/bash
-    groups: "{{midleo_mwuser}}"
+    groups: "{{ midleo_mwuser }}"
     expires: -1
     create_home: yes
 
 - name: "Add to docker if present"
-  ansible.user:
+  user:
     name: "{{midleo_mwuser}}"
     groups: "docker"
     append: yes
@@ -32,6 +32,7 @@
   loop:
     - "{{agent_install_dir}}"
     - "{{agent_install_dir}}modules"
+    - "{{agent_install_dir}}runable"
     - "{{agent_install_dir}}logs"
     - "{{agent_install_dir}}config"
 - name: "creage agent"
@@ -48,6 +49,13 @@
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
     mode: '0755'
+- name: "creage cronjob script"
+  template:
+    src: templates/python/cronjobs.sh
+    dest: "{{agent_install_dir}}cronjobs.sh"
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
+    mode: '0755'
 - name: "check exist agentconfig"
   stat: "path={{agent_install_dir}}config/mwagent.config"
   register: st_agcfg
@@ -59,15 +67,44 @@
     group: "{{midleo_mwuser}}"
     mode: '0644'
   when: not st_agcfg.stat.exists
-- name: "upload modules scripts"
-  template:
-    src: '{{ item.src }}'
-    dest: "{{agent_install_dir}}modules/{{ item.path }}"
-    owner: "{{midleo_mwuser}}"
-    group: "{{midleo_mwuser}}"
-    mode: 'a+x'
+- name: "Create module directories"
+  file:
+    path: "{{ agent_install_dir }}/modules/{{ item.path }}"
+    state: directory
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: '0755'
+  with_filetree: templates/python/modules
+  when: item.state == 'directory'
+- name: "Create runable directories"
+  file:
+    path: "{{ agent_install_dir }}/runable/{{ item.path }}"
+    state: directory
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: '0755'
+  with_filetree: templates/python/runable
+  when: item.state == 'directory'
+- name: "Upload module scripts"
+  copy: 
+    src: "{{ item.src }}"
+    dest: "{{ agent_install_dir }}/modules/{{ item.path }}"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: '0755'
     force: yes
   with_filetree: templates/python/modules
+  when: item.state == 'file'
+- name: "Upload runable scripts"
+  copy: 
+    src: "{{ item.src }}"
+    dest: "{{ agent_install_dir }}/runable/{{ item.path }}"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: '0755'
+    force: yes
+  with_filetree: templates/python/runable
+  when: item.state == 'file'
 - name: Update apt repo and cache on all Debian/Ubuntu boxes
   apt: 
     update_cache: yes 
@@ -92,8 +129,9 @@
       - pycryptodome
       - pywinrm
       - netifaces
-      - pymqi
+#      - pymqi
     state: latest
+    extra_args: --break-system-packages
 - name: copy agent service
   template:
     src: "templates/agent_linux_service.j2"
@@ -109,7 +147,7 @@
     name: midleoagent
     state: started
 - name: "Create crontab /etc/cron.d/midleoagent"
-  ansible.builtin.cron:
+  cron:
     name: restart agent
     weekday: "*/2"
     minute: "0"
