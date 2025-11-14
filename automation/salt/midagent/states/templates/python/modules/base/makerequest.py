@@ -69,3 +69,11 @@ def postMonAl(webssl,website,thisdata):
         classes.Err("HTTPResponse:"+res.content.decode())
     except requests.exceptions.RequestException as ex:  
         classes.Err("Exception:"+str(ex))
+
+def postMonCheck(webssl,website,thisdata):
+    headers = {'Content-type': 'application/json', 'Accept': 'text/plain', 'User-Agent': 'MWAdmin v.'+AGENT_VER}
+    try:
+        res = requests.post('http'+('s' if webssl=="y" else '')+'://'+website+'/pubapi/extmoncheck', data=thisdata, headers=headers, verify=False)
+        classes.Err("HTTPResponse:"+res.content.decode())
+    except requests.exceptions.RequestException as ex:  
+        classes.Err("Exception:"+str(ex))

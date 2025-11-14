@@ -35,6 +35,7 @@
     - "{{agent_install_dir}}runable"
     - "{{agent_install_dir}}logs"
     - "{{agent_install_dir}}config"
+    - "{{agent_install_dir}}extchecks"
 - name: "creage agent"
   template:
     src: templates/python/midleo_client.py

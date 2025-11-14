@@ -68,5 +68,6 @@ case "$1" in
       if [ $TST -le $(date '+%s') ]; then
          $PYTHON "runable/getsrvdata.py"
       fi
+      $PYTHON "runable/getextmonchecks.py"
       ;;
    esac

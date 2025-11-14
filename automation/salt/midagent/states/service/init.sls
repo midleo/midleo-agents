@@ -42,7 +42,7 @@ midagent_add_docker:
     - dir_mode: 755
     - makedirs: True
 
-{% for dir in 'modules', 'logs', 'runable', 'config' %}
+{% for dir in 'modules', 'logs', 'runable', 'config', 'extchecks' %}
 {{agent_install_dir}}{{ dir }}:
   file.directory:
     - name: {{agent_install_dir}}{{ dir }}
