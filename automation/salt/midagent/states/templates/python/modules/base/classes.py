@@ -2,15 +2,13 @@ import platform, os
 from datetime import datetime
 
 def ClearLog():
-    now = datetime.now()
-    current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+    current_time = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
     logfile = open(os.getcwd()+"/logs/midleoagent.log", 'w')
     logfile.write(current_time+":Empty file\n")
     logfile.close()
     
 def Err(logdata):
-    now = datetime.now()
-    current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+    current_time = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
     logfile = open(os.getcwd()+"/logs/midleoagent.log", 'a')
     logfile.write(current_time+":"+logdata+ "\n")
     logfile.close()

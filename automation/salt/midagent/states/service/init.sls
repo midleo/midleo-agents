@@ -9,7 +9,7 @@
 {% set int_token = salt['pillar.get']('INPUT:int_token') %}
 {% set update_interval_minutes = salt['pillar.get']('INPUT:update_interval_minutes') %}
 {% set mwtoken = salt['pillar.get']('midagent_vars:mwtoken') %}
-
+{% set osfam = grains.get('os_family', '') %}
 {% set agent_unique_id = salt['cmd.run'](cmd="head -c 8 /dev/urandom | xxd -p", python_shell=True) %}
 
 midagent_create_group:
@@ -118,6 +118,17 @@ midagent_create_config:
         midleo_website_base_url_ssl: "{{midleo_website_base_url_ssl}}"
         group_id: "{{group_id}}"
         inttoken: "{{int_token}}"
+        allowed_commands: 
+          - dspmq
+          - dspmqver
+          - runmqsc
+          - amqsevt
+          {% if osfam == "Linux" %}
+          - uptime
+          {% endif %}
+          {% if osfam == "Windows" %}
+          - net
+          {% endif %}
         update_interval_minutes: "{{update_interval_minutes}}"
         python_install_dir: "{{python_install_dir}}"
 {% endif %}

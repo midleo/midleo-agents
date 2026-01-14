@@ -1,79 +1,173 @@
-import base64,json,subprocess,socket,os,zlib
+import asyncio
+import re
+import base64
+import json
+import os
+import subprocess
 from datetime import datetime
-from modules.base import decrypt,classes,configs
+
+from modules.base import decrypt, classes, configs
 
 PORT_NUMBER = 5550
-SIZE = 1024
-AGENT_VER = "1.25.11"
+AGENT_VER = "1.26.01"
 
-def listenfordata():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-      config_data = configs.getcfgData()
-      uid = config_data['SRVUID']
-      uid = uid+uid+uid+uid
-      s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
-      s.bind(('', PORT_NUMBER))
-      s.listen(5)
-      while True:
-        now = datetime.now()
-        current_time = now.strftime("%H:%M:%S")
-        conn, addr = s.accept()
-        classes.Err("Info:"+"Connected by "+str(addr))
-        data = conn.recv(10240)
-        if not data:
-           pass
-           conn.close()
+MAX_FRAME_BYTES = 2 * 1024 * 1024
+MAX_COMMAND_OUTPUT_BYTES = 512 * 1024
+READ_TIMEOUT = 10
+CMD_TIMEOUT = 20
+
+FORBIDDEN_PATTERNS = [
+    r"\brm\s+-[rRfF]+\s+/",
+    r"\bchown\s+-[rRfF]+\s+/",
+    r"\bchmod\s+-[rRfF]+\s+/",
+    r"\bdd\s+if=",
+    r":\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\};:",
+    r">\s*/dev/sd[a-z]",
+    r">\s*/dev/nvme",
+    r"\bmkfs\b",
+    r"\bwipefs\b",
+    r"\bshutdown\b",
+    r"\breboot\b",
+    r"\bpoweroff\b",
+    r"\brm\s+(-[^\s]+\s+)?\*",
+]
+
+def _get_cfg():
+    cfg = configs.getcfgData() or {}
+    srvuid = str(cfg.get("SRVUID", ""))
+    uid_key = srvuid * 4
+
+    allowed_cmds = cfg.get("ALLOWED_COMMANDS", [])
+    if isinstance(allowed_cmds, str):
+        allowed_cmds = [c.strip() for c in allowed_cmds.split(",") if c.strip()]
+    allowed_cmds = [str(c) for c in allowed_cmds]
+
+    return {"uid_key": uid_key, "allowed_cmds": allowed_cmds}
+
+
+async def _read_framed_or_legacy(reader: asyncio.StreamReader) -> bytes:
+    try:
+        hdr = await asyncio.wait_for(reader.readexactly(4), timeout=READ_TIMEOUT)
+    except Exception:
+        return await asyncio.wait_for(reader.read(MAX_FRAME_BYTES), timeout=READ_TIMEOUT)
+
+    frame_len = int.from_bytes(hdr, "big", signed=False)
+    if frame_len <= 0 or frame_len > MAX_FRAME_BYTES:
+        rest = await asyncio.wait_for(reader.read(MAX_FRAME_BYTES), timeout=READ_TIMEOUT)
+        return hdr + rest
+
+    return await asyncio.wait_for(reader.readexactly(frame_len), timeout=READ_TIMEOUT)
+
+
+def _decode_json_bytes(b: bytes):
+    s = b.strip()
+    if not s:
+        raise ValueError("empty")
+    if isinstance(s, (bytes, bytearray)):
+        s = s.decode("utf-8", errors="strict")
+    return json.loads(s)
+
+
+def _reply(now_str: str, parts: list[str]) -> bytes:
+    return ("Time:" + now_str + "\n" + "\n".join(parts)).encode("utf-8", errors="replace")
+
+
+async def _run_command(cmd_str: str, allowed: list[str]) -> tuple[int, str]:
+    if not cmd_str or not cmd_str.strip():
+        raise ValueError("empty command")
+
+    cmd_l = cmd_str.lower()
+    for pat in FORBIDDEN_PATTERNS:
+        if re.search(pat, cmd_l):
+            classes.Err(
+              "Forbidden command blocked. Command: " + cmd_str + " | Pattern: " + pat
+            )
+            raise ValueError("forbidden command pattern detected")
+
+    first = cmd_str.strip().split()[0]
+    exe = os.path.basename(first).lower()
+    if exe.endswith(".exe"):
+        exe = exe[:-4]
+
+    if exe in ("env", "busybox"):
+        parts = cmd_str.strip().split()
+        if len(parts) > 1:
+            exe = os.path.basename(parts[1]).lower()
+            if exe.endswith(".exe"):
+                exe = exe[:-4]
+
+    allowed_set = {os.path.basename(a).lower() for a in allowed if a}
+    if allowed_set and exe not in allowed_set:
+        raise ValueError("command not allowed")
+
+    def _do():
+        r = subprocess.run(
+            cmd_str,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=CMD_TIMEOUT,
+            text=False,
+            shell=True
+        )
+        out = (r.stdout or b"")[:MAX_COMMAND_OUTPUT_BYTES]
+        return r.returncode, out.decode("utf-8", errors="replace").strip()
+
+    return await asyncio.to_thread(_do)
+
+
+async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    cfg = _get_cfg()
+    addr = writer.get_extra_info("peername")
+    classes.Err("Info:" + "Connected by " + str(addr))
+    now = datetime.now().strftime("%H:%M:%S")
+
+    try:
+        raw = await _read_framed_or_legacy(reader)
+        datamess = _decode_json_bytes(raw)
+
+        data_field = datamess["data"]
+        decrypted = decrypt.decryptit(data_field, cfg["uid_key"])
+        data = json.loads(decrypted)
+
+        if data.get("uid") != cfg["uid_key"]:
+            raise ValueError("unauthorized")
+
+        if "command" not in data:
+            classes.Err("Command:empty")
+            writer.write(_reply(now, ["Command:empty!"]))
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+            return
+
+        cmd = base64.b64decode(data["command"]).decode("utf-8", errors="strict")
+        rc, out = await _run_command(cmd, cfg["allowed_cmds"])
+
+        classes.Err("Command:" + cmd)
+        writer.write(_reply(now, ["Command:" + cmd, "RC:" + str(rc), "Output:" + out]))
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+
+    except Exception as ex:
         try:
-            datamess = data.rstrip()
-            datamess = json.loads(datamess)
-            data = decrypt.decryptit(datamess["data"],uid)
-            data = json.loads(data)
-            ftype=(data['ftype'] if 'ftype' in data else "")
-            if not data["uid"]==uid:
-               pass
-               conn.close()
-            if 'filename' in data and ftype=='create':
-               strf=base64.b64decode(datamess["file"])
-               strd=zlib.decompress(strf).decode('utf-8').replace('\r', '')
-               try:
-                 tf = open(data["filename"], "w")
-                 tf.write(strd)
-                 tf.close()
-                 output=""
-               except IOError:
-                 output="File write failed:"+data["filename"]
-               classes.Err("filename:"+data["filename"])
-               conn.sendall(str.encode("Time:"+current_time+"<br>"+"filename:"+data["filename"]+"<br>"+str(output)))
-               conn.close()
-            if 'filename' in data and ftype=='delete':
-               try:
-                  os.remove(data["filename"])
-                  output="File deleted:"+data["filename"]
-               except OSError as e:
-                  output="Error"+e.filename+" - "+e.strerror
-               classes.Err("filename:"+data["filename"])
-               conn.sendall(str.encode("Time:"+current_time+"<br>"+"filename:"+data["filename"]+"<br>"+str(output)))
-               conn.close()
-            elif 'command' in data:
-               data["command"]=base64.b64decode(data["command"]).decode('utf-8')
-               try:
-                 process = subprocess.Popen(data["command"], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                 stdout, stderr = process.communicate()
-                 output = stdout.decode('utf-8').strip()
-                 conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:"+data["command"]+"<br>"+"Output:"+str(output)))
-               except subprocess.CalledProcessError as e:
-                 output=e.output
-               classes.Err("Command:"+data["command"])
-               conn.close()
-            else:
-               classes.Err("Command:empty")
-               conn.sendall(str.encode("Time:"+current_time+"<br>"+"Command:empty!"))
-               conn.close()
-        except Exception as ex:
-            conn.sendall(str.encode("Error in receive:"+str(ex)))
-            conn.close()
+            writer.write(("Error in receive:" + str(ex)).encode("utf-8", errors="replace"))
+            await writer.drain()
+        except Exception:
+            pass
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            pass
 
-if __name__ == '__main__':
 
+async def main():
     classes.ClearLog()
-    listenfordata()
+    server = await asyncio.start_server(handle_client, host="", port=PORT_NUMBER, backlog=100)
+    async with server:
+        await server.serve_forever()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
