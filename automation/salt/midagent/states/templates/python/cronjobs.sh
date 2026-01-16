@@ -4,19 +4,28 @@
 #created by V.Vasilev
 #https://vasilev.link
 
-cd $(dirname $0)
-USR=`whoami`
-MWAGTDIR=$(pwd)
-HOMEDIR=$(pwd)"/config"
-if [[ ! -e $HOMEDIR ]]; then
-    mkdir $HOMEDIR
+set -euo pipefail
+
+LOCKDIR="/tmp/mwagent.lock"
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+  exit 0
 fi
-if [ ! -f $HOMEDIR"/mwagent.config" ]
-then
-  echo "no mwagent.config file found"
-else
-. $HOMEDIR"/mwagent.config"
+trap 'rmdir "$LOCKDIR"' EXIT
+
+cd "$(dirname "$0")" || exit 1
+
+MWAGTDIR="$(pwd)"
+HOMEDIR="$MWAGTDIR/config"
+
+mkdir -p "$HOMEDIR"
+
+if [[ ! -f "$HOMEDIR/mwagent.config" ]]; then
+  exit 1
 fi
+
+. "$HOMEDIR/mwagent.config"
+
+: "${PYTHON:?PYTHON not set}"
 
 export DSPMQ
 export DSPMQVER
@@ -30,44 +39,49 @@ export MWAGTDIR
 YM=$(date '+%Y-%m')
 WD=$(date '+%d')
 HOUR=$(date '+%H%M')
-CM=$(date +%M)
+CM=$(date '+%M')
 
-LRFILE=$HOMEDIR"/nextrun.txt"
-TST=$(date '+%s')
-if [ -e "$LRFILE" ]; then
-  T=$(head -n 1 $LRFILE)
-  if [ "$T" ]; then
-     TST=$T
-  fi  
+LRFILE="$HOMEDIR/nextrun.txt"
+NOW_TS=$(date '+%s')
+TST="$NOW_TS"
+
+if [[ -f "$LRFILE" ]]; then
+  read -r T < "$LRFILE" || true
+  [[ -n "${T:-}" ]] && TST="$T"
 fi
 
-case "$1" in
-    help )
-      echo "Cronjobs for MWAdmin"
-      echo "Used for background processes"
-      ;;
-    * )
-      if [ -f $HOMEDIR"/confapplstat.json" ]; then
-         if [[ $CM == "30" || $CM == "00" ]]; then
-            $PYTHON "runable/resetapplstat.py"
-         else
-            $PYTHON "runable/getapplstat.py"
-         fi
-      fi
-      if [ -f $HOMEDIR"/conftrack.json" ]; then
-         $PYTHON "runable/runmqtracker.py"
-      fi
-      if [ -e "$HOMEDIR/confavl.json" ]; then
-         if [ $HOUR == "2359" ]; then
-            $PYTHON "runable/resetappavl.py" $YM $WD
-         else
-            $PYTHON "runable/runappavllin.py"
-         fi
-         $PYTHON "runable/runmqevents.py"
-      fi
-      if [ $TST -le $(date '+%s') ]; then
-         $PYTHON "runable/getsrvdata.py"
-      fi
-      $PYTHON "runable/getextmonchecks.py"
-      ;;
-   esac
+if [[ "${1:-}" == "help" ]]; then
+  echo "Cronjobs for MWAdmin"
+  echo "Used for background processes"
+  exit 0
+fi
+
+if [[ -f "$HOMEDIR/confapplstat.json" ]]; then
+  if [[ "$CM" == "00" || "$CM" == "30" ]]; then
+    "$PYTHON" runable/resetapplstat.py
+  else
+    "$PYTHON" runable/getapplstat.py
+  fi
+fi
+
+if [[ -f "$HOMEDIR/conftrack.json" ]]; then
+  "$PYTHON" runable/runmqtracker.py
+fi
+
+if [[ -f "$HOMEDIR/confavl.json" ]]; then
+  if [[ "$HOUR" == "2359" ]]; then
+    "$PYTHON" runable/resetappavl.py "$YM" "$WD"
+  else
+    "$PYTHON" runable/runappavllin.py
+  fi
+
+  if [[ -n "${AMQSEVT:-}" && -x "$AMQSEVT" ]]; then
+    "$PYTHON" runable/runmqevents.py || true
+  fi
+fi
+
+if [[ "$TST" -le "$NOW_TS" ]]; then
+  "$PYTHON" runable/getsrvdata.py
+fi
+
+"$PYTHON" runable/getextmonchecks.py
