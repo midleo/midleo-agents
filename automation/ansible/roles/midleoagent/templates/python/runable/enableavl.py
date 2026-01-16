@@ -1,17 +1,22 @@
-import base64
 import json,sys,os,inspect
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 
-from modules.base import configs
+from modules.base import decrypt,configs
 
 APPSRV=sys.argv[1]
 APPSRVTYPE=sys.argv[2]
 MONDATA=sys.argv[3] if len(sys.argv) >= 4 else '{}'
 
 def createAvlJson():
+   config_data = configs.getcfgData()
+   uid = config_data['SRVUID']
+
+   if not uid:
+      pass
+   
    try:
       avl_data = configs.getAvlData()
    except Exception as err:
@@ -30,7 +35,7 @@ def createAvlJson():
        "usr": MONJSDATA['user'] if 'user' in MONJSDATA else '',
        "ssl": MONJSDATA['ssl'] if 'ssl' in MONJSDATA else 'no',
        "mngmport": MONJSDATA['mngmport'] if 'mngmport' in MONJSDATA else '',
-       "pwd":  base64.b64encode(MONJSDATA['pass'].encode()).decode('ascii') if 'pass' in MONJSDATA else ''
+       "pwd": decrypt.encrypt(MONJSDATA["pass"], uid * 4) if "pass" in MONJSDATA else ""
       }
    except:
       avl_data[APPSRVTYPE] = {}
@@ -41,7 +46,7 @@ def createAvlJson():
        "usr": MONJSDATA['user'] if 'user' in MONJSDATA else '',
        "ssl": MONJSDATA['ssl'] if 'ssl' in MONJSDATA else 'no',
        "mngmport": MONJSDATA['mngmport'] if 'mngmport' in MONJSDATA else '',
-       "pwd":  base64.b64encode(MONJSDATA['pass'].encode()).decode('ascii') if 'pass' in MONJSDATA else ''
+       "pwd": decrypt.encrypt(MONJSDATA["pass"], uid * 4) if "pass" in MONJSDATA else ""
       }
 
    with open(os.getcwd()+"/config/confavl.json", 'w+') as avl_file:

@@ -2,122 +2,100 @@ import subprocess as sp
 from os import path
 import re
 
+def run(cmd, shell=False):
+    return sp.check_output(cmd, shell=shell, stderr=sp.DEVNULL).decode("utf-8", errors="ignore").splitlines()
+
 def get_flatpak():
-    cmd=['/usr/bin/flatpak','list','--app','--show-details']
-    process=sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
-    stdout, stderr = process.communicate()
-    return stdout.decode().replace('\t',' ').split('\n')
+    return run(["flatpak", "list", "--app"])
 
 def get_apt():
-    cmd=['/usr/bin/dpkg','-l']
-    process=sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
-    stdout, stderr = process.communicate()
-    return re.sub(' {2,}', '#',stdout.decode().replace('\t',' ')).split('\n')
+    return run(["dpkg", "-l"])
 
 def get_yum():
-    cmd=['/usr/bin/yum','list','installed']
-    process=sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
-    stdout, stderr = process.communicate()
-    return stdout.decode().replace('\t',' ').split('\n')
+    return run(["yum", "list", "installed"])
 
 def get_rpm():
-    cmd=['/usr/bin/rpm -qa --qf "%{NAME} %{VERSION} %{VENDOR}\n"']
-    process=sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
-    stdout, stderr = process.communicate()
-    return stdout.decode().replace('\t',' ').split('\n')
+    return run('rpm -qa --qf "%{NAME} %{VERSION} %{VENDOR}\n"', shell=True)
 
 def get_pkginfo():
-    cmd=['/usr/bin/pkginfo -l | egrep "(PKGINST|VERSION)" | sed "s/  *//g" | awk "{print}" ORS=" "']
-    process=sp.Popen(cmd, shell=True, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)
-    stdout, stderr = process.communicate()
-    return stdout.decode().replace('\t',' ').replace('PKGINST:','\n').replace('VERSION:','').split('\n')
+    return run('pkginfo -l | egrep "(PKGINST|VERSION)" | sed "s/  *//g" | awk "{print}" ORS=" "', shell=True)
 
 def get_pkgs11():
-    cmd=['/usr/bin/pkg','list']
-    process=sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
-    stdout, stderr = process.communicate()
-    return stdout.decode().replace('\t',' ').split('\n')
+    return run(["pkg", "list", "-H"])
 
 def getSoftware():
-
     software_list = []
-    flatpak = False
-    apt = False      #for ubuntu
-    yum = False      #for fedora
-    rpm = False
-    pkginfo = False  #for solaris 10
-    pkgs11 = False  #for solars 11
 
     if path.exists("/usr/bin/flatpak"):
-       flatpak = True
+        for pkg in get_flatpak():
+            if pkg:
+                software_list.append({"name": pkg.split()[0], "version": "", "publisher": "flatpak", "description": ""})
+        return software_list
 
     if path.exists("/usr/bin/dpkg"):
-       apt = True
-
-    if path.exists("/usr/bin/rpm"):
-       rpm = True
-    
-    if path.exists("/usr/bin/pkginfo"):
-       pkginfo = True
-
-    if path.exists("/usr/bin/pkg"):
-       pkgs11 = True
+        for line in get_apt():
+            if line.startswith("ii"):
+                parts = line.split(None, 4)
+                if len(parts) >= 5:
+                    software_list.append({
+                        "name": parts[1],
+                        "version": parts[2],
+                        "publisher": "debian",
+                        "description": parts[4]
+                    })
+        return software_list
 
     if path.exists("/usr/bin/yum"):
-       yum = True
-       rpm = False
+        for pkg in get_yum():
+            parts = pkg.split()
+            if len(parts) >= 3 and "." in parts[0]:
+                software_list.append({
+                    "name": parts[0],
+                    "version": parts[1],
+                    "publisher": parts[2],
+                    "description": ""
+                })
+        return software_list
 
-    if flatpak:
-        pkgs = get_flatpak()
-        for pkg in pkgs:
-            if ' ' in pkg:
-                software_list.append(pkg.split()[0])
+    if path.exists("/usr/bin/rpm"):
+        for pkg in get_rpm():
+            parts = pkg.split(None, 2)
+            if len(parts) == 3:
+                software_list.append({
+                    "name": parts[0],
+                    "version": parts[1],
+                    "publisher": parts[2],
+                    "description": ""
+                })
+        return software_list
 
-    if apt:
-        pkgs = get_apt()
-        for pkg in pkgs:
-            if ' ' in pkg and len(pkg.split('#'))>4:
-                software = {}
-                software['name']=pkg.split('#')[1]
-                software['version']=pkg.split('#')[2]
-                software['publisher']=pkg.split('#')[-1]
-                software_list.append(software)
+    if path.exists("/usr/bin/pkginfo"):
+        name = version = None
+        for line in get_pkginfo():
+            if line.startswith("PKGINST:"):
+                name = line.split(":", 1)[1]
+            elif line.startswith("VERSION:"):
+                version = line.split(":", 1)[1]
+            if name and version:
+                software_list.append({
+                    "name": name,
+                    "version": version,
+                    "publisher": "solaris",
+                    "description": ""
+                })
+                name = version = None
+        return software_list
 
-    if pkginfo:
-        pkgs = get_pkginfo()
-        for pkg in pkgs:
-            if ' ' in pkg:
-                software = {}
-                software['name']=pkg.split()[0]
-                software['version']=pkg.split()[1]
-                software['publisher'] = 'undefined'
-                software_list.append(software)
-
-    if pkgs11:
-        pkgs = get_pkgs11()
-        for pkg in pkgs:
-            if ' ' in pkg:
-                software_list.append(pkg.split()[0])
-
-    if rpm:
-        pkgs = get_rpm()
-        for pkg in pkgs:
-            if len(pkg.split())>0:
-                software = {}
-                software['name']=pkg.split()[0]
-                software['version']=pkg.split()[1]
-                software['publisher']=pkg.split()[2]
-                software_list.append(software)
-
-    if yum:
-        pkgs = get_yum()
-        for pkg in pkgs:
-            if ' ' in pkg and len(pkg.split())>2:
-                software = {}
-                software['name']=pkg.split()[0]
-                software['version']=pkg.split()[1]
-                software['publisher'] = pkg.split()[2]
-                software_list.append(software)
+    if path.exists("/usr/bin/pkg"):
+        for pkg in get_pkgs11():
+            parts = pkg.split()
+            if len(parts) >= 2:
+                software_list.append({
+                    "name": parts[0],
+                    "version": parts[1],
+                    "publisher": "solaris",
+                    "description": ""
+                })
+        return software_list
 
     return software_list
-

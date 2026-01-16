@@ -118,7 +118,7 @@ async def _run_command(cmd_str: str, allowed: list[str]) -> tuple[int, str]:
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     cfg = _get_cfg()
     addr = writer.get_extra_info("peername")
-    classes.Err("Info:" + "Connected by " + str(addr))
+    classes.Err("Info:Connected by " + str(addr))
     now = datetime.now().strftime("%H:%M:%S")
 
     try:
@@ -130,26 +130,30 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         data = json.loads(decrypted)
 
         if data.get("uid") != cfg["uid_key"]:
+            classes.Err("Warn:Unauthorized client " + str(addr) + " – disconnecting")
             raise ValueError("unauthorized")
 
         if "command" not in data:
-            classes.Err("Command:empty")
+            classes.Err("Warn:No command from " + str(addr) + " – disconnecting")
             writer.write(_reply(now, ["Command:empty!"]))
             await writer.drain()
             writer.close()
             await writer.wait_closed()
+            classes.Err("Info:Disconnected " + str(addr))
             return
 
         cmd = base64.b64decode(data["command"]).decode("utf-8", errors="strict")
         rc, out = await _run_command(cmd, cfg["allowed_cmds"])
 
-        classes.Err("Command:" + cmd)
+        classes.Err("Command:" + cmd + " from " + str(addr))
         writer.write(_reply(now, ["Command:" + cmd, "RC:" + str(rc), "Output:" + out]))
         await writer.drain()
         writer.close()
         await writer.wait_closed()
+        classes.Err("Info:Disconnected " + str(addr))
 
     except Exception as ex:
+        classes.Err("Error:Disconnecting " + str(addr) + " reason=" + str(ex))
         try:
             writer.write(("Error in receive:" + str(ex)).encode("utf-8", errors="replace"))
             await writer.drain()

@@ -29,7 +29,7 @@ def create():
             hw_config = classes.HWConfig(win_utils.getName(), win_utils.getOS(), win_utils.getArchitecture(), win_utils.getMachineType(), cpu.__dict__, win_utils.getMemory(), win_utils.getDiskPartitions(), win_utils.getLBTS())
             net_config = classes.NetConfig(win_utils.getIP())
             if os.path.isfile(os.getcwd()+"/config/certs.json"):
-               cert_check = certcheck.Run(uid+uid+uid+uid)
+               cert_check = certcheck.Run(uid*4)
             else:
                cert_check = []
             config = classes.Config(uid,inttoken,groupid,AGENT_VER,updint, hw_config.__dict__, net_config.__dict__, win_utils.getSoftware(), cert_check) 
@@ -38,7 +38,7 @@ def create():
             hw_config = classes.HWConfig(lin_utils.getName(), lin_utils.getOS(), lin_utils.getArchitecture(), lin_utils.getMachineType(), cpu.__dict__, lin_utils.getMemory(), lin_utils.getDiskPartitions(), lin_utils.getLBTS())
             net_config = classes.NetConfig(lin_utils.getIP())
             if os.path.isfile(os.getcwd()+"/config/certs.json"):
-               cert_check = certcheck.Run(uid+uid+uid+uid)
+               cert_check = certcheck.Run(uid)*4
             else:
                cert_check = []
             config = classes.Config(uid,inttoken,groupid,AGENT_VER,updint, hw_config.__dict__, net_config.__dict__, lin_packages.getSoftware(), cert_check) 

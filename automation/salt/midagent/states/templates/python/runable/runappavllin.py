@@ -5,7 +5,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
 
-from modules.base import makerequest,classes,configs,statarr
+from modules.base import makerequest,classes,configs,statarr,decrypt
 
 try:
     from subprocess import CompletedProcess
@@ -72,7 +72,7 @@ try:
           if("usr" in item and item["usr"] != ""):
             cred["usr"] = item["usr"]
           if("pwd" in item and item["pwd"] != ""):
-            cred["pwd"] = item["pwd"]
+            cred["pwd"] =  decrypt.decryptit(item["pwd"], uid * 4)
           if("mngmport" in item and item["mngmport"] != ""):
             cred["mngmport"] = item["mngmport"]
           if("ssl" in item and item["ssl"] != ""):

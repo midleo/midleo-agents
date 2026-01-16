@@ -3,30 +3,32 @@ from modules.base import classes
 
 def getInstalledSW(hive, flag):
     aReg = winreg.ConnectRegistry(None, hive)
-    aKey = winreg.OpenKey(aReg, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-                          0, winreg.KEY_READ | flag)
+    aKey = winreg.OpenKey(
+        aReg,
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+        0,
+        winreg.KEY_READ | flag
+    )
 
     count_subkey = winreg.QueryInfoKey(aKey)[0]
-
     software_list = []
 
     for i in range(count_subkey):
-        software = {}
         try:
             asubkey_name = winreg.EnumKey(aKey, i)
             asubkey = winreg.OpenKey(aKey, asubkey_name)
-            software['name'] = winreg.QueryValueEx(asubkey, "DisplayName")[0]
 
-            try:
-                software['version'] = winreg.QueryValueEx(asubkey, "DisplayVersion")[0]
-            except EnvironmentError:
-                software['version'] = 'undefined'
-            try:
-                software['publisher'] = winreg.QueryValueEx(asubkey, "Publisher")[0]
-            except EnvironmentError:
-                software['publisher'] = 'undefined'
+            software = {
+                "name": winreg.QueryValueEx(asubkey, "DisplayName")[0],
+                "version": winreg.QueryValueEx(asubkey, "DisplayVersion")[0]
+                    if winreg.QueryValueEx(asubkey, "DisplayVersion") else "undefined",
+                "publisher": winreg.QueryValueEx(asubkey, "Publisher")[0]
+                    if winreg.QueryValueEx(asubkey, "Publisher") else "undefined",
+                "description": ""
+            }
+
             software_list.append(software)
-        except EnvironmentError:
+        except Exception:
             continue
 
     return software_list
