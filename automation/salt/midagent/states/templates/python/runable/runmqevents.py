@@ -90,6 +90,7 @@ try:
                         ret["appsrv"]=eventData["queueMgrName"]
                         ret["monid"]="MQRC" + str(event["eventReason"]["value"])
                         ret["srvid"]=uid
+                        ret["appsrvid"] = item["appsrvid"] if "appsrvid" in item else "none"
                         ret["srvtype"]=srvtype
                         ret["alerttime"]=event["eventCreation"]["timeStamp"]
                         ret["message"]=event["eventReason"]["name"]+event_table

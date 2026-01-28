@@ -34,6 +34,7 @@ def createAvlJson():
        "dockercont": MONJSDATA['docker'] if 'docker' in MONJSDATA else '',
        "usr": MONJSDATA['user'] if 'user' in MONJSDATA else '',
        "ssl": MONJSDATA['ssl'] if 'ssl' in MONJSDATA else 'no',
+       "appsrvid": MONJSDATA['appsrvid'] if 'appsrvid' in MONJSDATA else 'none',
        "mngmport": MONJSDATA['mngmport'] if 'mngmport' in MONJSDATA else '',
        "pwd": decrypt.encrypt(MONJSDATA["pass"], uid * 4) if "pass" in MONJSDATA else ""
       }
@@ -44,6 +45,7 @@ def createAvlJson():
        "monid": "monapplavl",
        "dockercont": MONJSDATA['docker'] if 'docker' in MONJSDATA else '',
        "usr": MONJSDATA['user'] if 'user' in MONJSDATA else '',
+       "appsrvid": MONJSDATA['appsrvid'] if 'appsrvid' in MONJSDATA else 'none',
        "ssl": MONJSDATA['ssl'] if 'ssl' in MONJSDATA else 'no',
        "mngmport": MONJSDATA['mngmport'] if 'mngmport' in MONJSDATA else '',
        "pwd": decrypt.encrypt(MONJSDATA["pass"], uid * 4) if "pass" in MONJSDATA else ""

@@ -45,25 +45,36 @@ try:
                                 cmd,
                                 shell=True,
                                 stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL
+                                stderr=subprocess.DEVNULL,
                             )
                             out = proc.stdout.decode(errors="ignore")
                             cnt = sum(1 for line in out.splitlines() if k in line)
 
                             if cnt >= 1:
-                                classes.WriteData("online", "avl_" + srvtype + "_" + k + ".csv")
+                                classes.WriteData(
+                                    "online", "avl_" + srvtype + "_" + k + ".csv"
+                                )
                             else:
-                                classes.WriteData("offline", "avl_" + srvtype + "_" + k + ".csv")
+                                classes.WriteData(
+                                    "offline", "avl_" + srvtype + "_" + k + ".csv"
+                                )
                                 if "monid" in item:
                                     req = {}
                                     req["appsrv"] = k
                                     req["monid"] = item["monid"]
                                     req["srvid"] = uid
+                                    req["appsrvid"] = (
+                                        item["appsrvid"]
+                                        if "appsrvid" in item
+                                        else "none"
+                                    )
                                     req["srvtype"] = srvtype
                                     req["message"] = "Server not available"
                                     req["alerttime"] = current_time
                                     req["inttoken"] = inttoken
-                                    makerequest.postMonAl(webssl, website, json.dumps(req))
+                                    makerequest.postMonAl(
+                                        webssl, website, json.dumps(req)
+                                    )
                         except subprocess.CalledProcessError as e:
                             classes.Err("avlCheck err:" + str(e))
 except Exception as err:
