@@ -27,7 +27,7 @@ try:
                     if "usr" in item and item["usr"]:
                         cred["usr"] = item["usr"]
                     if "pwd" in item and item["pwd"]:
-                        cred["pwd"] = decrypt.decryptit(item["pwd"], uid * 4)
+                        cred["pwd"] = item["pwd"]
                     if "mngmport" in item and item["mngmport"]:
                         cred["mngmport"] = item["mngmport"]
                     if "ssl" in item and item["ssl"]:

@@ -36,7 +36,7 @@ def createAvlJson():
        "ssl": MONJSDATA['ssl'] if 'ssl' in MONJSDATA else 'no',
        "appsrvid": MONJSDATA['appsrvid'] if 'appsrvid' in MONJSDATA else 'none',
        "mngmport": MONJSDATA['mngmport'] if 'mngmport' in MONJSDATA else '',
-       "pwd": decrypt.encrypt(MONJSDATA["pass"], uid * 4) if "pass" in MONJSDATA else ""
+       "pwd": decrypt.encryptPWD(MONJSDATA["pass"]) if "pass" in MONJSDATA else ""
       }
    except:
       avl_data[APPSRVTYPE] = {}
@@ -48,7 +48,7 @@ def createAvlJson():
        "appsrvid": MONJSDATA['appsrvid'] if 'appsrvid' in MONJSDATA else 'none',
        "ssl": MONJSDATA['ssl'] if 'ssl' in MONJSDATA else 'no',
        "mngmport": MONJSDATA['mngmport'] if 'mngmport' in MONJSDATA else '',
-       "pwd": decrypt.encrypt(MONJSDATA["pass"], uid * 4) if "pass" in MONJSDATA else ""
+       "pwd": decrypt.encryptPWD(MONJSDATA["pass"]) if "pass" in MONJSDATA else ""
       }
 
    with open(os.getcwd()+"/config/confavl.json", 'w+') as avl_file:
