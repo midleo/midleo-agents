@@ -35,17 +35,18 @@ def encryptPWD(payload: str) -> str:
     return base64.b64encode(iv + ciphertext).decode("ascii")
 
 def encrypt(data: dict, passphrase) -> str:
-    data_json_64 = base64.b64encode(json.dumps(data).encode('ascii'))
     try:
+        data_json_64 = base64.b64encode(json.dumps(data).encode())
         key = binascii.unhexlify(passphrase)
-        iv = Random.get_random_bytes(AES.block_size)
-        cipher = AES.new(key, AES.MODE_GCM, iv)
+        iv = Random.get_random_bytes(12)
+        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
         encrypted, tag = cipher.encrypt_and_digest(data_json_64)
-        encrypted_64 = base64.b64encode(encrypted).decode('ascii')
-        iv_64 = base64.b64encode(iv).decode('ascii')
-        tag_64 = base64.b64encode(tag).decode('ascii')
-        json_data = {'iv': iv_64, 'data': encrypted_64, 'tag': tag_64}
-        return base64.b64encode(json.dumps(json_data).encode('ascii')).decode('ascii')
+        payload = {
+           "iv": base64.b64encode(iv).decode(),
+           "data": base64.b64encode(encrypted).decode(),
+           "tag": base64.b64encode(tag).decode()
+        }
+        return base64.b64encode(json.dumps(payload).encode()).decode()
     except Exception as ex:
         classes.Err("Exception:"+str(ex))
 

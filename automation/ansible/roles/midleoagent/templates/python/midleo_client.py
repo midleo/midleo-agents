@@ -32,6 +32,7 @@ FORBIDDEN_PATTERNS = [
     r"\brm\s+(-[^\s]+\s+)?\*",
 ]
 
+
 def _get_cfg():
     cfg = configs.getcfgData() or {}
     srvuid = str(cfg.get("SRVUID", ""))
@@ -49,11 +50,15 @@ async def _read_framed_or_legacy(reader: asyncio.StreamReader) -> bytes:
     try:
         hdr = await asyncio.wait_for(reader.readexactly(4), timeout=READ_TIMEOUT)
     except Exception:
-        return await asyncio.wait_for(reader.read(MAX_FRAME_BYTES), timeout=READ_TIMEOUT)
+        return await asyncio.wait_for(
+            reader.read(MAX_FRAME_BYTES), timeout=READ_TIMEOUT
+        )
 
     frame_len = int.from_bytes(hdr, "big", signed=False)
     if frame_len <= 0 or frame_len > MAX_FRAME_BYTES:
-        rest = await asyncio.wait_for(reader.read(MAX_FRAME_BYTES), timeout=READ_TIMEOUT)
+        rest = await asyncio.wait_for(
+            reader.read(MAX_FRAME_BYTES), timeout=READ_TIMEOUT
+        )
         return hdr + rest
 
     return await asyncio.wait_for(reader.readexactly(frame_len), timeout=READ_TIMEOUT)
@@ -68,8 +73,14 @@ def _decode_json_bytes(b: bytes):
     return json.loads(s)
 
 
-def _reply(now_str: str, parts: list[str]) -> bytes:
-    return ("Time:" + now_str + "\n" + "\n".join(parts)).encode("utf-8", errors="replace")
+def _reply(now_str: str, parts: list[str], cfgkey: str) -> bytes:
+    data_field = "Time:" + now_str + "\n" + "\n".join(parts)
+    encrypted = decrypt.encrypt(data_field, cfgkey)
+    return (
+        encrypted
+        if isinstance(encrypted, bytes)
+        else encrypted.encode("utf-8", errors="replace")
+    )
 
 
 async def _run_command(cmd_str: str, allowed: list[str]) -> tuple[int, str]:
@@ -80,7 +91,7 @@ async def _run_command(cmd_str: str, allowed: list[str]) -> tuple[int, str]:
     for pat in FORBIDDEN_PATTERNS:
         if re.search(pat, cmd_l):
             classes.Err(
-              "Forbidden command blocked. Command: " + cmd_str + " | Pattern: " + pat
+                "Forbidden command blocked. Command: " + cmd_str + " | Pattern: " + pat
             )
             raise ValueError("forbidden command pattern detected")
 
@@ -107,7 +118,7 @@ async def _run_command(cmd_str: str, allowed: list[str]) -> tuple[int, str]:
             stderr=subprocess.STDOUT,
             timeout=CMD_TIMEOUT,
             text=False,
-            shell=True
+            shell=True,
         )
         out = (r.stdout or b"")[:MAX_COMMAND_OUTPUT_BYTES]
         return r.returncode, out.decode("utf-8", errors="replace").strip()
@@ -135,7 +146,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
 
         if "command" not in data:
             classes.Err("Warn:No command from " + str(addr) + " – disconnecting")
-            writer.write(_reply(now, ["Command:empty!"]))
+            writer.write(_reply(now, ["Command:empty!"], cfg["uid_key"]))
             await writer.drain()
             writer.close()
             await writer.wait_closed()
@@ -144,9 +155,22 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
 
         cmd = base64.b64decode(data["command"]).decode("utf-8", errors="strict")
         rc, out = await _run_command(cmd, cfg["allowed_cmds"])
+        
+        sanitized = re.sub(
+            r'("?(?:pwd|pass|password|srvpass|cpass|chlpass)"?\s*:\s*)(".*?"|\'.*?\'|[^,\}\s]+)',
+            r'\1"..."',
+            cmd,
+            flags=re.IGNORECASE,
+        )
 
-        classes.Err("Command:" + cmd + " from " + str(addr))
-        writer.write(_reply(now, ["Command:" + cmd, "RC:" + str(rc), "Output:" + out]))
+        classes.Err("Command:" + sanitized + " from " + str(addr))
+        writer.write(
+            _reply(
+                now,
+                ["Command:" + cmd, "RC:" + str(rc), "Output:" + out],
+                cfg["uid_key"],
+            )
+        )
         await writer.drain()
         writer.close()
         await writer.wait_closed()
@@ -155,7 +179,9 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
     except Exception as ex:
         classes.Err("Error:Disconnecting " + str(addr) + " reason=" + str(ex))
         try:
-            writer.write(("Error in receive:" + str(ex)).encode("utf-8", errors="replace"))
+            writer.write(
+                ("Error in receive:" + str(ex)).encode("utf-8", errors="replace")
+            )
             await writer.drain()
         except Exception:
             pass
@@ -168,7 +194,9 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
 
 async def main():
     classes.ClearLog()
-    server = await asyncio.start_server(handle_client, host="", port=PORT_NUMBER, backlog=100)
+    server = await asyncio.start_server(
+        handle_client, host="", port=PORT_NUMBER, backlog=100
+    )
     async with server:
         await server.serve_forever()
 
