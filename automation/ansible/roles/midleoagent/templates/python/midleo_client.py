@@ -167,7 +167,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         writer.write(
             _reply(
                 now,
-                ["Command:" + cmd, "RC:" + str(rc), "Output:" + out],
+                ["Command:" + sanitized, "RC:" + str(rc), "Output:" + out],
                 cfg["uid_key"],
             )
         )
