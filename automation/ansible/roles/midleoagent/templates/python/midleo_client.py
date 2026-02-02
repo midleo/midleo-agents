@@ -3,13 +3,14 @@ import re
 import base64
 import json
 import os
+import zlib
 import subprocess
 from datetime import datetime
 
 from modules.base import decrypt, classes, configs
 
 PORT_NUMBER = 5550
-AGENT_VER = "1.26.01"
+AGENT_VER = "1.26.02"
 
 MAX_FRAME_BYTES = 2 * 1024 * 1024
 MAX_COMMAND_OUTPUT_BYTES = 512 * 1024
@@ -136,41 +137,73 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         raw = await _read_framed_or_legacy(reader)
         datamess = _decode_json_bytes(raw)
 
-        data_field = datamess["data"]
-        decrypted = decrypt.decryptit(data_field, cfg["uid_key"])
+        decrypted = decrypt.decryptit(datamess["data"], cfg["uid_key"])
         data = json.loads(decrypted)
 
         if data.get("uid") != cfg["uid_key"]:
-            classes.Err("Warn:Unauthorized client " + str(addr) + " – disconnecting")
             raise ValueError("unauthorized")
 
-        if "command" not in data:
-            classes.Err("Warn:No command from " + str(addr) + " – disconnecting")
-            writer.write(_reply(now, ["Command:empty!"], cfg["uid_key"]))
+        ftype = data.get("ftype", "")
+        filename = data.get("filename")
+
+        if ftype == "create" and filename and "file" in datamess:
+            try:
+                rawf = base64.b64decode(datamess["file"])
+                content = zlib.decompress(rawf).decode("utf-8").replace("\r", "")
+                os.makedirs(os.path.dirname(filename), exist_ok=True)
+                with open(filename, "w") as fh:
+                    fh.write(content)
+                msg = f"File created:{filename}"
+            except Exception as ex:
+                msg = f"File write failed:{filename} ({ex})"
+
+            writer.write(_reply(now, [msg], cfg["uid_key"]))
             await writer.drain()
             writer.close()
             await writer.wait_closed()
             classes.Err("Info:Disconnected " + str(addr))
             return
 
-        cmd = base64.b64decode(data["command"]).decode("utf-8", errors="strict")
-        rc, out = await _run_command(cmd, cfg["allowed_cmds"])
-        
-        sanitized = re.sub(
-            r'("?(?:pwd|pass|password|srvpass|cpass|chlpass)"?\s*:\s*)(".*?"|\'.*?\'|[^,\}\s]+)',
-            r'\1"..."',
-            cmd,
-            flags=re.IGNORECASE,
-        )
+        if ftype == "delete" and filename:
+            try:
+                os.remove(filename)
+                msg = f"File deleted:{filename}"
+            except Exception as ex:
+                msg = f"File delete failed:{filename} ({ex})"
 
-        classes.Err("Command:" + sanitized + " from " + str(addr))
-        writer.write(
-            _reply(
-                now,
-                ["Command:" + sanitized, "RC:" + str(rc), "Output:" + out],
-                cfg["uid_key"],
+            writer.write(_reply(now, [msg], cfg["uid_key"]))
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+            classes.Err("Info:Disconnected " + str(addr))
+            return
+
+        if "command" in data:
+            cmd = base64.b64decode(data["command"]).decode("utf-8", errors="strict")
+            rc, out = await _run_command(cmd, cfg["allowed_cmds"])
+
+            sanitized = re.sub(
+                r'("?(?:pwd|pass|password|srvpass|cpass|chlpass)"?\s*:\s*)(".*?"|\'.*?\'|[^,\}\s]+)',
+                r'\1"..."',
+                cmd,
+                flags=re.IGNORECASE,
             )
-        )
+
+            classes.Err("Command:" + sanitized + " from " + str(addr))
+            writer.write(
+                _reply(
+                    now,
+                    ["Command:" + sanitized, "RC:" + str(rc), "Output:" + out],
+                    cfg["uid_key"],
+                )
+            )
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+            classes.Err("Info:Disconnected " + str(addr))
+            return
+
+        writer.write(_reply(now, ["Command:empty!"], cfg["uid_key"]))
         await writer.drain()
         writer.close()
         await writer.wait_closed()
@@ -180,7 +213,11 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         classes.Err("Error:Disconnecting " + str(addr) + " reason=" + str(ex))
         try:
             writer.write(
-                ("Error in receive:" + str(ex)).encode("utf-8", errors="replace")
+                _reply(
+                    datetime.now().strftime("%H:%M:%S"),
+                    ["Error in receive:" + str(ex)],
+                    cfg["uid_key"],
+                )
             )
             await writer.drain()
         except Exception:
