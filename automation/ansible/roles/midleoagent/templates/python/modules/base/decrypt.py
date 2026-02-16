@@ -11,7 +11,7 @@ from Crypto.Util.Padding import pad
 from pathlib import Path
 import base64
 
-_SECRET_PATH = Path("/run/secrets/crypto.secret")
+_SECRET_PATH = Path("/etc/midleo/crypto.secret")
 _SECRET: bytes | None = None
 _SUFFIX = b"|midleo|v1"
 
