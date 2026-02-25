@@ -84,7 +84,6 @@ try:
               entry = {
                 "code": parts[0],
                 "srvtype": srvtype,
-                "srvid": uid,
                 "appsrv": appsrv,
                 "objname": objname_only,
                 "interval": parts[2],
@@ -96,6 +95,7 @@ try:
           if data:
              payload = {
                "inttoken": inttoken,
+               "srvid": uid,
                "data": data
              }
              makerequest.postMonCheck(webssl,website,json.dumps(payload))
