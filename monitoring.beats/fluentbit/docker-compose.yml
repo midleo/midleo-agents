@@ -1,0 +1,18 @@
+services:
+    fluentbit:
+        image: fluent/fluent-bit:latest
+        container_name: fluentbit
+        volumes:
+            - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+            - ./enrich.lua:/fluent-bit/etc/enrich.lua:ro
+            - ./parsers.conf:/fluent-bit/etc/parsers.conf:ro
+            - /weblogic_domain/domains/base_domain/servers/AdminServer/logs:/logs/weblogic:ro
+        command: >
+            /fluent-bit/bin/fluent-bit
+            -c /fluent-bit/etc/fluent-bit.conf
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: always
