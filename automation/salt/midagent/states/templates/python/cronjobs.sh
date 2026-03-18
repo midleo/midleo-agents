@@ -42,6 +42,7 @@ HOUR=$(date '+%H%M')
 CM=$(date '+%M')
 
 LRFILE="$HOMEDIR/nextrun.txt"
+MAINTFILE="$HOMEDIR/maintenance.flag"
 NOW_TS=$(date '+%s')
 TST="$NOW_TS"
 
@@ -80,7 +81,7 @@ if [[ -f "$HOMEDIR/confavl.json" ]]; then
   fi
 fi
 
-if [[ "$TST" -le "$NOW_TS" ]]; then
+if [[ ! -f "$MAINTFILE" && "$TST" -le "$NOW_TS" ]]; then
   "$PYTHON" runable/getsrvdata.py
 fi
 
