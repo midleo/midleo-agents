@@ -129,7 +129,7 @@ case "$1" in
    * )
       echo ""
       echo "usage:"
-      echo "   -  $0 addcert '{\"tool\":\"keytool\",\"keystore\":\"/var/tmp/key.jks\",\"label\":\"demolabel\",\"password\":\"testpass\"}'"
+      echo "   -  $0 addcert '{\"tool\":\"keytool\",\"keystore\":\"/var/tmp/key.jks\",\"excluded\":\"alias1,alias2\",\"password\":\"testpass\"}'"      
       echo "   -  $0 delcert LABEL"
       echo "   -  $0 enableavl APP_SERVER SERVER_TYPE '{\"docker\":\"DOCKER_CONTAINER_NAME\",\"user\":\"USERNAME_FOR_APPLICATION_SERVER_ACCESS\",\"pass\":\"PASSWORD_FOR_APPLICATION_SERVER_ACCESS\"}'"
       echo "   -  $0 disableavl APP_SERVER SERVER_TYPE"

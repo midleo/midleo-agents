@@ -144,7 +144,7 @@ EXIT /B 0
 
 :usage
 echo usage:
-echo    -  %~nx0 addcert '{"tool":"keytool","keystore":"/var/tmp/key.jks","label":"demolabel","password":"testpass"}'
+echo    -  %~nx0 addcert '{"tool":"keytool","keystore":"/var/tmp/key.jks","excluded":"alias1,alias2","password":"testpass"}'
 echo    -  %~nx0 delcert LABEL
 echo    -  %~nx0 enableavl APP_SERVER SERVER_TYPE DOCKER_CONTAINER(In case it is working on Docker) USER(password) PASS(password)
 echo    -  %~nx0 disableavl APP_SERVER SERVER_TYPE
