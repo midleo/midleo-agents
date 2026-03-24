@@ -12,6 +12,7 @@ sys.path.insert(0, parentdir)
 
 from modules.base import makerequest, classes, certcheck, configs
 from midleo_client import AGENT_VER
+from getlocaljobs import getLocalJobsBody
 
 OS_TYPE = platform.system()
 BASE_DIR = os.getcwd()
@@ -67,6 +68,16 @@ def _safe_software_linux():
     except Exception as ex:
         classes.Err("Exception in lin_packages.getSoftware(): " + str(ex))
         return []
+
+
+def _safe_jobsdata():
+    try:
+        data = getLocalJobsBody()
+        if isinstance(data, dict):
+            return data
+    except Exception as ex:
+        classes.Err("Exception in getLocalJobsBody(): " + str(ex))
+    return {"jobs": []}
 
 
 def _build_windows_config(uid, inttoken, groupid, updint, certs):
@@ -146,6 +157,7 @@ def create():
         inttoken = config_data["INTTOKEN"]
 
         certs = _safe_cert_check(uid)
+        jobsdata = _safe_jobsdata()
 
         if OS_TYPE == "Windows":
             config = _build_windows_config(uid, inttoken, groupid, updint, certs)
@@ -157,6 +169,7 @@ def create():
         if config is None:
             raise RuntimeError("classes.Config() returned None")
 
+        config.jobsdata = jobsdata
         return config
 
     except OSError as err:

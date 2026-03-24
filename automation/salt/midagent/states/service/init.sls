@@ -77,6 +77,8 @@ midagent_create_script:
         - source: salt://midagent/templates/python/cronjobs.sh
       - {{agent_install_dir}}cronjobs.bat:
         - source: salt://midagent/templates/python/cronjobs.bat
+      - {{agent_install_dir}}config/cronjobs.json:
+        - source: salt://midagent/templates/python/config/cronjobs.json
     - context:
         python_install_dir: "{{python_install_dir}}"
 

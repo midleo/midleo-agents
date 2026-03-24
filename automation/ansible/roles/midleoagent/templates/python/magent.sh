@@ -4,16 +4,18 @@
 #created by V.Vasilev
 #https://vasilev.link
 
-cd $(dirname $0)
-USR=`whoami`
-HOMEDIR=$(pwd)"/config"
+set -euo pipefail
 
-if [ ! -f $HOMEDIR"/mwagent.config" ]
-then
+cd "$(dirname "$0")" || exit 1
+USR="$(whoami)"
+HOMEDIR="$(pwd)/config"
+
+if [ ! -f "$HOMEDIR/mwagent.config" ]; then
   echo "no mwagent.config file found"
-else
-. $HOMEDIR"/mwagent.config"
+  exit 1
 fi
+
+. "$HOMEDIR/mwagent.config"
 
 export DSPMQ
 export DSPMQVER
@@ -22,20 +24,45 @@ export RUNMQSC
 export ACEUSR
 export MQSIPROFILE
 export IIBMQSIPROFILE
+export PYTHON
 
-case "$1" in
-	addcert )
-      $PYTHON "runable/addcert.py" $2
+"$PYTHON" - <<'PY'
+import os
+from modules.base import configs
+
+cfgdir = os.path.join(os.getcwd(), "config")
+os.makedirs(cfgdir, exist_ok=True)
+
+if not os.path.isfile(os.path.join(cfgdir, "cronjobs.json")):
+    raise SystemExit("missing config/cronjobs.json")
+
+for path in (
+    os.path.join(cfgdir, "certs.json"),
+    os.path.join(cfgdir, "conftrack.json"),
+    os.path.join(cfgdir, "confavl.json"),
+    os.path.join(cfgdir, "confapplstat.json"),
+):
+    if not os.path.isfile(path):
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("{}\n")
+
+configs.syncCronjobsForConfig("conftrack.json", configs.gettrackData())
+configs.syncCronjobsForConfig("confavl.json", configs.getAvlData())
+configs.syncCronjobsForConfig("confapplstat.json", configs.getmonData())
+PY
+
+case "${1:-}" in
+  addcert )
+      "$PYTHON" "runable/addcert.py" "$2"
       ;;
-   delcert )
-      if [ -z "$2" ]
-      then
-        $0
+  delcert )
+      if [ -z "${2:-}" ]; then
+        "$0"
         exit 1
       fi
-      $PYTHON "runable/delcert.py" $2
+      "$PYTHON" "runable/delcert.py" "$2"
       ;;
-   enableavl )
+  enableavl )
       if [ -z "$2" ]
       then
         $0
@@ -43,7 +70,7 @@ case "$1" in
       fi
       $PYTHON "runable/enableavl.py" $2 $3 $4
       ;;
-   disableavl )
+  disableavl )
       if [ -z "$2" ]
       then
         $0
@@ -51,7 +78,7 @@ case "$1" in
       fi
       $PYTHON "runable/disableavl.py" $2 $3
       ;;
-   stopavl )
+  stopavl )
       if [ -z "$3" ]
       then
         $0
@@ -59,51 +86,45 @@ case "$1" in
       fi
       $PYTHON "runable/stopavl.py" $USR $2 $3 "${4}"
       ;;
-   startavl )
-      if [ -z "$2" ]
-      then
-        $0
+  startavl )
+      if [ -z "${2:-}" ]; then
+        "$0"
         exit 1
       fi
-      $PYTHON "runable/startavl.py" $USR $2 $3
+      "$PYTHON" "runable/startavl.py" "$USR" "$2" "$3"
       ;;
-   addappstat )
-      if [ -z "$3" ]
-      then
-        $0
+  addappstat )
+      if [ -z "${3:-}" ]; then
+        "$0"
         exit 1
       fi
-      $PYTHON "runable/addappstat.py" $2 $3 $4
+      "$PYTHON" "runable/addappstat.py" "$2" "$3" "$4"
       ;;
-   delappstat )
-      if [ -z "$2" ]
-      then
-        $0
+  delappstat )
+      if [ -z "${2:-}" ]; then
+        "$0"
         exit 1
       fi
-      $PYTHON "runable/delappstat.py" $2 $3
+      "$PYTHON" "runable/delappstat.py" "$2" "$3"
       ;;
-   enabletrackqm )
-      if [ -z "$2" ]
-      then
+  enabletrackqm )
+      if [ -z "${2:-}" ]; then
         echo "Empty Qmanager"
         exit 1
       fi
       sudo su - mqm -c "echo 'ALTER QMGR ACTVTRC(ON)' | $RUNMQSC $2"
-      $PYTHON "runable/enabletrackqm.py" $2
+      "$PYTHON" "runable/enabletrackqm.py" "$2"
       ;;
-   disabletrackqm )
-      if [ -z "$2" ]
-      then
+  disabletrackqm )
+      if [ -z "${2:-}" ]; then
         echo "Empty Qmanager"
         exit 1
       fi
       sudo su - mqm -c "echo 'ALTER QMGR ACTVTRC(OFF)' | $RUNMQSC $2"
-      $PYTHON "runable/disabletrackqm.py" $2
+      "$PYTHON" "runable/disabletrackqm.py" "$2"
       ;;
-   maintenance )
-      if [ -z "$2" ]
-      then
+  maintenance )
+      if [ -z "${2:-}" ]; then
         echo "usage: $0 maintenance on|off [comment]"
         exit 1
       fi
@@ -115,32 +136,22 @@ case "$1" in
         echo "usage: $0 maintenance on|off [comment]"
         exit 1
       fi
-
-      $PYTHON "runable/setmaintenance.py" "$2" "${3}"
+      "$PYTHON" "runable/setmaintenance.py" "$2" "${3:-}"
       ;;
-   createconfig )
-      if [ -f $HOMEDIR"/agentConfig.json" ]
-      then
-         echo "file config/agentConfig.json already exist"
-      else
-        $PYTHON "runable/createconfig.py"
-      fi
-      ;;
-   * )
+  * )
       echo ""
       echo "usage:"
-      echo "   -  $0 addcert '{\"tool\":\"keytool\",\"keystore\":\"/var/tmp/key.jks\",\"excluded\":\"alias1,alias2\",\"password\":\"testpass\"}'"      
-      echo "   -  $0 delcert LABEL"
+      echo "   -  $0 addcert '{\"tool\":\"keytool\",\"keystore\":\"/var/tmp/key.jks\",\"excluded\":\"alias1,alias2\",\"password\":\"testpass\"}'"
+      echo "   -  $0 delcert LABEL_OR_KEYSTORE"
       echo "   -  $0 enableavl APP_SERVER SERVER_TYPE '{\"docker\":\"DOCKER_CONTAINER_NAME\",\"user\":\"USERNAME_FOR_APPLICATION_SERVER_ACCESS\",\"pass\":\"PASSWORD_FOR_APPLICATION_SERVER_ACCESS\"}'"
       echo "   -  $0 disableavl APP_SERVER SERVER_TYPE"
       echo "   -  $0 stopavl APP_SERVER SERVER_TYPE comment"
       echo "   -  $0 startavl APP_SERVER SERVER_TYPE"
       echo "   -  $0 addappstat SRV_TYPE APPSRV '{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\"}'"
       echo "   -  $0 delappstat SRV_TYPE APPSRV"
-      echo "   -  $0 enabletrackqm QMGR # Transfer the mqat.ini file to /var/mqm/qmgr/QMGR/ folder"
+      echo "   -  $0 enabletrackqm QMGR"
       echo "   -  $0 disabletrackqm QMGR"
       echo "   -  $0 maintenance on|off [comment]"
-      echo "   -  $0 createconfig"
       echo ""
       ;;
 esac

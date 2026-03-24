@@ -1,5 +1,7 @@
-import base64
-import json, sys, os, inspect
+import json
+import sys
+import os
+import inspect
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
@@ -13,27 +15,28 @@ STDATA = sys.argv[3]
 
 
 def createMonJson():
-    try:
-        mon_data = configs.getmonData()
-    except Exception:
-        mon_data = {}
+    mon_data = configs.getmonData()
 
     try:
-        STJSDATA = json.loads(STDATA)
+        stjsdata = json.loads(STDATA) if STDATA else {}
     except Exception:
-        STJSDATA = {}
+        raise ValueError("Invalid JSON for appstat configuration")
 
-    if SRVTYPE not in mon_data:
+    if not isinstance(stjsdata, dict):
+        raise ValueError("Appstat configuration must be a JSON object")
+
+    if SRVTYPE not in mon_data or not isinstance(mon_data.get(SRVTYPE), dict):
         mon_data[SRVTYPE] = {}
-    if APPSRV not in mon_data[SRVTYPE]:
+
+    if APPSRV not in mon_data[SRVTYPE] or not isinstance(mon_data[SRVTYPE].get(APPSRV), dict):
         mon_data[SRVTYPE][APPSRV] = {}
-    for k, item in STJSDATA.items():
-        mon_data[SRVTYPE][APPSRV][k] = (
-            decrypt.encryptPWD(item) if k == "pwd" and item else item
-        )
-    with open(os.getcwd() + "/config/confapplstat.json", "w+") as mon_file:
-        json.dump(mon_data, mon_file)
+
+    for k, item in stjsdata.items():
+        mon_data[SRVTYPE][APPSRV][k] = decrypt.encryptPWD(item) if k == "pwd" and item else item
+
+    configs.savemonData(mon_data)
     print(APPSRV + " of type " + SRVTYPE + " have been added")
+
 
 if __name__ == "__main__":
     createMonJson()

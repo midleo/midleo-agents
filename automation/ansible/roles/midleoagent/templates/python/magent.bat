@@ -6,124 +6,126 @@ setlocal enabledelayedexpansion
 ::https://vasilev.link
 
 cd /d "%~dp0"
-set USR=%USERNAME%
-set MWAGTDIR=%cd%
-set HOMEDIR=%cd%\config
-set DSPMQVER=D:\apps\IBM\MQ\bin\dspmqver
-set DSPMQ=D:\apps\IBM\MQ\bin\dspmq
-set RUNMQSC=D:\apps\IBM\MQ\bin\runmqsc
-set AMQSEVT=D:\apps\IBM\MQ\bin\amqsevt
-set ACEUSR=mqbrk
-set MQSIPROFILE=D:\apps\IBM\ACE\server\bin\mqsiprofile
-set IIBMQSIPROFILE=D:\apps\IBM\IIB\server\bin\mqsiprofile
+set "USR=%USERNAME%"
+set "MWAGTDIR=%cd%"
+set "HOMEDIR=%cd%\config"
+set "DSPMQVER=D:\apps\IBM\MQ\bin\dspmqver"
+set "DSPMQ=D:\apps\IBM\MQ\bin\dspmq"
+set "RUNMQSC=D:\apps\IBM\MQ\bin\runmqsc"
+set "AMQSEVT=D:\apps\IBM\MQ\bin\amqsevt"
+set "ACEUSR=mqbrk"
+set "MQSIPROFILE=D:\apps\IBM\ACE\server\bin\mqsiprofile"
+set "IIBMQSIPROFILE=D:\apps\IBM\IIB\server\bin\mqsiprofile"
+set "PYTHON=python"
 
 if exist "%HOMEDIR%\mwagent.config.bat" (
   call "%HOMEDIR%\mwagent.config.bat"
 )
 
-IF /I "%1"=="addcert" (
-  goto addcert
-)
-IF /I "%1"=="delcert" (
-  goto delcert
-)
-IF /I "%1"=="enableavl" (
-  goto enableavl
-)
-IF /I "%1"=="disableavl" (
-  goto disableavl
-)
-IF /I "%1"=="stopavl" (
-  goto stopavl
-)
-IF /I "%1"=="startavl" (
-  goto startavl
-)
-IF /I "%1"=="addappstat" (
-  goto addappstat
-)
-IF /I "%1"=="delappstat" (
-  goto delappstat
-)
-IF /I "%1"=="enabletrackqm" (
-  goto enabletrackqm
-)
-IF /I "%1"=="disabletrackqm" (
-  goto disabletrackqm
-)
-IF /I "%1"=="maintenance" (
-  goto maintenance
-)
-IF /I "%1"=="createconfig" (
-  goto createconfig
-)
+if not defined PYTHON set "PYTHON=python"
+
+"%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; cfgdir=os.path.join(os.getcwd(),'config'); os.makedirs(cfgdir, exist_ok=True); cronf=os.path.join(cfgdir,'cronjobs.json'); 
+import sys as _s; 
+_s.exit('missing config\\cronjobs.json' if not os.path.isfile(cronf) else 0)"
+if errorlevel 1 exit /b 1
+
+if not exist "%HOMEDIR%\certs.json" echo {}>"%HOMEDIR%\certs.json"
+if not exist "%HOMEDIR%\conftrack.json" echo {}>"%HOMEDIR%\conftrack.json"
+if not exist "%HOMEDIR%\confavl.json" echo {}>"%HOMEDIR%\confavl.json"
+if not exist "%HOMEDIR%\confapplstat.json" echo {}>"%HOMEDIR%\confapplstat.json"
+
+"%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; configs.syncCronjobsForConfig('conftrack.json', configs.gettrackData()); configs.syncCronjobsForConfig('confavl.json', configs.getAvlData()); configs.syncCronjobsForConfig('confapplstat.json', configs.getmonData())"
+if errorlevel 1 exit /b 1
+
+if /I "%1"=="addcert" goto addcert
+if /I "%1"=="delcert" goto delcert
+if /I "%1"=="enableavl" goto enableavl
+if /I "%1"=="disableavl" goto disableavl
+if /I "%1"=="stopavl" goto stopavl
+if /I "%1"=="startavl" goto startavl
+if /I "%1"=="addappstat" goto addappstat
+if /I "%1"=="delappstat" goto delappstat
+if /I "%1"=="enabletrackqm" goto enabletrackqm
+if /I "%1"=="disabletrackqm" goto disabletrackqm
+if /I "%1"=="maintenance" goto maintenance
 
 goto usage
 
 :addcert
 set "json=%~2"
-python "runable\addcert.py" !json!
-EXIT /B 0
+"%PYTHON%" "runable\addcert.py" !json!
+exit /b %ERRORLEVEL%
 
 :delcert
-if NOT "%~2"=="" (
-  python "runable\delcert.py" "%~2"
+if "%~2"=="" (
+  goto usage
 )
-EXIT /B 0
+"%PYTHON%" "runable\delcert.py" "%~2"
+exit /b %ERRORLEVEL%
 
 :enableavl
-if NOT "%~3"=="" (
-  python "runable\enableavl.py" "%~2" "%~3" "%~4" "%~5" "%~6"
+if "%~2"=="" (
+  goto usage
 )
-EXIT /B 0
+"%PYTHON%" "runable\enableavl.py" %2 %3 %4
+exit /b %ERRORLEVEL%
 
 :disableavl
-if NOT "%~2"=="" (
-  python "runable\disableavl.py" "%~2" "%~3"
+if "%~2"=="" (
+  goto usage
 )
-EXIT /B 0
+"%PYTHON%" "runable\disableavl.py" %2 %3
+exit /b %ERRORLEVEL%
 
 :stopavl
-if NOT "%~3"=="" (
-  python "runable\stopavl.py" "%USR%" "%~2" "%~3" "%~4"
+if "%~3"=="" (
+  goto usage
 )
-EXIT /B 0
+"%PYTHON%" "runable\stopavl.py" "%USR%" %2 %3 "%~4"
+exit /b %ERRORLEVEL%
 
 :startavl
-if NOT "%~2"=="" (
-  python "runable\startavl.py" "%USR%" "%~2" "%~3"
+if "%~2"=="" (
+  goto usage
 )
-EXIT /B 0
+"%PYTHON%" "runable\startavl.py" "%USR%" "%~2" "%~3"
+exit /b %ERRORLEVEL%
 
 :addappstat
-if NOT "%~3"=="" (
-  set "json=%~4"
-  python "runable\addappstat.py" "%~2" "%~3" !json!
+if "%~3"=="" (
+  goto usage
 )
-EXIT /B 0
+set "json=%~4"
+"%PYTHON%" "runable\addappstat.py" "%~2" "%~3" !json!
+exit /b %ERRORLEVEL%
 
 :delappstat
-if NOT "%~3"=="" (
-  python "runable\delappstat.py" "%~2" "%~3"
+if "%~3"=="" (
+  goto usage
 )
-EXIT /B 0
+"%PYTHON%" "runable\delappstat.py" "%~2" "%~3"
+exit /b %ERRORLEVEL%
 
 :enabletrackqm
-if NOT "%~2"=="" (
-  python "runable\enabletrackqm.py" "%~2"
+if "%~2"=="" (
+  echo Empty Qmanager
+  exit /b 1
 )
-EXIT /B 0
+"%PYTHON%" "runable\enabletrackqm.py" "%~2"
+exit /b %ERRORLEVEL%
 
 :disabletrackqm
-if NOT "%~2"=="" (
-  python "runable\disabletrackqm.py" "%~2"
+if "%~2"=="" (
+  echo Empty Qmanager
+  exit /b 1
 )
-EXIT /B 0
+"%PYTHON%" "runable\disabletrackqm.py" "%~2"
+exit /b %ERRORLEVEL%
 
 :maintenance
 if "%~2"=="" (
   echo usage: %~nx0 maintenance on^|off [comment]
-  EXIT /B 1
+  exit /b 1
 )
 
 if /I "%~2"=="on" (
@@ -132,28 +134,23 @@ if /I "%~2"=="on" (
   if exist "%HOMEDIR%\maintenance.flag" del /f /q "%HOMEDIR%\maintenance.flag"
 ) else (
   echo usage: %~nx0 maintenance on^|off [comment]
-  EXIT /B 1
+  exit /b 1
 )
 
-python "runable\setmaintenance.py" "%~2" "%~3"
-EXIT /B %ERRORLEVEL%
-
-:createconfig
-python "runable\createconfig.py"
-EXIT /B 0
+"%PYTHON%" "runable\setmaintenance.py" "%~2" "%~3"
+exit /b %ERRORLEVEL%
 
 :usage
 echo usage:
-echo    -  %~nx0 addcert '{"tool":"keytool","keystore":"/var/tmp/key.jks","excluded":"alias1,alias2","password":"testpass"}'
-echo    -  %~nx0 delcert LABEL
-echo    -  %~nx0 enableavl APP_SERVER SERVER_TYPE DOCKER_CONTAINER(In case it is working on Docker) USER(password) PASS(password)
+echo    -  %~nx0 addcert "{\"tool\":\"keytool\",\"keystore\":\"C:\\temp\\key.jks\",\"excluded\":\"alias1,alias2\",\"password\":\"testpass\"}"
+echo    -  %~nx0 delcert LABEL_OR_KEYSTORE
+echo    -  %~nx0 enableavl APP_SERVER SERVER_TYPE "{\"docker\":\"DOCKER_CONTAINER_NAME\",\"user\":\"USERNAME_FOR_APPLICATION_SERVER_ACCESS\",\"pass\":\"PASSWORD_FOR_APPLICATION_SERVER_ACCESS\"}"
 echo    -  %~nx0 disableavl APP_SERVER SERVER_TYPE
 echo    -  %~nx0 stopavl APP_SERVER SERVER_TYPE comment
 echo    -  %~nx0 startavl APP_SERVER SERVER_TYPE
-echo    -  %~nx0 addappstat SRV_TYPE APPSRV '{"queues":"TEST.*,VVV.*","channels":"SDR.*,CHL.*"}'
+echo    -  %~nx0 addappstat SRV_TYPE APPSRV "{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\"}"
 echo    -  %~nx0 delappstat SRV_TYPE APPSRV
-echo    -  %~nx0 enabletrackqm QMGR # Transfer the mqat.ini file to /var/mqm/qmgr/QMGR/ folder
+echo    -  %~nx0 enabletrackqm QMGR
 echo    -  %~nx0 disabletrackqm QMGR
 echo    -  %~nx0 maintenance on^|off [comment]
-echo    -  %~nx0 createconfig
-EXIT /B 0
+exit /b 0

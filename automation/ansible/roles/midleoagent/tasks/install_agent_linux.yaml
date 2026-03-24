@@ -57,6 +57,13 @@
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
     mode: '0755'
+- name: "copy cronjobs json"
+  copy:
+    src: templates/config/cronjobs.json
+    dest: "{{agent_install_dir}}config/cronjobs.json"
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
+    mode: '0644'
 - name: "check exist agentconfig"
   stat: "path={{agent_install_dir}}config/mwagent.config"
   register: st_agcfg

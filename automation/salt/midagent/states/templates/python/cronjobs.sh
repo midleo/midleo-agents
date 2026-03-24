@@ -6,20 +6,42 @@
 
 set -euo pipefail
 
-LOCKDIR="/tmp/mwagent.lock"
-if ! mkdir "$LOCKDIR" 2>/dev/null; then
-  exit 0
+SCRIPT_PATH="$(readlink -f "$0")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+MWAGTDIR="$SCRIPT_DIR"
+
+if [ -d "$MWAGTDIR/runable" ] && [ -d "$MWAGTDIR/config" ]; then
+  :
+elif [ -d "$SCRIPT_DIR/../runable" ] && [ -d "$SCRIPT_DIR/../config" ]; then
+  MWAGTDIR="$(readlink -f "$SCRIPT_DIR/..")"
+else
+  exit 1
 fi
-trap 'rmdir "$LOCKDIR"' EXIT
 
-cd "$(dirname "$0")" || exit 1
-
-MWAGTDIR="$(pwd)"
 HOMEDIR="$MWAGTDIR/config"
+LOCKDIR="/tmp/mwagent_cron.lock"
+PIDFILE="$LOCKDIR/pid"
 
 mkdir -p "$HOMEDIR"
 
-if [[ ! -f "$HOMEDIR/mwagent.config" ]]; then
+if mkdir "$LOCKDIR" 2>/dev/null; then
+  echo "$$" > "$PIDFILE"
+else
+  if [ -f "$PIDFILE" ]; then
+    OLD_PID="$(cat "$PIDFILE" 2>/dev/null || true)"
+    if [ -n "${OLD_PID:-}" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+      exit 0
+    fi
+  fi
+
+  rm -rf "$LOCKDIR"
+  mkdir "$LOCKDIR"
+  echo "$$" > "$PIDFILE"
+fi
+
+trap 'rm -rf "$LOCKDIR"' EXIT
+
+if [ ! -f "$HOMEDIR/mwagent.config" ]; then
   exit 1
 fi
 
@@ -27,6 +49,7 @@ fi
 
 : "${PYTHON:?PYTHON not set}"
 
+export PYTHON
 export DSPMQ
 export DSPMQVER
 export AMQSEVT
@@ -36,53 +59,4 @@ export MQSIPROFILE
 export IIBMQSIPROFILE
 export MWAGTDIR
 
-YM=$(date '+%Y-%m')
-WD=$(date '+%d')
-HOUR=$(date '+%H%M')
-CM=$(date '+%M')
-
-LRFILE="$HOMEDIR/nextrun.txt"
-MAINTFILE="$HOMEDIR/maintenance.flag"
-NOW_TS=$(date '+%s')
-TST="$NOW_TS"
-
-if [[ -f "$LRFILE" ]]; then
-  read -r T < "$LRFILE" || true
-  [[ -n "${T:-}" ]] && TST="$T"
-fi
-
-if [[ "${1:-}" == "help" ]]; then
-  echo "Cronjobs for MWAdmin"
-  echo "Used for background processes"
-  exit 0
-fi
-
-if [[ -f "$HOMEDIR/confapplstat.json" ]]; then
-  if [[ "$CM" == "00" || "$CM" == "30" ]]; then
-    "$PYTHON" runable/resetapplstat.py
-  else
-    "$PYTHON" runable/getapplstat.py
-  fi
-fi
-
-if [[ -f "$HOMEDIR/conftrack.json" ]]; then
-  "$PYTHON" runable/runmqtracker.py
-fi
-
-if [[ -f "$HOMEDIR/confavl.json" ]]; then
-  if [[ "$HOUR" == "2359" ]]; then
-    "$PYTHON" runable/resetappavl.py "$YM" "$WD"
-  else
-    "$PYTHON" runable/runappavllin.py
-  fi
-
-  if [[ -n "${AMQSEVT:-}" && -x "$AMQSEVT" ]]; then
-    "$PYTHON" runable/runmqevents.py || true
-  fi
-fi
-
-if [[ ! -f "$MAINTFILE" && "$TST" -le "$NOW_TS" ]]; then
-  "$PYTHON" runable/getsrvdata.py
-fi
-
-"$PYTHON" runable/getextmonchecks.py
+exec "$PYTHON" "$MWAGTDIR/runable/run_cronjobs.py"

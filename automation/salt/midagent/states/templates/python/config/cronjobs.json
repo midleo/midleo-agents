@@ -1,0 +1,74 @@
+{
+    "getsrvdata.py": {
+        "enabled": true,
+        "run": {
+            "always": true
+        },
+        "skip_if_maintenance": true,
+        "requires_nextrun_check": true
+    },
+    "getextmonchecks.py": {
+        "enabled": true,
+        "run": {
+            "always": true
+        }
+    },
+    "runmqtracker.py": {
+        "enabled": false,
+        "config_file": "conftrack.json",
+        "run": {
+            "always": true
+        }
+    },
+    "getapplstat.py": {
+        "enabled": false,
+        "config_file": "confapplstat.json",
+        "run": {
+            "always": true,
+            "minute_not_in": [
+                "00",
+                "30"
+            ]
+        }
+    },
+    "resetapplstat.py": {
+        "enabled": false,
+        "config_file": "confapplstat.json",
+        "run": {
+            "minute_in": [
+                "00",
+                "30"
+            ]
+        }
+    },
+    "runappavllin.py": {
+        "enabled": false,
+        "config_file": "confavl.json",
+        "run": {
+            "always": true,
+            "hourminute_not_in": [
+                "2359"
+            ]
+        }
+    },
+    "resetappavl.py": {
+        "enabled": false,
+        "config_file": "confavl.json",
+        "run": {
+            "hourminute": "2359"
+        },
+        "args": [
+            "{YM}",
+            "{WD}"
+        ]
+    },
+    "runmqevents.py": {
+        "enabled": false,
+        "config_file": "confavl.json",
+        "run": {
+            "always": true
+        },
+        "requires_exec_env": "AMQSEVT",
+        "ignore_error": true
+    }
+}

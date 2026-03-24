@@ -1,4 +1,8 @@
-import json, subprocess, sys, os, inspect
+import json
+import subprocess
+import sys
+import os
+import inspect
 from datetime import datetime
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -35,7 +39,7 @@ except:
 
         if this_input is not None:
             if "stdin" in kwargs:
-                raise ValueError("stdin and input arguments may not " "both be used.")
+                raise ValueError("stdin and input arguments may not both be used.")
             kwargs["stdin"] = subprocess.PIPE
 
         process = subprocess.Popen(*popenargs, **kwargs)
@@ -62,6 +66,7 @@ try:
     webssl = config_data["SSLENABLED"]
     inttoken = config_data["INTTOKEN"]
     uid = config_data["SRVUID"]
+
     if len(avl_data) > 0:
         for srvtype, srvinfo in avl_data.items():
             if len(srvinfo.items()) > 0:
@@ -70,10 +75,16 @@ try:
 
                     if "usr" in item and item["usr"] != "":
                         cred["usr"] = item["usr"]
+
                     if "pwd" in item and item["pwd"] != "":
-                        cred["pwd"] = item["pwd"]
+                        try:
+                            cred["pwd"] = decrypt.decryptPWD(item["pwd"])
+                        except Exception:
+                            cred["pwd"] = item["pwd"]
+
                     if "mngmport" in item and item["mngmport"] != "":
                         cred["mngmport"] = item["mngmport"]
+
                     if "ssl" in item and item["ssl"] != "":
                         cred["ssl"] = item["ssl"]
 
@@ -81,6 +92,7 @@ try:
                         ret = statarr.avlCheck(k, item["dockercont"], cred)
                     else:
                         ret = statarr.avlCheck(k, "", cred)
+
                     if item["enabled"] == "yes":
                         ret = ret[srvtype]
                         try:
@@ -90,7 +102,7 @@ try:
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL,
                             )
-                            output = output.stdout.decode()
+                            output = output.stdout.decode().strip()
                             if int(output) >= 1:
                                 classes.WriteData(
                                     "online", "avl_" + srvtype + "_" + k + ".csv"
@@ -103,7 +115,11 @@ try:
                                     req = {}
                                     req["appsrv"] = k
                                     req["monid"] = item["monid"]
-                                    req["appsrvid"] = item["appsrvid"] if "appsrvid" in item else "none"
+                                    req["appsrvid"] = (
+                                        item["appsrvid"]
+                                        if "appsrvid" in item
+                                        else "none"
+                                    )
                                     req["srvid"] = uid
                                     req["srvtype"] = srvtype
                                     req["message"] = "Server not available"
