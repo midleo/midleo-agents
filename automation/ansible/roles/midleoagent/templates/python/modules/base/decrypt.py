@@ -12,7 +12,7 @@ from pathlib import Path
 import base64
 
 _SECRET_PATH = Path("/etc/midleo/crypto.secret")
-_SECRET: bytes | None = None
+_SECRET = None
 _SUFFIX = b"|midleo|v1"
 
 def _get_secret() -> bytes:
