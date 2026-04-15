@@ -16,6 +16,10 @@
   win_template:
     src: templates/python/midleo_client.py
     dest: "{{agent_install_dir}}midleo_client.py"
+- name: "create actions agent"
+  win_template:
+    src: templates/python/midleo_actions.py
+    dest: "{{agent_install_dir}}midleo_actions.py"
 - name: "creage agent script"
   win_template:
     src: templates/python/magent.bat
@@ -53,6 +57,19 @@
     actions:
     - path: "{{python_install_dir}}/python.exe"
       arguments: "{{agent_install_dir}}midleo_client.py"
+      working_directory: "{{agent_install_dir}}"
+    triggers:
+    - type: boot
+    username: SYSTEM
+    run_level: highest
+    state: present
+- name: create scheduled task to run python actions agent on boot
+  win_scheduled_task:
+    name: midleoactions
+    description: Run the midleoactions on boot
+    actions:
+    - path: "{{python_install_dir}}/python.exe"
+      arguments: "{{agent_install_dir}}midleo_actions.py"
       working_directory: "{{agent_install_dir}}"
     triggers:
     - type: boot

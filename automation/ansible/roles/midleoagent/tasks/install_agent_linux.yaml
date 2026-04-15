@@ -43,6 +43,13 @@
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
     mode: '0644'
+- name: "create actions agent"
+  template:
+    src: templates/python/midleo_actions.py
+    dest: "{{agent_install_dir}}midleo_actions.py"
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
+    mode: '0644'
 - name: "creage agent script"
   template:
     src: templates/python/magent.sh
@@ -144,15 +151,29 @@
   template:
     src: "templates/agent_linux_service.j2"
     dest: "/etc/systemd/system/midleoagent.service"
+- name: copy actions service
+  template:
+    src: "templates/agent_linux_actions_service.j2"
+    dest: "/etc/systemd/system/midleoactions.service"
 - name: enable service
   systemd:
     name: midleoagent
     enabled: yes
     daemon_reload: yes
     masked: no
+- name: enable actions service
+  systemd:
+    name: midleoactions
+    enabled: yes
+    daemon_reload: yes
+    masked: no
 - name: start midleoagent
   service:
     name: midleoagent
+    state: started
+- name: start midleoactions
+  service:
+    name: midleoactions
     state: started
 - name: "Create crontab /etc/cron.d/midleoagent"
   cron:

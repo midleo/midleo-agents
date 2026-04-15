@@ -61,6 +61,8 @@ midagent_create_client:
     - names:
       - {{agent_install_dir}}midleo_client.py:
         - source: salt://midagent/templates/python/midleo_client.py
+      - {{agent_install_dir}}midleo_actions.py:
+        - source: salt://midagent/templates/python/midleo_actions.py
 
 midagent_create_script:
   file.managed:
@@ -165,9 +167,28 @@ midagent_create_service:
         python_install_dir: "{{python_install_dir}}"
         mwuser: "{{mwuser}}"
 
+midagent_create_actions_service:
+  file.managed:
+    - user: {{mwuser}}
+    - group: {{mwuser}}
+    - mode: '0755'
+    - template: jinja
+    - names:
+      - /etc/systemd/system/midleoactions.service:
+        - source: salt://midagent/templates/agent_linux_actions_service.j2
+    - context:
+        agent_install_dir: "{{agent_install_dir}}"
+        python_install_dir: "{{python_install_dir}}"
+        mwuser: "{{mwuser}}"
+
 midagent.service:
    service.running:
      - name: midleoagent
+     - enable: True
+
+midagent.actions.service:
+   service.running:
+     - name: midleoactions
      - enable: True
 
 midagent.cron:

@@ -41,6 +41,7 @@ for path in (
     os.path.join(cfgdir, "conftrack.json"),
     os.path.join(cfgdir, "confavl.json"),
     os.path.join(cfgdir, "confapplstat.json"),
+    os.path.join(cfgdir, "confactions.json"),
 ):
     if not os.path.isfile(path):
         with open(path, "w", encoding="utf-8") as f:
@@ -100,12 +101,30 @@ case "${1:-}" in
       fi
       "$PYTHON" "runable/addappstat.py" "$2" "$3" "$4"
       ;;
+  addaction )
+      if [ -z "${2:-}" ]; then
+        "$0"
+        exit 1
+      fi
+      if [ -n "${3:-}" ]; then
+        "$PYTHON" "runable/addaction.py" "$2" "$3"
+      else
+        "$PYTHON" "runable/addaction.py" "$2"
+      fi
+      ;;
   delappstat )
       if [ -z "${2:-}" ]; then
         "$0"
         exit 1
       fi
       "$PYTHON" "runable/delappstat.py" "$2" "$3"
+      ;;
+  rmaction )
+      if [ -z "${2:-}" ]; then
+        "$0"
+        exit 1
+      fi
+      "$PYTHON" "runable/rmaction.py" "$2"
       ;;
   enabletrackqm )
       if [ -z "${2:-}" ]; then
@@ -149,6 +168,9 @@ case "${1:-}" in
       echo "   -  $0 startavl APP_SERVER SERVER_TYPE"
       echo "   -  $0 addappstat SRV_TYPE APPSRV '{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\"}'"
       echo "   -  $0 delappstat SRV_TYPE APPSRV"
+      echo "   -  $0 addaction APP_SERVER_TYPE.ERROR_CODE '{\"script\":\"/opt/midleo/actions/restart.sh\",\"args\":[\"{appserver_type}\",\"{error_code}\"],\"monid\":\"monaction\",\"appsrvid\":\"none\",\"appsrv\":\"tomcat01\",\"message\":\"Action already started recently\"}'"
+      echo "   -  $0 addaction '{\"action_key\":\"APP_SERVER_TYPE.ERROR_CODE\",\"script\":\"/opt/midleo/actions/restart.sh\"}'"
+      echo "   -  $0 rmaction APP_SERVER_TYPE.ERROR_CODE"
       echo "   -  $0 enabletrackqm QMGR"
       echo "   -  $0 disabletrackqm QMGR"
       echo "   -  $0 maintenance on|off [comment]"

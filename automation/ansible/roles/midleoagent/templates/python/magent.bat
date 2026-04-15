@@ -33,6 +33,7 @@ if not exist "%HOMEDIR%\certs.json" echo {}>"%HOMEDIR%\certs.json"
 if not exist "%HOMEDIR%\conftrack.json" echo {}>"%HOMEDIR%\conftrack.json"
 if not exist "%HOMEDIR%\confavl.json" echo {}>"%HOMEDIR%\confavl.json"
 if not exist "%HOMEDIR%\confapplstat.json" echo {}>"%HOMEDIR%\confapplstat.json"
+if not exist "%HOMEDIR%\confactions.json" echo {}>"%HOMEDIR%\confactions.json"
 
 "%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; configs.syncCronjobsForConfig('conftrack.json', configs.gettrackData()); configs.syncCronjobsForConfig('confavl.json', configs.getAvlData()); configs.syncCronjobsForConfig('confapplstat.json', configs.getmonData())"
 if errorlevel 1 exit /b 1
@@ -45,6 +46,8 @@ if /I "%1"=="stopavl" goto stopavl
 if /I "%1"=="startavl" goto startavl
 if /I "%1"=="addappstat" goto addappstat
 if /I "%1"=="delappstat" goto delappstat
+if /I "%1"=="addaction" goto addaction
+if /I "%1"=="rmaction" goto rmaction
 if /I "%1"=="enabletrackqm" goto enabletrackqm
 if /I "%1"=="disabletrackqm" goto disabletrackqm
 if /I "%1"=="maintenance" goto maintenance
@@ -106,6 +109,26 @@ if "%~3"=="" (
 "%PYTHON%" "runable\delappstat.py" "%~2" "%~3"
 exit /b %ERRORLEVEL%
 
+:addaction
+if "%~2"=="" (
+  goto usage
+)
+if not "%~3"=="" (
+  set "json=%~3"
+  "%PYTHON%" "runable\addaction.py" "%~2" !json!
+) else (
+  set "json=%~2"
+  "%PYTHON%" "runable\addaction.py" !json!
+)
+exit /b %ERRORLEVEL%
+
+:rmaction
+if "%~2"=="" (
+  goto usage
+)
+"%PYTHON%" "runable\rmaction.py" "%~2"
+exit /b %ERRORLEVEL%
+
 :enabletrackqm
 if "%~2"=="" (
   echo Empty Qmanager
@@ -150,6 +173,9 @@ echo    -  %~nx0 stopavl APP_SERVER SERVER_TYPE comment
 echo    -  %~nx0 startavl APP_SERVER SERVER_TYPE
 echo    -  %~nx0 addappstat SRV_TYPE APPSRV "{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\"}"
 echo    -  %~nx0 delappstat SRV_TYPE APPSRV
+echo    -  %~nx0 addaction APP_SERVER_TYPE.ERROR_CODE "{\"script\":\"C:\\actions\\restart.cmd\",\"args\":[\"{appserver_type}\",\"{error_code}\"],\"monid\":\"monaction\",\"appsrvid\":\"none\",\"appsrv\":\"tomcat01\",\"message\":\"Action already started recently\"}"
+echo    -  %~nx0 addaction "{\"action_key\":\"APP_SERVER_TYPE.ERROR_CODE\",\"script\":\"C:\\actions\\restart.cmd\"}"
+echo    -  %~nx0 rmaction APP_SERVER_TYPE.ERROR_CODE
 echo    -  %~nx0 enabletrackqm QMGR
 echo    -  %~nx0 disabletrackqm QMGR
 echo    -  %~nx0 maintenance on^|off [comment]

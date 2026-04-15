@@ -6,6 +6,11 @@
     name: midleoagent
     description: Run the midleoagent on boot
     state: absent
+- name: delete scheduled task to run python actions agent on boot
+  win_scheduled_task:
+    name: midleoactions
+    description: Run the midleoactions on boot
+    state: absent
 - name: Remove midleoagent
   win_file:
     path: "{{agent_install_dir}}"

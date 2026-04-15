@@ -1,12 +1,12 @@
 [Unit]
-Description = Midleo Agent
+Description = Midleo Actions
 After=syslog.target network.target
  
 [Service]
 User={{mwuser}}
 Group={{mwuser}}
 WorkingDirectory={{agent_install_dir}}
-ExecStart={{python_install_dir}} {{agent_install_dir}}midleo_client.py
+ExecStart={{python_install_dir}} {{agent_install_dir}}midleo_actions.py
 Restart=always
 RestartSec=120
  

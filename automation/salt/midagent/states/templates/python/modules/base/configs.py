@@ -10,6 +10,7 @@ MON_FILE = os.path.join(CONFIG_DIR, "confapplstat.json")
 CERT_FILE = os.path.join(CONFIG_DIR, "certs.json")
 TRACK_FILE = os.path.join(CONFIG_DIR, "conftrack.json")
 AVL_FILE = os.path.join(CONFIG_DIR, "confavl.json")
+ACTIONS_FILE = os.path.join(CONFIG_DIR, "confactions.json")
 
 FILE_TO_CRONJOBS = {
     "conftrack.json": ["runmqtracker.py"],
@@ -22,6 +23,7 @@ SECTION_FILE_MAP = {
     "conftrack": TRACK_FILE,
     "confavl": AVL_FILE,
     "confapplstat": MON_FILE,
+    "confactions": ACTIONS_FILE,
 }
 
 
@@ -182,3 +184,11 @@ def getAvlData():
 
 def saveAvlData(data):
     _save_config(AVL_FILE, data, "confavl.json")
+
+
+def getActionData():
+    return _get_config(ACTIONS_FILE)
+
+
+def saveActionData(data):
+    _save_config(ACTIONS_FILE, data, "confactions.json")
