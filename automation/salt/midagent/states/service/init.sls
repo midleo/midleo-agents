@@ -38,6 +38,31 @@ midagent_add_docker:
     - require:
       - user: midagent_create_user
 
+/etc/midleo:
+  file.directory:
+    - name: /etc/midleo
+    - user: root
+    - group: {{mwuser}}
+    - dir_mode: 750
+    - makedirs: True
+
+midagent_create_crypto_secret:
+  cmd.run:
+    - name: umask 027 && head -c 48 /dev/urandom | base64 > /etc/midleo/crypto.secret
+    - unless: test -f /etc/midleo/crypto.secret
+    - require:
+      - file: /etc/midleo
+
+midagent_secure_crypto_secret:
+  file.managed:
+    - name: /etc/midleo/crypto.secret
+    - user: root
+    - group: {{mwuser}}
+    - mode: '0640'
+    - replace: False
+    - require:
+      - cmd: midagent_create_crypto_secret
+
 {{agent_install_dir}}:
   file.directory:
     - name: {{agent_install_dir}}
@@ -136,14 +161,14 @@ midagent_create_config:
         inttoken: "{{int_token}}"
         agent_install_dir: "{{agent_install_dir}}"
         allowed_commands: 
+          - magent.sh
           - dspmq
           - dspmqver
-          - runmqsc
-          - amqsevt
           {% if osfam == "Linux" %}
           - uptime
           {% endif %}
           {% if osfam == "Windows" %}
+          - magent.bat
           - net
           {% endif %}
         update_interval_minutes: "{{update_interval_minutes}}"

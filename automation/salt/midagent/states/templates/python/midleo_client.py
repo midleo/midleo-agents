@@ -40,6 +40,7 @@ FORBIDDEN_PATTERNS = [
 ]
 
 SHELL_META_CHARS = set("|&;<>\n`")
+AGENT_SCRIPT_COMMANDS = {"magent.sh", "magent.bat", "cronjobs.sh", "cronjobs.bat"}
 SECRET_RE = re.compile(
     r'("?(?:pwd|pass|password|srvpass|cpass|chlpass)"?\s*:\s*)'
     r'(".*?"|\'.*?\'|[^,\}\s]+)',
@@ -276,7 +277,7 @@ def _command_args(cmd_str):
         raise ValueError("invalid command syntax: " + str(ex))
 
 
-def _command_exe(args):
+def _command_index(args):
     if not args:
         raise ValueError("empty command")
 
@@ -295,10 +296,16 @@ def _command_exe(args):
             exe = exe[:-4]
 
     if exe == "busybox" and len(args) > index + 1:
-        exe = os.path.basename(args[index + 1]).lower()
-        if exe.endswith(".exe"):
-            exe = exe[:-4]
+        index = index + 1
 
+    return index
+
+
+def _command_exe(args):
+    index = _command_index(args)
+    exe = os.path.basename(args[index]).lower()
+    if exe.endswith(".exe"):
+        exe = exe[:-4]
     return exe
 
 
@@ -323,12 +330,25 @@ def _validate_command(cmd_str, allowed):
             raise ValueError("forbidden command pattern detected")
 
     args = _command_args(cmd_str)
+    cmd_index = _command_index(args)
     exe = _command_exe(args)
     allowed_set = {_normalize_exe(a) for a in allowed if a}
     if not allowed_set:
         raise ValueError("command allowlist is empty")
     if exe not in allowed_set:
         raise ValueError("command not allowed")
+
+    if exe in AGENT_SCRIPT_COMMANDS:
+        expected = os.path.realpath(os.path.join(os.getcwd(), exe))
+        candidate_raw = args[cmd_index]
+        candidate = os.path.realpath(
+            candidate_raw
+            if os.path.isabs(candidate_raw)
+            else os.path.join(os.getcwd(), candidate_raw)
+        )
+        if candidate != expected:
+            raise ValueError("agent script path not allowed")
+        args[cmd_index] = expected
 
     return args
 

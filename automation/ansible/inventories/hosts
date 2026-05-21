@@ -17,7 +17,7 @@ midleo_website_base_url_ssl="n"
 update_interval_minutes="5"
 midleo_mwuser="mwadmin"
 inttoken=""
-allowed_commands=['dspmq','dspmqver','runmqsc','amqsevt','net','docker']
+allowed_commands=['magent.bat','net']
 
 [linux:vars]
 midleo_website_base_url="MIDLEO_BASE_URL"
@@ -25,7 +25,7 @@ midleo_website_base_url_ssl="n"
 update_interval_minutes="5"
 midleo_mwuser="mwadmin"
 inttoken=""
-allowed_commands=['dspmq','dspmqver','runmqsc','amqsevt','uptime','sudo','docker']
+allowed_commands=['magent.sh','dspmq','dspmqver','uptime']
 
 [middleware:children]
 linux

@@ -34,7 +34,7 @@ def _run_mq_event(qmgr, srvtype, item):
             return []
         command = ["docker", "exec", container, "bash", "-c", _mq_event_command(qmgr)]
     else:
-        command = ["sudo", "su", "-", "mqm", "-c", _mq_event_command(qmgr)]
+        command = ["sudo", "-u", "mqm", "-i", "/bin/bash", "-lc", _mq_event_command(qmgr)]
 
     proc = subprocess.run(
         command,

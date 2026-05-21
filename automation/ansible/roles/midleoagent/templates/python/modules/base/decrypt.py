@@ -1,6 +1,7 @@
 import base64
 import binascii
 import json
+import os
 from pathlib import Path
 
 from Crypto import Random
@@ -11,7 +12,14 @@ from Crypto.Util.Padding import pad, unpad
 
 from modules.base import classes
 
-_SECRET_PATH = Path("/etc/midleo/crypto.secret")
+_SECRET_PATH = Path(
+    os.environ.get(
+        "MIDLEO_CRYPTO_SECRET",
+        os.path.join(os.getcwd(), "config", "crypto.secret")
+        if os.name == "nt"
+        else "/etc/midleo/crypto.secret",
+    )
+)
 _SECRET = None
 _SUFFIX = b"|midleo|v1"
 

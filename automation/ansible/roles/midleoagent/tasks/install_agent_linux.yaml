@@ -24,6 +24,23 @@
     append: yes
   ignore_errors: True
 
+- name: "Create Midleo crypto directory"
+  file:
+    path: /etc/midleo
+    state: directory
+    owner: root
+    group: "{{midleo_mwuser}}"
+    mode: '0750'
+
+- name: "Create Midleo crypto secret"
+  copy:
+    dest: /etc/midleo/crypto.secret
+    content: "{{ lookup('password', '/dev/null length=64 chars=ascii_letters,digits') }}\n"
+    owner: root
+    group: "{{midleo_mwuser}}"
+    mode: '0640'
+    force: no
+
 - name: "create midleoagent folder"
   file:
     path: "{{item}}"
@@ -90,6 +107,16 @@
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
     mode: '0640'
+
+- name: "Install Midleo sudoers policy"
+  template:
+    src: templates/mwadmin.sudo.j2
+    dest: "/etc/sudoers.d/{{midleo_mwuser}}.conf"
+    owner: root
+    group: root
+    mode: '0440'
+    validate: /usr/sbin/visudo -cf %s
+
 - name: "Create module directories"
   file:
     path: "{{ agent_install_dir }}/modules/{{ item.path }}"

@@ -38,6 +38,8 @@ diff -qr automation/ansible/roles/midleoagent/templates/python automation/salt/m
 - Command execution is allowlist-based through `ALLOWED_COMMANDS`.
 - Shell execution is disabled by default with `ALLOW_SHELL_COMMANDS=n`.
 - Remote file writes are restricted by `REMOTE_FILE_ROOTS`.
+- Action scripts are restricted by `ACTION_SCRIPT_ROOTS`.
+- Application credential encryption uses `/etc/midleo/crypto.secret`, created by Linux automation with root ownership and service-user read access.
 - HTTPS certificate verification is enabled by default with `SSLVERIFY=y`.
 - systemd services run with additional hardening options where supported.
 

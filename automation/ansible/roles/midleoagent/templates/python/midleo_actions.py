@@ -69,11 +69,22 @@ def _write_json_atomic(path, data):
 
 def _load_runtime_config():
     cfg = configs.getcfgData() or {}
+    action_roots = [
+        item.strip()
+        for item in str(
+            cfg.get(
+                "ACTION_SCRIPT_ROOTS",
+                os.path.join(BASE_DIR, "extchecks") + ",/opt/midleo/actions",
+            )
+        ).split(",")
+        if item.strip()
+    ]
     return {
         "uid": str(cfg.get("SRVUID", "")),
         "website": str(cfg.get("MWADMIN", "")),
         "webssl": str(cfg.get("SSLENABLED", "n")),
         "inttoken": str(cfg.get("INTTOKEN", "")),
+        "action_roots": action_roots,
     }
 
 
@@ -114,10 +125,33 @@ def _resolve_script_command(script_path, args):
     return [script_path, *args]
 
 
-def _start_action(action_key, action_cfg, payload):
+def _safe_action_script(script_path, roots):
+    if not script_path or "\x00" in script_path:
+        raise ValueError("invalid action script")
+
+    candidate = (
+        script_path
+        if os.path.isabs(script_path)
+        else os.path.join(BASE_DIR, script_path)
+    )
+    real_candidate = os.path.realpath(candidate)
+
+    for root in roots:
+        real_root = os.path.realpath(root)
+        try:
+            if os.path.commonpath([real_root, real_candidate]) == real_root:
+                return real_candidate
+        except ValueError:
+            continue
+
+    raise ValueError("action script outside allowed roots")
+
+
+def _start_action(action_key, action_cfg, payload, action_roots):
     script_path = str(action_cfg.get("script", "")).strip()
     if not script_path:
         raise ValueError("action has no script")
+    script_path = _safe_action_script(script_path, action_roots)
     if not os.path.isfile(script_path):
         raise FileNotFoundError("script not found: " + script_path)
     if not os.access(script_path, os.X_OK):
@@ -287,7 +321,9 @@ def _handle_action(payload):
 
             return repeated
 
-        start_info = _start_action(action_key, action_cfg, payload)
+        start_info = _start_action(
+            action_key, action_cfg, payload, runtime_cfg["action_roots"]
+        )
         state[action_key] = {
             "uid": runtime_cfg["uid"],
             "action_key": action_key,

@@ -72,6 +72,7 @@ The state creates:
 - `/var/midleoagent/`
 - `/var/midleoagent/config/mwagent.config`
 - `/var/midleoagent/config/cronjobs.json`
+- `/etc/midleo/crypto.secret`
 - `/etc/systemd/system/midleoagent.service`
 - `/etc/systemd/system/midleoactions.service`
 - a per-minute cron entry for the Midleo service user.
@@ -147,7 +148,8 @@ tibrvjms.jar
 ```bash
 systemctl status midleoagent midleoactions
 crontab -u mwadmin -l
+test -f /etc/midleo/crypto.secret
 salt-call state.apply midagent.installAgent test=True pillar="$pillar"
 ```
 
-Before customer rollout, verify TLS trust, firewall rules, `ALLOWED_COMMANDS`, `REMOTE_FILE_ROOTS`, and the Midleo Core endpoint.
+Before customer rollout, verify TLS trust, firewall rules, `ALLOWED_COMMANDS`, `REMOTE_FILE_ROOTS`, `ACTION_SCRIPT_ROOTS`, and the Midleo Core endpoint. Avoid allowing raw `sudo`, `docker`, shells, or interpreters unless the customer explicitly accepts that operational risk.

@@ -37,6 +37,14 @@ require_arg() {
   fi
 }
 
+require_qmgr() {
+  require_arg "${1:-}"
+  if [[ ! "$1" =~ ^[A-Za-z0-9._%/-]+$ ]]; then
+    echo "Invalid Qmanager"
+    exit 1
+  fi
+}
+
 "$PYTHON" - <<'PY'
 import os
 from modules.base import configs
@@ -130,19 +138,17 @@ case "${1:-}" in
       "$PYTHON" "runable/rmaction.py" "$2"
       ;;
   enabletrackqm )
-      if [ -z "${2:-}" ]; then
-        echo "Empty Qmanager"
-        exit 1
-      fi
-      sudo su - mqm -c "echo 'ALTER QMGR ACTVTRC(ON)' | $RUNMQSC $2"
+      require_qmgr "${2:-}"
+      sudo -u mqm -i "$RUNMQSC" "$2" <<'MQSC'
+ALTER QMGR ACTVTRC(ON)
+MQSC
       "$PYTHON" "runable/enabletrackqm.py" "$2"
       ;;
   disabletrackqm )
-      if [ -z "${2:-}" ]; then
-        echo "Empty Qmanager"
-        exit 1
-      fi
-      sudo su - mqm -c "echo 'ALTER QMGR ACTVTRC(OFF)' | $RUNMQSC $2"
+      require_qmgr "${2:-}"
+      sudo -u mqm -i "$RUNMQSC" "$2" <<'MQSC'
+ALTER QMGR ACTVTRC(OFF)
+MQSC
       "$PYTHON" "runable/disabletrackqm.py" "$2"
       ;;
   maintenance )

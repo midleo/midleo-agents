@@ -3,6 +3,7 @@
     agent_unique_id: "{{ lookup('password', '/dev/null length=16 chars=hexdigits') }}"
     agent_install_dir: "D:/apps/midleoagent/"
     python_install_dir: "D:/apps/Python"
+
 - name: "create midleoagent folder"
   win_file:
     path: "{{item}}"
@@ -10,37 +11,93 @@
   loop:
     - "{{agent_install_dir}}"
     - "{{agent_install_dir}}modules"
+    - "{{agent_install_dir}}runable"
     - "{{agent_install_dir}}logs"
     - "{{agent_install_dir}}config"
-- name: "creage agent"
-  win_template:
+    - "{{agent_install_dir}}extchecks"
+
+- name: "create agent"
+  win_copy:
     src: templates/python/midleo_client.py
     dest: "{{agent_install_dir}}midleo_client.py"
+
 - name: "create actions agent"
-  win_template:
+  win_copy:
     src: templates/python/midleo_actions.py
     dest: "{{agent_install_dir}}midleo_actions.py"
-- name: "creage agent script"
-  win_template:
+
+- name: "create agent script"
+  win_copy:
     src: templates/python/magent.bat
     dest: "{{agent_install_dir}}magent.bat"
-- name: "creage agent cronjob"
-  win_template:
+
+- name: "create agent cronjob"
+  win_copy:
     src: templates/python/cronjobs.bat
     dest: "{{agent_install_dir}}cronjobs.bat"
-- name: "creage agentconfig"
+
+- name: "copy cronjobs json"
+  win_copy:
+    src: templates/python/config/cronjobs.json
+    dest: "{{agent_install_dir}}config/cronjobs.json"
+    force: no
+
+- name: "check existing windows agent config"
+  win_stat:
+    path: "{{agent_install_dir}}config/mwagent.config"
+  register: st_win_agcfg
+
+- name: "create windows agent config"
   win_template:
-    src: templates/agentConfig.json.j2
-    dest: "{{agent_install_dir}}config/agentConfig.json"
-- name: "creage bashconfig"
-  win_template:
-    src: templates/mwagent.config
+    src: templates/mwagent.config.win.j2
     dest: "{{agent_install_dir}}config/mwagent.config"
-- name: "upload python scripts"
+  when: not st_win_agcfg.stat.exists
+
+- name: "check existing windows batch config"
+  win_stat:
+    path: "{{agent_install_dir}}config/mwagent.config.bat"
+  register: st_win_batcfg
+
+- name: "create windows batch config"
   win_template:
-    src: '{{ item.src }}'
+    src: templates/mwagent.config.bat.j2
+    dest: "{{agent_install_dir}}config/mwagent.config.bat"
+  when: not st_win_batcfg.stat.exists
+
+- name: "create windows crypto secret"
+  win_copy:
+    dest: "{{agent_install_dir}}config/crypto.secret"
+    content: "{{ lookup('password', '/dev/null length=64 chars=ascii_letters,digits') }}\n"
+    force: no
+
+- name: "Create module directories"
+  win_file:
+    path: "{{ agent_install_dir }}modules/{{ item.path }}"
+    state: directory
+  with_filetree: templates/python/modules
+  when: item.state == 'directory'
+
+- name: "Create runable directories"
+  win_file:
+    path: "{{ agent_install_dir }}runable/{{ item.path }}"
+    state: directory
+  with_filetree: templates/python/runable
+  when: item.state == 'directory'
+
+- name: "Upload module files"
+  win_copy:
+    src: "{{ item.src }}"
     dest: "{{agent_install_dir}}modules/{{ item.path }}"
   with_filetree: templates/python/modules
+  when: item.state == 'file'
+
+- name: "Upload runable files"
+  win_copy:
+    src: "{{ item.src }}"
+    dest: "{{agent_install_dir}}runable/{{ item.path }}"
+  with_filetree: templates/python/runable
+  when: item.state == 'file'
+
 - name: Install python packages
   win_shell: |
     {{python_install_dir}}\\python -m pip install --upgrade pip
@@ -51,6 +108,7 @@
     {{python_install_dir}}\\python -m pip install pycryptodome
     {{python_install_dir}}\\python -m pip install pywinrm
     {{python_install_dir}}\\python -m pip install netifaces
+
 - name: create scheduled task to run python agent on boot
   win_scheduled_task:
     name: midleoagent
@@ -64,6 +122,7 @@
     username: SYSTEM
     run_level: highest
     state: present
+
 - name: create scheduled task to run python actions agent on boot
   win_scheduled_task:
     name: midleoactions
@@ -77,4 +136,10 @@
     username: SYSTEM
     run_level: highest
     state: present
+
+- name: create scheduled task to run cronjobs every minute
+  win_shell: >
+    schtasks /Create /TN midleocron /SC MINUTE /MO 1
+    /TR "\"{{agent_install_dir}}cronjobs.bat\""
+    /RU SYSTEM /RL HIGHEST /F
 ...

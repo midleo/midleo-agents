@@ -26,7 +26,7 @@ def _mq_event_command(qmgr):
 
 def _run_mq_event(qmgr):
     proc = subprocess.run(
-        ["sudo", "su", "-", "mqm", "-c", _mq_event_command(qmgr)],
+        ["sudo", "-u", "mqm", "-i", "/bin/bash", "-lc", _mq_event_command(qmgr)],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         timeout=MQ_EVENT_TIMEOUT_SECONDS,

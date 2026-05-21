@@ -67,6 +67,8 @@ Linux deployment creates:
 
 The cron entry runs every minute and executes enabled jobs from `/var/midleoagent/config/cronjobs.json`. Jobs are bounded by `JOB_TIMEOUT_SECONDS`.
 
+Linux deployment also creates `/etc/midleo/crypto.secret` once and preserves it across reinstall. This secret is used for local application credential encryption and must not be rotated without re-encrypting stored agent credentials.
+
 ## Vendor Libraries
 
 Create `/midleolibs/lib` and `/midleolibs/vendor` on hosts that need Java or vendor-specific statistics modules.
@@ -140,6 +142,7 @@ systemctl status midleoagent midleoactions
 crontab -u mwadmin -l
 test -f /var/midleoagent/config/mwagent.config
 test -f /var/midleoagent/config/cronjobs.json
+test -f /etc/midleo/crypto.secret
 ```
 
-Review `ALLOWED_COMMANDS`, `REMOTE_FILE_ROOTS`, `SSLVERIFY`, firewall rules, and the Midleo Core endpoint before exposing the service to enterprise networks.
+Review `ALLOWED_COMMANDS`, `REMOTE_FILE_ROOTS`, `ACTION_SCRIPT_ROOTS`, `SSLVERIFY`, firewall rules, and the Midleo Core endpoint before exposing the service to enterprise networks. Avoid allowing raw `sudo`, `docker`, shells, or interpreters unless the customer explicitly accepts that operational risk.
