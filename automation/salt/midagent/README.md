@@ -1,32 +1,90 @@
-# midleoagent
+# Midleo Agent Salt Deployment
 
-# installation
+This Salt formula installs the Linux Midleo agent service, action service, and cron runner.
 
-- create configuration file <b>midagent.conf</b>
+## Quick Start
 
-```console
-midleo_website_base_url="MIDLEO_BASE_URL"  # the base url of the midleo.CORE website, ex. https://app.midleo.com
-midleo_website_base_url_ssl="y"   # is the website accessed via http or https -> https=y
-group_id="MIDsf4"                 # the GroupID taken from midleo.CORE website -> Configuration -> Groups -> Edit -> GroupID
-update_interval_minutes="5"       # interval in minutes. The agent is getting information about resources and post it to the midleo.CORE website
+Create `midagent.conf`:
 
-pillar='{"INPUT":{"midleo_website_base_url":"'$midleo_website_base_url'","midleo_website_base_url_ssl":"'$midleo_website_base_url_ssl'","group_id":"'$group_id'","update_interval_minutes":"'$update_interval_minutes'"}}'
+```bash
+midleo_website_base_url="MIDLEO_BASE_URL"
+midleo_website_base_url_ssl="y"
+group_id="MIDLEO_GROUP_ID"
+int_token="MIDLEO_INTERNAL_TOKEN"
+update_interval_minutes="5"
+install_pymqi="false"
+
+pillar='{"INPUT":{"midleo_website_base_url":"'$midleo_website_base_url'","midleo_website_base_url_ssl":"'$midleo_website_base_url_ssl'","group_id":"'$group_id'","int_token":"'$int_token'","update_interval_minutes":"'$update_interval_minutes'","install_pymqi":"'$install_pymqi'"}}'
 ```
 
-- install the agent
+Apply the state:
 
-
-```
+```bash
 . midagent.conf
 salt-call -c saltconfig state.apply midagent.installAgent pillar="$pillar"
 ```
 
-- download vendor and external libraries (depends on which modules you will use)
+## Pillar Variables
 
+Runtime input:
 
-```
-mkdir -p /midleolibs/{lib,vendor}
-libraries in lib folder:
+- `INPUT:midleo_website_base_url`: Midleo Core host or base URL.
+- `INPUT:midleo_website_base_url_ssl`: `y` for HTTPS, `n` for HTTP.
+- `INPUT:group_id`: Midleo Core group ID.
+- `INPUT:int_token`: integration token used in payloads.
+- `INPUT:update_interval_minutes`: server inventory update interval.
+- `INPUT:install_pymqi`: optional, install `pymqi` on IBM MQ hosts only.
+
+Static defaults are in `pillars/midagent_vars.sls`:
+
+- `agent_install_dir`: default `/var/midleoagent/`
+- `python_install_dir`: default `/usr/bin/python3`
+- `mwuser`: default `mwadmin`
+
+## Installed Dependencies
+
+System packages:
+
+- `gcc`
+- `curl`
+- `jq`
+- `python3-dev` on Debian/Ubuntu or `python3-devel` on RHEL-family hosts
+- `python3-pip`
+- `python3-setuptools`
+
+Python packages:
+
+- `psutil`
+- `py-cpuinfo`
+- `dnspython`
+- `requests`
+- `pycryptodome`
+- `pywinrm`
+- `netifaces`
+- optional: `pymqi`
+
+`shlex`, `subprocess`, `asyncio`, and the other base runtime imports are Python standard-library modules and are not installed separately.
+
+## Services and Files
+
+The state creates:
+
+- `/var/midleoagent/`
+- `/var/midleoagent/config/mwagent.config`
+- `/var/midleoagent/config/cronjobs.json`
+- `/etc/systemd/system/midleoagent.service`
+- `/etc/systemd/system/midleoactions.service`
+- a per-minute cron entry for the Midleo service user.
+
+Executable demo app-server registration states are not part of the production install. Register application servers through Midleo Core or explicit Salt states with customer-specific data.
+
+## Vendor Libraries
+
+Create `/midleolibs/lib` and `/midleolibs/vendor` only on hosts that need the related middleware modules.
+
+`/midleolibs/lib`:
+
+```text
 activemq-client-6.1.6.jar
 asm-7.0.jar
 gson-2.10.1.jar
@@ -66,9 +124,11 @@ websocket-common.jar
 wildfly-client-all-35.0.1.Final.jar
 wildfly-controller-client-28.0.0.Final.jar
 wildfly-protocol-28.0.0.Final.jar
+```
 
+`/midleolibs/vendor`:
 
-libraries in vendor folder:
+```text
 bipbroker.jar
 brokerutil.jar
 com.ibm.mq.allclient.jar
@@ -80,5 +140,14 @@ tibjmsadmin.jar
 tibjmsapps.jar
 tibjms.jar
 tibrvjms.jar
-
 ```
+
+## Production Checks
+
+```bash
+systemctl status midleoagent midleoactions
+crontab -u mwadmin -l
+salt-call state.apply midagent.installAgent test=True pillar="$pillar"
+```
+
+Before customer rollout, verify TLS trust, firewall rules, `ALLOWED_COMMANDS`, `REMOTE_FILE_ROOTS`, and the Midleo Core endpoint.

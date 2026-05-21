@@ -1,19 +1,20 @@
 import base64
 import binascii
 import json
-from modules.base import classes
+from pathlib import Path
 
 from Crypto import Random
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256
 from Crypto.Random import get_random_bytes
-from Crypto.Util.Padding import pad
-from pathlib import Path
-import base64
+from Crypto.Util.Padding import pad, unpad
+
+from modules.base import classes
 
 _SECRET_PATH = Path("/etc/midleo/crypto.secret")
 _SECRET = None
 _SUFFIX = b"|midleo|v1"
+
 
 def _get_secret() -> bytes:
     global _SECRET
@@ -27,12 +28,25 @@ def _get_secret() -> bytes:
 def _derive_key() -> bytes:
     return SHA256.new(_get_secret() + _SUFFIX).digest()
 
+
 def encryptPWD(payload: str) -> str:
     key = _derive_key()
     iv = get_random_bytes(16)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     ciphertext = cipher.encrypt(pad(payload.encode("utf-8"), AES.block_size))
     return base64.b64encode(iv + ciphertext).decode("ascii")
+
+
+def decryptPWD(payload: str) -> str:
+    if not payload:
+        return ""
+
+    raw = base64.b64decode(str(payload))
+    iv = raw[:16]
+    ciphertext = raw[16:]
+    cipher = AES.new(_derive_key(), AES.MODE_CBC, iv)
+    return unpad(cipher.decrypt(ciphertext), AES.block_size).decode("utf-8")
+
 
 def encrypt(data: dict, passphrase) -> str:
     try:
@@ -42,13 +56,14 @@ def encrypt(data: dict, passphrase) -> str:
         cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
         encrypted, tag = cipher.encrypt_and_digest(data_json_64)
         payload = {
-           "iv": base64.b64encode(iv).decode(),
-           "data": base64.b64encode(encrypted).decode(),
-           "tag": base64.b64encode(tag).decode()
+            "iv": base64.b64encode(iv).decode(),
+            "data": base64.b64encode(encrypted).decode(),
+            "tag": base64.b64encode(tag).decode()
         }
         return base64.b64encode(json.dumps(payload).encode()).decode()
     except Exception as ex:
-        classes.Err("Exception:"+str(ex))
+        classes.Err("Exception:" + str(ex))
+
 
 def decryptit(data: str, passphrase) -> dict:
     try:
@@ -61,4 +76,4 @@ def decryptit(data: str, passphrase) -> dict:
         decrypted = cipher.decrypt_and_verify(encrypted_data, tag)
         return json.loads(base64.b64decode(decrypted).decode('ascii'))
     except Exception as ex:
-        classes.Err("Exception:"+str(ex))
+        classes.Err("Exception:" + str(ex))

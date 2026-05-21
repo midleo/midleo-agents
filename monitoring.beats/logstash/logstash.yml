@@ -1,2 +1,7 @@
 http.host: "0.0.0.0"
 pipeline.ecs_compatibility: disabled
+pipeline.workers: 2
+pipeline.batch.size: 125
+queue.type: persisted
+queue.max_bytes: 1gb
+dead_letter_queue.enable: true

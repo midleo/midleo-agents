@@ -6,10 +6,20 @@ sys.path.insert(0, parentdir)
 
 from modules.base import makerequest, classes, configs, file_utils
 
-YM = sys.argv[1]
-WD = sys.argv[2]
+
+def _arg(index, name):
+    try:
+        value = sys.argv[index]
+    except IndexError:
+        raise ValueError("Missing required argument: " + name)
+    value = str(value).strip()
+    if not value:
+        raise ValueError("Empty required argument: " + name)
+    return value
 
 try:
+    YM = _arg(1, "YM")
+    WD = _arg(2, "WD")
     avl_data = configs.getAvlData()
     config_data = configs.getcfgData()
     website = config_data["MWADMIN"]
@@ -34,4 +44,4 @@ try:
                         makerequest.postAvlData(webssl, website, json.dumps(ret))
 
 except Exception as err:
-    classes.Err("No such configuration file - config/confavl.json." + err)
+    classes.Err("No such configuration file - config/confavl.json." + str(err))

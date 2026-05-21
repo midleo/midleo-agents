@@ -17,6 +17,8 @@ STATE_FILE = os.path.join(CONFIG_DIR, "cron_state.json")
 NEXT_RUN_FILE = os.path.join(CONFIG_DIR, "nextrun.txt")
 MAINTENANCE_FILE = os.path.join(CONFIG_DIR, "maintenance.flag")
 LOG_FILE = os.path.join(CONFIG_DIR, "cronjobs.log")
+DEFAULT_JOB_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_JOB_TIMEOUT_SECONDS", "55"))
+MAX_CAPTURE_BYTES = 4000
 
 
 def now_str():
@@ -47,6 +49,10 @@ def write_json_atomic(path, data):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
     os.replace(tmp, path)
+    try:
+        os.chmod(path, 0o640)
+    except Exception:
+        pass
 
 
 def ensure_state_file():
@@ -158,7 +164,7 @@ def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
 
 
 def run_job(script_name, args):
-    python_bin = os.environ["PYTHON"]
+    python_bin = os.environ.get("PYTHON") or sys.executable
     script_path = os.path.join(RUNABLE_DIR, script_name)
 
     if not os.path.isfile(script_path):
@@ -175,14 +181,31 @@ def run_job(script_name, args):
     started_ts = int(time.time())
     started_at = now_str()
 
-    completed = subprocess.run(
-        [python_bin, script_path, *args],
-        cwd=BASE_DIR,
-        env=os.environ.copy(),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    timeout_seconds = DEFAULT_JOB_TIMEOUT_SECONDS
+    try:
+        timeout_seconds = int(os.environ.get("JOB_TIMEOUT_SECONDS", timeout_seconds))
+    except Exception:
+        pass
+    timeout_seconds = max(5, min(timeout_seconds, 3600))
+
+    try:
+        completed = subprocess.run(
+            [python_bin, script_path] + list(args),
+            cwd=BASE_DIR,
+            env=os.environ.copy(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+        exit_code = completed.returncode
+        stdout = completed.stdout[-MAX_CAPTURE_BYTES:] if completed.stdout else ""
+        stderr = completed.stderr[-MAX_CAPTURE_BYTES:] if completed.stderr else ""
+    except subprocess.TimeoutExpired as err:
+        exit_code = 124
+        stdout = (err.stdout or "")[-MAX_CAPTURE_BYTES:] if isinstance(err.stdout, str) else ""
+        stderr = "job timed out after " + str(timeout_seconds) + " seconds"
 
     ended_ts = int(time.time())
     ended_at = now_str()
@@ -192,10 +215,10 @@ def run_job(script_name, args):
         "last_run": started_at,
         "finished_ts": ended_ts,
         "finished_at": ended_at,
-        "exit_code": completed.returncode,
+        "exit_code": exit_code,
         "args": args,
-        "stdout": completed.stdout[-4000:] if completed.stdout else "",
-        "stderr": completed.stderr[-4000:] if completed.stderr else "",
+        "stdout": stdout,
+        "stderr": stderr,
     }
 
 

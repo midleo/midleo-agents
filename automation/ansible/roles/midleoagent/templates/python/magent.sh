@@ -26,6 +26,17 @@ export MQSIPROFILE
 export IIBMQSIPROFILE
 export PYTHON
 
+usage() {
+  "$0"
+  exit 1
+}
+
+require_arg() {
+  if [ -z "${1:-}" ]; then
+    usage
+  fi
+}
+
 "$PYTHON" - <<'PY'
 import os
 from modules.base import configs
@@ -54,6 +65,7 @@ PY
 
 case "${1:-}" in
   addcert )
+      require_arg "${2:-}"
       "$PYTHON" "runable/addcert.py" "$2"
       ;;
   delcert )
@@ -64,41 +76,34 @@ case "${1:-}" in
       "$PYTHON" "runable/delcert.py" "$2"
       ;;
   enableavl )
-      if [ -z "$2" ]
-      then
-        $0
-        exit 1
-      fi
-      $PYTHON "runable/enableavl.py" $2 $3 $4
+      require_arg "${2:-}"
+      require_arg "${3:-}"
+      appsrv="$2"
+      appsrvtype="$3"
+      shift 3
+      mondata="${*:-{}}"
+      "$PYTHON" "runable/enableavl.py" "$appsrv" "$appsrvtype" "$mondata"
       ;;
   disableavl )
-      if [ -z "$2" ]
-      then
-        $0
-        exit 1
-      fi
-      $PYTHON "runable/disableavl.py" $2 $3
+      require_arg "${2:-}"
+      require_arg "${3:-}"
+      "$PYTHON" "runable/disableavl.py" "$2" "$3"
       ;;
   stopavl )
-      if [ -z "$3" ]
-      then
-        $0
-        exit 1
-      fi
-      $PYTHON "runable/stopavl.py" $USR $2 $3 "${4}"
+      require_arg "${2:-}"
+      require_arg "${3:-}"
+      require_arg "${4:-}"
+      "$PYTHON" "runable/stopavl.py" "$USR" "$2" "$3" "$4"
       ;;
   startavl )
-      if [ -z "${2:-}" ]; then
-        "$0"
-        exit 1
-      fi
+      require_arg "${2:-}"
+      require_arg "${3:-}"
       "$PYTHON" "runable/startavl.py" "$USR" "$2" "$3"
       ;;
   addappstat )
-      if [ -z "${3:-}" ]; then
-        "$0"
-        exit 1
-      fi
+      require_arg "${2:-}"
+      require_arg "${3:-}"
+      require_arg "${4:-}"
       "$PYTHON" "runable/addappstat.py" "$2" "$3" "$4"
       ;;
   addaction )
@@ -113,10 +118,8 @@ case "${1:-}" in
       fi
       ;;
   delappstat )
-      if [ -z "${2:-}" ]; then
-        "$0"
-        exit 1
-      fi
+      require_arg "${2:-}"
+      require_arg "${3:-}"
       "$PYTHON" "runable/delappstat.py" "$2" "$3"
       ;;
   rmaction )

@@ -7,7 +7,8 @@ import tempfile
 import threading
 import time
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
 
 from modules.base import classes, configs, makerequest
 
@@ -23,6 +24,10 @@ ACTION_CONFIG_FILE = os.path.join(CONFIG_DIR, "confactions.json")
 STATE_FILE = os.path.join(CONFIG_DIR, "actions_state.json")
 
 STATE_LOCK = threading.Lock()
+
+
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
 
 
 def _now():
@@ -53,6 +58,10 @@ def _write_json_atomic(path, data):
         with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
             json.dump(data, tmp_file, ensure_ascii=False, indent=2, sort_keys=True)
         os.replace(tmp_path, path)
+        try:
+            os.chmod(path, 0o640)
+        except Exception:
+            pass
     finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
@@ -111,6 +120,8 @@ def _start_action(action_key, action_cfg, payload):
         raise ValueError("action has no script")
     if not os.path.isfile(script_path):
         raise FileNotFoundError("script not found: " + script_path)
+    if not os.access(script_path, os.X_OK):
+        raise PermissionError("script is not executable: " + script_path)
 
     payload_json = json.dumps(payload, ensure_ascii=False)
     action_args = action_cfg.get("args", [])
@@ -359,6 +370,7 @@ class ActionHandler(BaseHTTPRequestHandler):
 def main():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     server = ThreadingHTTPServer((HOST, PORT_NUMBER), ActionHandler)
+    server.daemon_threads = True
     classes.Err("midleo_actions listening on " + HOST + ":" + str(PORT_NUMBER))
     server.serve_forever()
 

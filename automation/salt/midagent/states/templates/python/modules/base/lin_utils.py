@@ -21,8 +21,7 @@ def getArchitecture():
 
 def getCPUName():
     try:
-        command = "lscpu"
-        all_info = subprocess.check_output(command, shell=True).strip()
+        all_info = subprocess.check_output(["lscpu"], timeout=10).strip()
         for line in all_info.split("\n".encode()):
             if b"Model name" in line:
                 return re.sub( b".*Model name.*:", "".encode(), line,1).decode("utf-8").replace('  ','')

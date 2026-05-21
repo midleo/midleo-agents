@@ -144,8 +144,14 @@ def _sanitize_output(output):
 
 def _write_next_run(updint):
     timenow = datetime.now() + timedelta(minutes=updint)
-    with open(NEXTRUN_FILE, "w", encoding="utf-8") as log_file:
+    tmp_file = NEXTRUN_FILE + ".tmp"
+    with open(tmp_file, "w", encoding="utf-8") as log_file:
         log_file.write(str(int(timenow.timestamp())))
+    os.replace(tmp_file, NEXTRUN_FILE)
+    try:
+        os.chmod(NEXTRUN_FILE, 0o640)
+    except Exception:
+        pass
 
 
 def create():

@@ -8,16 +8,26 @@ sys.path.insert(0, parentdir)
 
 from modules.base import configs
 
-CERT = sys.argv[1]
+
+def _arg(index, name):
+    try:
+        value = sys.argv[index]
+    except IndexError:
+        raise ValueError("Missing required argument: " + name)
+    value = str(value).strip()
+    if not value:
+        raise ValueError("Empty required argument: " + name)
+    return value
 
 def deleteCertJson():
+    cert = _arg(1, "CERT")
     cert_data = configs.getcertData()
 
-    if CERT in cert_data:
-        configs.deleteSectionItem("certs", CERT)
-        print(CERT + " configuration deleted")
+    if cert in cert_data:
+        configs.deleteSectionItem("certs", cert)
+        print(cert + " configuration deleted")
     else:
-        print(CERT + " configuration not found")
+        print(cert + " configuration not found")
 
 if __name__ == "__main__":
     deleteCertJson()

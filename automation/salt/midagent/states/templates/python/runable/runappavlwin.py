@@ -1,14 +1,50 @@
-import json, subprocess, sys, os, inspect
+import inspect
+import json
+import os
+import subprocess
+import sys
 from datetime import datetime
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
-from modules.base import makerequest, classes, configs, statarr, decrypt
+from modules.base import classes, configs, makerequest, statarr
+
+AVL_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_AVL_TIMEOUT_SECONDS", "20"))
 
 now = datetime.now()
 current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _credentials(item):
+    cred = {}
+    if item.get("usr"):
+        cred["usr"] = item["usr"]
+    if item.get("pwd"):
+        cred["pwd"] = item["pwd"]
+    if item.get("mngmport"):
+        cred["mngmport"] = item["mngmport"]
+    if item.get("ssl"):
+        cred["ssl"] = item["ssl"]
+    return cred
+
+
+def _send_offline_alert(webssl, website, uid, inttoken, srvtype, appsrv, item):
+    if "monid" not in item:
+        return
+    req = {
+        "appsrv": appsrv,
+        "monid": item["monid"],
+        "srvid": uid,
+        "appsrvid": item["appsrvid"] if "appsrvid" in item else "none",
+        "srvtype": srvtype,
+        "message": "Server not available",
+        "alerttime": current_time,
+        "inttoken": inttoken,
+    }
+    makerequest.postMonAl(webssl, website, json.dumps(req))
+
 
 try:
     avl_data = configs.getAvlData()
@@ -18,64 +54,39 @@ try:
     inttoken = config_data["INTTOKEN"]
     uid = config_data["SRVUID"]
 
-    if len(avl_data) > 0:
-        for srvtype, srvinfo in avl_data.items():
-            if len(srvinfo.items()) > 0:
-                for k, item in srvinfo.items():
-                    cred = {}
+    for srvtype, srvinfo in avl_data.items():
+        if not isinstance(srvinfo, dict):
+            continue
 
-                    if "usr" in item and item["usr"]:
-                        cred["usr"] = item["usr"]
-                    if "pwd" in item and item["pwd"]:
-                        cred["pwd"] = item["pwd"]
-                    if "mngmport" in item and item["mngmport"]:
-                        cred["mngmport"] = item["mngmport"]
-                    if "ssl" in item and item["ssl"]:
-                        cred["ssl"] = item["ssl"]
+        for appsrv, item in srvinfo.items():
+            if not isinstance(item, dict) or item.get("enabled") != "yes":
+                continue
 
-                    if "dockercont" in item:
-                        ret = statarr.avlCheck(k, item["dockercont"], cred)
-                    else:
-                        ret = statarr.avlCheck(k, "", cred)
+            checks = statarr.avlCheck(appsrv, item.get("dockercont", ""), _credentials(item))
+            command = checks.get(srvtype)
+            if not command:
+                classes.Err("avlCheck unsupported type:" + str(srvtype))
+                continue
 
-                    if item["enabled"] == "yes":
-                        cmd = ret[srvtype]
-                        try:
-                            proc = subprocess.run(
-                                cmd,
-                                shell=True,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL,
-                            )
-                            out = proc.stdout.decode(errors="ignore")
-                            cnt = sum(1 for line in out.splitlines() if k in line)
+            try:
+                proc = subprocess.run(
+                    command,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    timeout=AVL_TIMEOUT_SECONDS,
+                    check=False,
+                )
+                out = proc.stdout.decode(errors="ignore")
+                cnt = sum(1 for line in out.splitlines() if appsrv in line)
 
-                            if cnt >= 1:
-                                classes.WriteData(
-                                    "online", "avl_" + srvtype + "_" + k + ".csv"
-                                )
-                            else:
-                                classes.WriteData(
-                                    "offline", "avl_" + srvtype + "_" + k + ".csv"
-                                )
-                                if "monid" in item:
-                                    req = {}
-                                    req["appsrv"] = k
-                                    req["monid"] = item["monid"]
-                                    req["srvid"] = uid
-                                    req["appsrvid"] = (
-                                        item["appsrvid"]
-                                        if "appsrvid" in item
-                                        else "none"
-                                    )
-                                    req["srvtype"] = srvtype
-                                    req["message"] = "Server not available"
-                                    req["alerttime"] = current_time
-                                    req["inttoken"] = inttoken
-                                    makerequest.postMonAl(
-                                        webssl, website, json.dumps(req)
-                                    )
-                        except subprocess.CalledProcessError as e:
-                            classes.Err("avlCheck err:" + str(e))
+                if cnt >= 1:
+                    classes.WriteData("online", "avl_" + srvtype + "_" + appsrv + ".csv")
+                else:
+                    classes.WriteData("offline", "avl_" + srvtype + "_" + appsrv + ".csv")
+                    _send_offline_alert(webssl, website, uid, inttoken, srvtype, appsrv, item)
+            except subprocess.TimeoutExpired:
+                classes.Err("avlCheck timed out:" + str(srvtype) + "/" + str(appsrv))
+
 except Exception as err:
     classes.Err("error in runappavl:" + str(err))

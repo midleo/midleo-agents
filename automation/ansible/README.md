@@ -1,27 +1,79 @@
-# Midleo Agents
+# Midleo Agent Ansible Deployment
 
-install Midleo Agent with Ansible
+This playbook installs the Midleo agent runtime and schedules collection on middleware servers.
 
-## Getting started
+## Quick Start
 
-
-```
-cd your-folder
-git clone https://github.com/midleo/midleo-agents.git
-cd midleo-agents/automation/ansible
-ansible-playbook install_midleo_agent.yaml -i inventories
+```bash
+cd automation/ansible
+ansible-playbook install_midleo_agent.yaml -i inventories/hosts
 ```
 
-## Information
+The playbook targets the `middleware` inventory group. Linux hosts are installed under `/var/midleoagent/`; Windows hosts are installed under `D:/apps/midleoagent/`.
 
-- inventories : list of Windows/Linux servers
+## Required Inventory Variables
 
-- download vendor and external libraries (depends on which modules you will use)
+Set these per host or group:
 
+- `group_id`: Midleo Core group ID.
+- `midleo_website_base_url`: Midleo Core host or base URL.
+- `midleo_website_base_url_ssl`: `y` for HTTPS, `n` for HTTP.
+- `update_interval_minutes`: server inventory update interval.
+- `midleo_mwuser`: Linux service account, normally `mwadmin`.
+- `inttoken`: integration token sent with monitoring payloads.
+- `allowed_commands`: command allowlist for remote operations.
 
-```
-mkdir -p /midleolibs/{lib,vendor}
-libraries in lib folder:
+Windows inventory also needs:
+
+- `win_user`
+- `win_pass`
+- WinRM connection settings appropriate for the customer environment.
+
+## Optional Variables
+
+- `midleo_install_pymqi`: set to `true` only on IBM MQ hosts that have IBM MQ client development libraries installed.
+
+## Installed Dependencies
+
+Linux system packages:
+
+- `gcc`
+- `curl`
+- `jq`
+- `python3-dev` on Debian/Ubuntu or `python3-devel` on RHEL-family hosts
+- `python3-pip`
+- `python3-setuptools`
+
+Python packages:
+
+- `psutil`
+- `py-cpuinfo`
+- `dnspython`
+- `requests`
+- `pycryptodome`
+- `pywinrm`
+- `netifaces`
+- optional: `pymqi`
+
+`shlex` and `subprocess` are Python standard-library modules and are available in Python 3.6 and current Python releases.
+
+## Services and Schedule
+
+Linux deployment creates:
+
+- `midleoagent.service`
+- `midleoactions.service`
+- `/etc/cron.d/midleoagent`
+
+The cron entry runs every minute and executes enabled jobs from `/var/midleoagent/config/cronjobs.json`. Jobs are bounded by `JOB_TIMEOUT_SECONDS`.
+
+## Vendor Libraries
+
+Create `/midleolibs/lib` and `/midleolibs/vendor` on hosts that need Java or vendor-specific statistics modules.
+
+`/midleolibs/lib`:
+
+```text
 activemq-client-6.1.6.jar
 asm-7.0.jar
 gson-2.10.1.jar
@@ -61,9 +113,11 @@ websocket-common.jar
 wildfly-client-all-35.0.1.Final.jar
 wildfly-controller-client-28.0.0.Final.jar
 wildfly-protocol-28.0.0.Final.jar
+```
 
+`/midleolibs/vendor`:
 
-libraries in vendor folder:
+```text
 bipbroker.jar
 brokerutil.jar
 com.ibm.mq.allclient.jar
@@ -75,5 +129,17 @@ tibjmsadmin.jar
 tibjmsapps.jar
 tibjms.jar
 tibrvjms.jar
-
 ```
+
+## Production Checks
+
+After deployment:
+
+```bash
+systemctl status midleoagent midleoactions
+crontab -u mwadmin -l
+test -f /var/midleoagent/config/mwagent.config
+test -f /var/midleoagent/config/cronjobs.json
+```
+
+Review `ALLOWED_COMMANDS`, `REMOTE_FILE_ROOTS`, `SSLVERIFY`, firewall rules, and the Midleo Core endpoint before exposing the service to enterprise networks.

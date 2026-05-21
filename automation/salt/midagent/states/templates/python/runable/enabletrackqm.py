@@ -8,16 +8,26 @@ sys.path.insert(0, parentdir)
 
 from modules.base import configs
 
-QMGR = sys.argv[1]
+
+def _arg(index, name):
+    try:
+        value = sys.argv[index]
+    except IndexError:
+        raise ValueError("Missing required argument: " + name)
+    value = str(value).strip()
+    if not value:
+        raise ValueError("Empty required argument: " + name)
+    return value
 
 
 def createTrackJson():
+    qmgr = _arg(1, "QMGR")
     track_data = configs.gettrackData()
-    track_data[QMGR] = {
+    track_data[qmgr] = {
         "type": "enabled"
     }
     configs.savetrackData(track_data)
-    print(QMGR + " have been added")
+    print(qmgr + " have been added")
 
 
 if __name__ == "__main__":

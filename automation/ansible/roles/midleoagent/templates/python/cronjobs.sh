@@ -19,7 +19,7 @@ else
 fi
 
 HOMEDIR="$MWAGTDIR/config"
-LOCKDIR="/tmp/mwagent_cron.lock"
+LOCKDIR="$HOMEDIR/.mwagent_cron.lock"
 PIDFILE="$LOCKDIR/pid"
 
 mkdir -p "$HOMEDIR"
@@ -34,12 +34,12 @@ else
     fi
   fi
 
-  rm -rf "$LOCKDIR"
+  rm -rf -- "$LOCKDIR"
   mkdir "$LOCKDIR"
   echo "$$" > "$PIDFILE"
 fi
 
-trap 'rm -rf "$LOCKDIR"' EXIT
+trap 'rm -rf -- "$LOCKDIR"' EXIT
 
 if [ ! -f "$HOMEDIR/mwagent.config" ]; then
   exit 1
@@ -58,5 +58,6 @@ export ACEUSR
 export MQSIPROFILE
 export IIBMQSIPROFILE
 export MWAGTDIR
+export JOB_TIMEOUT_SECONDS
 
 exec "$PYTHON" "$MWAGTDIR/runable/run_cronjobs.py"

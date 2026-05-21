@@ -4,21 +4,29 @@ from datetime import datetime
 
 try:
     import pymqi
-except:
-    pass
+    MQ_ERROR = pymqi.MQMIError
+    PYMQI_IMPORT_ERROR = None
+except ImportError as ex:
+    pymqi = None
+    MQ_ERROR = Exception
+    PYMQI_IMPORT_ERROR = ex
 
 
 def qmConn(thisqm):
+    if pymqi is None:
+        classes.Err("Exception:pymqi is not available:" + str(PYMQI_IMPORT_ERROR))
+        return None
     try:
         qmgr = pymqi.connect(thisqm)
-    except pymqi.MQMIError as ex:
+    except MQ_ERROR as ex:
         classes.Err("Exception:" + str(ex))
         qmgr = None
     return qmgr
 
 
 def qmDisc(thisqm):
-    thisqm.disconnect()
+    if thisqm is not None:
+        thisqm.disconnect()
 
 
 def qStat(thisqm, q, queues):
@@ -56,7 +64,7 @@ def qStat(thisqm, q, queues):
                 queues[qname]["depthllim"] = queue_info[
                     pymqi.CMQC.MQIA_Q_DEPTH_LOW_LIMIT
                 ]
-    except pymqi.MQMIError as ex:
+    except MQ_ERROR as ex:
         classes.Err("Exception:" + str(ex))
     return queues
 
@@ -123,7 +131,7 @@ def qStatInfo(thisqm, q, queues):
                     .decode("utf-8")
                     .strip()
                 )
-    except pymqi.MQMIError as ex:
+    except MQ_ERROR as ex:
         classes.Err("Exception:" + str(ex))
     return queues
 
@@ -148,7 +156,7 @@ def qResStat(thisqm, q, queues):
                 queues[qname]["timereset"] = queue_info[
                     pymqi.CMQC.MQIA_TIME_SINCE_RESET
                 ]
-    except pymqi.MQMIError as ex:
+    except MQ_ERROR as ex:
         classes.Err("Exception:" + str(ex))
     return queues
 
@@ -206,9 +214,7 @@ def chStat(thisqm, ch, chls):
                     pymqi.CMQCFC.MQIACH_CURRENT_MSGS
                 ]
                 chls[chlname]["bytes_sent"] = chl_info[pymqi.CMQCFC.MQIACH_BYTES_SENT]
-                chls[chlname]["bytes_received"] = chl_info[
-                    pymqi.CMQCFC.MQIACH_BUFFERS_RECEIVED
-                ]
+                chls[chlname]["bytes_received"] = chl_info[pymqi.CMQCFC.MQIACH_BYTES_RECEIVED]
                 chls[chlname]["buff_sent"] = chl_info[pymqi.CMQCFC.MQIACH_BUFFERS_SENT]
                 chls[chlname]["buff_received"] = chl_info[
                     pymqi.CMQCFC.MQIACH_BUFFERS_RCVD
@@ -216,7 +222,7 @@ def chStat(thisqm, ch, chls):
                 chls[chlname]["indoubt_status"] = chl_info[
                     pymqi.CMQCFC.MQIACH_INDOUBT_STATUS
                 ]
-    except pymqi.MQMIError as ex:
+    except MQ_ERROR as ex:
         classes.Err("Exception:" + str(ex))
     return chls
 
@@ -267,11 +273,7 @@ def getStat(thisqm, inpdata):
 
             if queues:
                 for k, v in queues.items():
-                    strin = ""
-                    for kin, vin in v.items():
-                        if kin != "name":
-                            strin += str(vin) + "#"
-                    strin = strin[:-1] if strin else ""
+                    strin = "#".join(str(vin) for kin, vin in v.items() if kin != "name")
 
                     rowkey = (k, strin)
                     if rowkey not in qseen:
@@ -290,11 +292,7 @@ def getStat(thisqm, inpdata):
 
             if chls:
                 for k, v in chls.items():
-                    strin = ""
-                    for kin, vin in v.items():
-                        if kin != "name":
-                            strin += str(vin) + "#"
-                    strin = strin[:-1] if strin else ""
+                    strin = "#".join(str(vin) for kin, vin in v.items() if kin != "name")
 
                     rowkey = (k, strin)
                     if rowkey not in chseen:
@@ -325,7 +323,7 @@ def getStat(thisqm, inpdata):
                 "a",
             )
 
-    except pymqi.MQMIError as ex:
+    except MQ_ERROR as ex:
         classes.Err("ibmmq error:" + str(ex))
     except Exception as ex:
         classes.Err("ibmmq error:" + str(ex))
@@ -345,6 +343,8 @@ def depthperc(queue_info):
         return None
     depthcur = queue_info[pymqi.CMQC.MQIA_CURRENT_Q_DEPTH]
     depthmax = queue_info[pymqi.CMQC.MQIA_MAX_Q_DEPTH]
+    if depthmax == 0:
+        return 0
     depthperc = (depthcur / depthmax) * 100
     return depthperc
 

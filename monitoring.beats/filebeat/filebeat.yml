@@ -1,10 +1,10 @@
 filebeat.modules:
-- module: ibmmq
-  errorlog:
-    enabled: true
-    var.paths: ["/var/mqm/qmgrs/*/errors/*.json"]
-    json.keys_under_root: true
-    json.message_key: message
+  - module: ibmmq
+    errorlog:
+      enabled: true
+      var.paths: ["/var/mqm/qmgrs/*/errors/*.json"]
+      json.keys_under_root: true
+      json.message_key: message
 
 processors:
   - add_fields:
@@ -12,5 +12,13 @@ processors:
       fields:
         srvid: UNIQUE_ID
 
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0640
+
 output.logstash:
-   hosts: ["${LOGSTASH_HOST}:5044"]
+  hosts: ["${LOGSTASH_HOST:logstash}:5044"]

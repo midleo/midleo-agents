@@ -8,7 +8,6 @@
 {% set group_id = salt['pillar.get']('INPUT:group_id') %}
 {% set int_token = salt['pillar.get']('INPUT:int_token') %}
 {% set update_interval_minutes = salt['pillar.get']('INPUT:update_interval_minutes') %}
-{% set mwtoken = salt['pillar.get']('midagent_vars:mwtoken') %}
 {% set osfam = grains.get('os_family', '') %}
 {% set agent_unique_id = salt['cmd.run'](cmd="head -c 8 /dev/urandom | xxd -p", python_shell=True) %}
 
@@ -26,20 +25,25 @@ midagent_create_user:
       - allow_gid_change: True
       - groups:
          - {{mwuser}}
+      - require:
+         - group: midagent_create_group
 
 #add aditional groups if exist
 midagent_add_docker:
   user.present:
+    - name: {{mwuser}}
     - optional_groups:
       - docker
     - remove_groups: False
+    - require:
+      - user: midagent_create_user
 
 {{agent_install_dir}}:
   file.directory:
     - name: {{agent_install_dir}}
     - user: {{mwuser}}
     - group: {{mwuser}}
-    - dir_mode: 755
+    - dir_mode: 750
     - makedirs: True
 
 {% for dir in 'modules', 'logs', 'runable', 'config', 'extchecks' %}
@@ -48,7 +52,7 @@ midagent_add_docker:
     - name: {{agent_install_dir}}{{ dir }}
     - user: {{mwuser}}
     - group: {{mwuser}}
-    - dir_mode: 755
+    - dir_mode: 750
     - makedirs: True
 {% endfor %}
 
@@ -56,7 +60,7 @@ midagent_create_client:
   file.managed:
     - user: {{mwuser}}
     - group: {{mwuser}}
-    - mode: '0755'
+    - mode: '0750'
     - template: jinja
     - names:
       - {{agent_install_dir}}midleo_client.py:
@@ -84,12 +88,20 @@ midagent_create_script:
     - context:
         python_install_dir: "{{python_install_dir}}"
 
+midagent_secure_cronjobs_config:
+  file.managed:
+    - name: {{agent_install_dir}}config/cronjobs.json
+    - user: {{mwuser}}
+    - group: {{mwuser}}
+    - mode: '0640'
+    - replace: False
+
 midagent_create_client_modules:
   file.recurse:
     - user: {{mwuser}}
     - group: {{mwuser}}
-    - dir_mode: 2775
-    - file_mode: '0644'
+    - dir_mode: 2750
+    - file_mode: '0640'
     - makedirs: True
     - names:
       - {{agent_install_dir}}modules:
@@ -99,8 +111,8 @@ midagent_create_client_runable:
   file.recurse:
     - user: {{mwuser}}
     - group: {{mwuser}}
-    - dir_mode: 2775
-    - file_mode: '0644'
+    - dir_mode: 2750
+    - file_mode: '0640'
     - makedirs: True
     - names:
       - {{agent_install_dir}}runable:
@@ -111,7 +123,7 @@ midagent_create_config:
   file.managed:
     - user: {{mwuser}}
     - group: {{mwuser}}
-    - mode: '0755'
+    - mode: '0640'
     - template: jinja
     - names:
       - {{agent_install_dir}}config/mwagent.config:
@@ -122,6 +134,7 @@ midagent_create_config:
         midleo_website_base_url_ssl: "{{midleo_website_base_url_ssl}}"
         group_id: "{{group_id}}"
         inttoken: "{{int_token}}"
+        agent_install_dir: "{{agent_install_dir}}"
         allowed_commands: 
           - dspmq
           - dspmqver
@@ -136,6 +149,14 @@ midagent_create_config:
         update_interval_minutes: "{{update_interval_minutes}}"
         python_install_dir: "{{python_install_dir}}"
 {% endif %}
+
+midagent_secure_config:
+  file.managed:
+    - name: {{agent_install_dir}}config/mwagent.config
+    - user: {{mwuser}}
+    - group: {{mwuser}}
+    - mode: '0640'
+    - replace: False
 
 midagent_create_sudoer:
   file.managed:
@@ -155,9 +176,9 @@ midagent_create_sudoer:
 
 midagent_create_service:
   file.managed:
-    - user: {{mwuser}}
-    - group: {{mwuser}}
-    - mode: '0755'
+    - user: root
+    - group: root
+    - mode: '0644'
     - template: jinja
     - names:
       - /etc/systemd/system/midleoagent.service:
@@ -169,9 +190,9 @@ midagent_create_service:
 
 midagent_create_actions_service:
   file.managed:
-    - user: {{mwuser}}
-    - group: {{mwuser}}
-    - mode: '0755'
+    - user: root
+    - group: root
+    - mode: '0644'
     - template: jinja
     - names:
       - /etc/systemd/system/midleoactions.service:
@@ -185,21 +206,22 @@ midagent.service:
    service.running:
      - name: midleoagent
      - enable: True
+     - require:
+       - file: midagent_create_service
+       - file: midagent_create_client
 
 midagent.actions.service:
    service.running:
      - name: midleoactions
      - enable: True
+     - require:
+       - file: midagent_create_actions_service
+       - file: midagent_create_client
 
-midagent.cron:
-  cron.present:
+midagent.legacy_restart_cron:
+  cron.absent:
     - name: service midleoagent stop && sleep 5 && service midleoagent start \;
     - user: root
-    - minute: 00
-    - hour: 01
-    - daymonth: '*'
-    - month: '*'
-    - dayweek: '*'
 
 midagent.cronjob:
   cron.present:
@@ -210,24 +232,5 @@ midagent.cronjob:
     - daymonth: '*'
     - month: '*'
     - dayweek: '*'
-
-#register appserver on mwadmin
-midagent_registerappsrv:
-  mwagent_ext.register_appsrv:
-     - token: {{ mwtoken }}
-     - appcode: "TEST"
-     - proj: "sys"
-     - srvdata: 
-         appsrv_type: "ibmiib"  #ibmace/ibmmq/jboss...
-         srvname: "INTSRV"      #name of the application server
-         app_port: 9999         #the port for the application server
-         appuser: "username"    #in case user is used for the app server access
-         apppass: "pass"        #in case password is used for the app server access
-         
-#enable availability
-midagent_enableavl:
-  cmd.run:
-     - runas: {{mwuser}}
-     - name: |
-         {{agent_install_dir}}magent.sh enableavl {{srvname}} {{appsrv_type}}
-        
+    - require:
+      - file: midagent_create_script

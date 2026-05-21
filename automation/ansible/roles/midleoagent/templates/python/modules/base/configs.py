@@ -51,6 +51,10 @@ def _write_json_atomic(path, data):
         with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
             json.dump(data, tmp_file, ensure_ascii=False, indent=2, sort_keys=True)
         os.replace(tmp_path, path)
+        try:
+            os.chmod(path, 0o640)
+        except Exception:
+            pass
     finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)

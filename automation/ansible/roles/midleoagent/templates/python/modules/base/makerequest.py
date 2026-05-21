@@ -1,98 +1,106 @@
-import requests, json, base64, urllib3
-from midleo_client import AGENT_VER
-from modules.base import classes
+import base64
+import json
+from urllib.parse import quote
 
-urllib3.disable_warnings()
+import requests
+import urllib3
+from midleo_client import AGENT_VER
+from modules.base import classes, configs
+
+DEFAULT_TIMEOUT_SECONDS = 20
+MAX_LOG_BODY_BYTES = 2048
+
+
+def _cfg():
+    data = configs.getcfgData() or {}
+    timeout_raw = data.get("REQUEST_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
+    try:
+        timeout = int(timeout_raw)
+    except Exception:
+        timeout = DEFAULT_TIMEOUT_SECONDS
+    timeout = max(1, min(timeout, 120))
+
+    verify = str(data.get("SSLVERIFY", "y")).strip().lower() not in (
+        "n",
+        "no",
+        "false",
+        "0",
+    )
+
+    return {"timeout": timeout, "verify": verify}
+
+
+def _headers():
+    return {
+        "Content-type": "application/json",
+        "Accept": "text/plain",
+        "User-Agent": "MWAdmin v." + AGENT_VER,
+    }
+
+
+def _base_url(webssl, website):
+    website = str(website or "").strip().rstrip("/")
+    if website.startswith("http://") or website.startswith("https://"):
+        return website
+
+    scheme = "https" if str(webssl).strip().lower() in ("y", "yes", "true", "1") else "http"
+    return scheme + "://" + website
+
+
+def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
+    options = _cfg()
+    url = _base_url(webssl, website) + path
+    verify = options["verify"]
+
+    if not verify:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    try:
+        res = requests.request(
+            method,
+            url,
+            data=data,
+            headers=headers or _headers(),
+            verify=verify,
+            timeout=options["timeout"],
+            **kwargs,
+        )
+        body = (res.content or b"")[:MAX_LOG_BODY_BYTES].decode(
+            "utf-8", errors="replace"
+        )
+        classes.Err(method.upper() + " " + path + " HTTPResponse:" + str(res.status_code) + " " + body)
+        return res
+    except requests.exceptions.RequestException as ex:
+        classes.Err("Exception:" + str(ex))
+        return None
 
 
 def postData(webssl, website, data):
-    headers = {
-        "Content-type": "application/json",
-        "Accept": "text/plain",
-        "User-Agent": "MWAdmin v." + AGENT_VER,
-    }
-    try:
-        res = requests.post(
-            "http"
-            + ("s" if webssl == "y" else "")
-            + "://"
-            + website
-            + "/pubapi/updatesrv",
-            data=json.dumps(data),
-            headers=headers,
-            verify=False,
-        )
-        classes.Err("HTTPResponse:" + res.content.decode())
-    except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+    _request("post", webssl, website, "/pubapi/updatesrv", json.dumps(data))
 
 
 def postStatData(webssl, website, thisdata):
-    headers = {
-        "Content-type": "application/json",
-        "Accept": "text/plain",
-        "User-Agent": "MWAdmin v." + AGENT_VER,
-    }
-    try:
-        res = requests.post(
-            "http"
-            + ("s" if webssl == "y" else "")
-            + "://"
-            + website
-            + "/pubapi/updatestat",
-            data=thisdata,
-            headers=headers,
-            verify=False,
-        )
-        classes.Err("HTTPResponse:" + res.content.decode())
-    except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+    _request("post", webssl, website, "/pubapi/updatestat", thisdata)
 
 
 def postibmmqQData(webssl, website, qm, data):
-    headers = {
-        "Content-type": "application/json",
-        "Accept": "text/plain",
-        "User-Agent": "MWAdmin v." + AGENT_VER,
-    }
-    try:
-        res = requests.post(
-            "http"
-            + ("s" if webssl == "y" else "")
-            + "://"
-            + website
-            + "/pubapi/updateibmmqqstat/"
-            + qm,
-            data=data,
-            headers=headers,
-            verify=False,
-        )
-        classes.Err("postibmmqQData HTTPResponse:" + res.content.decode())
-    except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+    _request(
+        "post",
+        webssl,
+        website,
+        "/pubapi/updateibmmqqstat/" + quote(str(qm), safe=""),
+        data,
+    )
 
 
 def postibmmqCHData(webssl, website, qm, data):
-    headers = {
-        "Content-type": "application/json",
-        "Accept": "text/plain",
-        "User-Agent": "MWAdmin v." + AGENT_VER,
-    }
-    try:
-        res = requests.post(
-            "http"
-            + ("s" if webssl == "y" else "")
-            + "://"
-            + website
-            + "/pubapi/updateibmmqchstat/"
-            + qm,
-            data=data,
-            headers=headers,
-            verify=False,
-        )
-        classes.Err("postibmmqCHdata HTTPResponse:" + res.content.decode())
-    except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+    _request(
+        "post",
+        webssl,
+        website,
+        "/pubapi/updateibmmqchstat/" + quote(str(qm), safe=""),
+        data,
+    )
 
 
 def getQRestStat(webssl, website, webport, qmgr, queue, usr, passwd):
@@ -101,136 +109,50 @@ def getQRestStat(webssl, website, webport, qmgr, queue, usr, passwd):
         "charset": "utf-8",
         "User-Agent": "MWAdmin v." + AGENT_VER,
     }
-    try:
-        res = requests.get(
-            "http"
-            + ("s" if webssl == "y" else "")
-            + "://"
-            + website
-            + ":"
-            + webport
-            + "/ibmmq/rest/v1/admin/qmgr/"
-            + qmgr
-            + "/queue/"
-            + queue
-            + "?type=local&attributes=storage.maximumDepth&status=status",
-            verify=False,
-            headers=headers,
-            auth=(usr, base64.b64decode(passwd).decode("utf-8").rstrip()),
-        )
-        if 200 == res.status_code:
-            return res.json()
-        else:
-            return "{}"
-    except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+    qmgr_path = quote(str(qmgr), safe="")
+    queue_path = quote(str(queue), safe="")
+    base = str(website or "").strip()
+    if not base.startswith("http://") and not base.startswith("https://"):
+        scheme = "https" if str(webssl).strip().lower() in ("y", "yes", "true", "1") else "http"
+        base = scheme + "://" + base
+    if webport:
+        base = base.rstrip("/") + ":" + str(webport)
+
+    path = (
+        "/ibmmq/rest/v1/admin/qmgr/"
+        + qmgr_path
+        + "/queue/"
+        + queue_path
+        + "?type=local&attributes=storage.maximumDepth&status=status"
+    )
+    res = _request(
+        "get",
+        webssl,
+        base,
+        path,
+        headers=headers,
+        auth=(usr, base64.b64decode(passwd).decode("utf-8").rstrip()),
+    )
+    if res is not None and res.status_code == 200:
+        return res.json()
+    return "{}"
 
 
 def postTrackData(webssl, website, thisdata):
-    headers = {
-        "Content-type": "application/json",
-        "Accept": "text/plain",
-        "User-Agent": "MWAdmin v." + AGENT_VER,
-    }
-    try:
-        res = requests.post(
-            "http"
-            + ("s" if webssl == "y" else "")
-            + "://"
-            + website
-            + "/pubapi/updateibmqtrack",
-            data=thisdata,
-            headers=headers,
-            verify=False,
-        )
-        classes.Err("HTTPResponse:" + res.content.decode())
-    except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+    _request("post", webssl, website, "/pubapi/updateibmqtrack", thisdata)
 
 
 def postAvlData(webssl, website, thisdata):
-    headers = {
-        "Content-type": "application/json",
-        "Accept": "text/plain",
-        "User-Agent": "MWAdmin v." + AGENT_VER,
-    }
-    try:
-        res = requests.post(
-            "http"
-            + ("s" if webssl == "y" else "")
-            + "://"
-            + website
-            + "/pubapi/updateappsrvavl",
-            data=thisdata,
-            headers=headers,
-            verify=False,
-        )
-        classes.Err("HTTPResponse:" + res.content.decode())
-    except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+    _request("post", webssl, website, "/pubapi/updateappsrvavl", thisdata)
 
 
 def postMonAl(webssl, website, thisdata):
-    headers = {
-        "Content-type": "application/json",
-        "Accept": "text/plain",
-        "User-Agent": "MWAdmin v." + AGENT_VER,
-    }
-    try:
-        res = requests.post(
-            "http"
-            + ("s" if webssl == "y" else "")
-            + "://"
-            + website
-            + "/pubapi/monalert",
-            data=thisdata,
-            headers=headers,
-            verify=False,
-        )
-        classes.Err("HTTPResponse:" + res.content.decode())
-    except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+    _request("post", webssl, website, "/pubapi/monalert", thisdata)
 
 
 def postMonCheck(webssl, website, thisdata):
-    headers = {
-        "Content-type": "application/json",
-        "Accept": "text/plain",
-        "User-Agent": "MWAdmin v." + AGENT_VER,
-    }
-    try:
-        res = requests.post(
-            "http"
-            + ("s" if webssl == "y" else "")
-            + "://"
-            + website
-            + "/pubapi/extmoncheck",
-            data=thisdata,
-            headers=headers,
-            verify=False,
-        )
-        classes.Err("HTTPResponse:" + res.content.decode())
-    except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+    _request("post", webssl, website, "/pubapi/extmoncheck", thisdata)
 
 
 def postMaintenance(webssl, website, data):
-    headers = {
-        "Content-type": "application/json",
-        "Accept": "text/plain",
-        "User-Agent": "MWAdmin v." + AGENT_VER,
-    }
-    try:
-        res = requests.post(
-            "http"
-            + ("s" if webssl == "y" else "")
-            + "://"
-            + website
-            + "/pubapi/servermaintenance",
-            data=json.dumps(data),
-            headers=headers,
-            verify=False,
-        )
-        classes.Err("HTTPResponse:" + res.content.decode())
-    except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+    _request("post", webssl, website, "/pubapi/servermaintenance", json.dumps(data))

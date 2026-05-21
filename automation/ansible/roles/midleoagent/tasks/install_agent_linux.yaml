@@ -28,7 +28,9 @@
   file:
     path: "{{item}}"
     state: directory
-    mode: '0755'
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
+    mode: '0750'
   loop:
     - "{{agent_install_dir}}"
     - "{{agent_install_dir}}modules"
@@ -42,14 +44,14 @@
     dest: "{{agent_install_dir}}midleo_client.py"
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
-    mode: '0644'
+    mode: '0750'
 - name: "create actions agent"
   template:
     src: templates/python/midleo_actions.py
     dest: "{{agent_install_dir}}midleo_actions.py"
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
-    mode: '0644'
+    mode: '0750'
 - name: "creage agent script"
   template:
     src: templates/python/magent.sh
@@ -65,12 +67,12 @@
     group: "{{midleo_mwuser}}"
     mode: '0755'
 - name: "copy cronjobs json"
-  copy:
-    src: templates/config/cronjobs.json
+  template:
+    src: templates/python/config/cronjobs.json
     dest: "{{agent_install_dir}}config/cronjobs.json"
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
-    mode: '0644'
+    mode: '0640'
 - name: "check exist agentconfig"
   stat: "path={{agent_install_dir}}config/mwagent.config"
   register: st_agcfg
@@ -80,15 +82,21 @@
     dest: "{{agent_install_dir}}config/mwagent.config"
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
-    mode: '0644'
+    mode: '0640'
   when: not st_agcfg.stat.exists
+- name: "secure agentconfig"
+  file:
+    path: "{{agent_install_dir}}config/mwagent.config"
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
+    mode: '0640'
 - name: "Create module directories"
   file:
     path: "{{ agent_install_dir }}/modules/{{ item.path }}"
     state: directory
     owner: "{{ midleo_mwuser }}"
     group: "{{ midleo_mwuser }}"
-    mode: '0755'
+    mode: '0750'
   with_filetree: templates/python/modules
   when: item.state == 'directory'
 - name: "Create runable directories"
@@ -97,7 +105,7 @@
     state: directory
     owner: "{{ midleo_mwuser }}"
     group: "{{ midleo_mwuser }}"
-    mode: '0755'
+    mode: '0750'
   with_filetree: templates/python/runable
   when: item.state == 'directory'
 - name: "Upload module scripts"
@@ -106,7 +114,7 @@
     dest: "{{ agent_install_dir }}/modules/{{ item.path }}"
     owner: "{{ midleo_mwuser }}"
     group: "{{ midleo_mwuser }}"
-    mode: '0755'
+    mode: '0640'
     force: yes
   with_filetree: templates/python/modules
   when: item.state == 'file'
@@ -125,15 +133,15 @@
     update_cache: yes 
     force_apt_get: yes 
     cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
   tags: update
+- name: Select required system packages
+  set_fact:
+    midleo_agent_system_packages: "{{ ['gcc', 'curl', 'jq', 'python3-dev', 'python3-pip', 'python3-setuptools'] if ansible_os_family == 'Debian' else ['gcc', 'curl', 'jq', 'python3-devel', 'python3-pip', 'python3-setuptools'] }}"
 - name: Install required system packages
-  apt:
-    pkg:
-      - gcc
-      - curl
-      - python3-dev
-      - python3-pip
-      - python3-setuptools
+  package:
+    name: "{{ midleo_agent_system_packages }}"
+    state: present
 - name: Install python packages
   pip:
     name:
@@ -145,16 +153,28 @@
       - pywinrm
       - netifaces
 #      - pymqi
-    state: latest
+    state: present
     extra_args: --break-system-packages
+- name: Install optional IBM MQ Python package
+  pip:
+    name: pymqi
+    state: present
+    extra_args: --break-system-packages
+  when: midleo_install_pymqi | default(false) | bool
 - name: copy agent service
   template:
     src: "templates/agent_linux_service.j2"
     dest: "/etc/systemd/system/midleoagent.service"
+    owner: root
+    group: root
+    mode: '0644'
 - name: copy actions service
   template:
     src: "templates/agent_linux_actions_service.j2"
     dest: "/etc/systemd/system/midleoactions.service"
+    owner: root
+    group: root
+    mode: '0644'
 - name: enable service
   systemd:
     name: midleoagent
@@ -170,18 +190,22 @@
 - name: start midleoagent
   service:
     name: midleoagent
-    state: started
+    state: restarted
 - name: start midleoactions
   service:
     name: midleoactions
-    state: started
-- name: "Create crontab /etc/cron.d/midleoagent"
+    state: restarted
+- name: "Remove legacy periodic service restart"
   cron:
     name: restart agent
-    weekday: "*/2"
-    minute: "0"
-    hour: "1"
+    cron_file: midleoagent
     user: "{{midleo_mwuser}}"
-    job: "service midleoagent stop && sleep 5 && service midleoagent start"
+    state: absent
+- name: "Create cronjob /etc/cron.d/midleoagent"
+  cron:
+    name: midleo cronjobs
+    minute: "*"
+    user: "{{midleo_mwuser}}"
+    job: "{{agent_install_dir}}cronjobs.sh"
     cron_file: midleoagent
 ...
