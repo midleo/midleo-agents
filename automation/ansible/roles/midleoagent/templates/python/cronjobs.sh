@@ -49,6 +49,8 @@ fi
 
 : "${PYTHON:?PYTHON not set}"
 
+cd "$MWAGTDIR"
+
 export PYTHON
 export DSPMQ
 export DSPMQVER
