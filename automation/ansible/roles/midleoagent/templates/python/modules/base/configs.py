@@ -20,6 +20,21 @@ FILE_TO_CRONJOBS = {
     "confoptadvisor.json": ["getoptadvisor.py", "resetoptadvisor.py"],
 }
 
+DEFAULT_CRONJOB_DEFS = {
+    "getoptadvisor.py": {
+        "config_file": "confoptadvisor.json",
+        "run": {
+            "minute_in": ["00", "10", "20", "30", "40", "50"],
+        },
+    },
+    "resetoptadvisor.py": {
+        "config_file": "confoptadvisor.json",
+        "run": {
+            "minute_in": ["05", "15", "25", "35", "45", "55"],
+        },
+    },
+}
+
 SECTION_FILE_MAP = {
     "certs": CERT_FILE,
     "conftrack": TRACK_FILE,
@@ -110,6 +125,9 @@ def syncCronjobsForConfig(config_filename, config_data):
         job_def = cronjobs.get(job_name, {})
         if not isinstance(job_def, dict):
             job_def = {}
+        for key, value in DEFAULT_CRONJOB_DEFS.get(job_name, {}).items():
+            if key not in job_def or job_def[key] in (None, {}, []):
+                job_def[key] = value
         job_def["enabled"] = enabled
         cronjobs[job_name] = job_def
 
