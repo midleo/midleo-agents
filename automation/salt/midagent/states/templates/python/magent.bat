@@ -33,9 +33,10 @@ if not exist "%HOMEDIR%\certs.json" echo {}>"%HOMEDIR%\certs.json"
 if not exist "%HOMEDIR%\conftrack.json" echo {}>"%HOMEDIR%\conftrack.json"
 if not exist "%HOMEDIR%\confavl.json" echo {}>"%HOMEDIR%\confavl.json"
 if not exist "%HOMEDIR%\confapplstat.json" echo {}>"%HOMEDIR%\confapplstat.json"
+if not exist "%HOMEDIR%\confoptadvisor.json" echo {}>"%HOMEDIR%\confoptadvisor.json"
 if not exist "%HOMEDIR%\confactions.json" echo {}>"%HOMEDIR%\confactions.json"
 
-"%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; configs.syncCronjobsForConfig('conftrack.json', configs.gettrackData()); configs.syncCronjobsForConfig('confavl.json', configs.getAvlData()); configs.syncCronjobsForConfig('confapplstat.json', configs.getmonData())"
+"%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; configs.syncCronjobsForConfig('conftrack.json', configs.gettrackData()); configs.syncCronjobsForConfig('confavl.json', configs.getAvlData()); configs.syncCronjobsForConfig('confapplstat.json', configs.getmonData()); configs.syncCronjobsForConfig('confoptadvisor.json', configs.getOptAdvisorData())"
 if errorlevel 1 exit /b 1
 
 if /I "%1"=="addcert" goto addcert
@@ -46,6 +47,11 @@ if /I "%1"=="stopavl" goto stopavl
 if /I "%1"=="startavl" goto startavl
 if /I "%1"=="addappstat" goto addappstat
 if /I "%1"=="delappstat" goto delappstat
+if /I "%1"=="addoptadvisor" goto addoptadvisor
+if /I "%1"=="deloptadvisor" goto deloptadvisor
+if /I "%1"=="enableoptadvisor" goto enableoptadvisor
+if /I "%1"=="disableoptadvisor" goto disableoptadvisor
+if /I "%1"=="optadvisorstatus" goto optadvisorstatus
 if /I "%1"=="addaction" goto addaction
 if /I "%1"=="rmaction" goto rmaction
 if /I "%1"=="enabletrackqm" goto enabletrackqm
@@ -107,6 +113,41 @@ if "%~3"=="" (
   goto usage
 )
 "%PYTHON%" "runable\delappstat.py" "%~2" "%~3"
+exit /b %ERRORLEVEL%
+
+:addoptadvisor
+if "%~3"=="" (
+  goto usage
+)
+set "json=%~4"
+"%PYTHON%" "runable\addoptadvisor.py" "%~2" "%~3" !json!
+exit /b %ERRORLEVEL%
+
+:deloptadvisor
+if "%~3"=="" (
+  goto usage
+)
+"%PYTHON%" "runable\deloptadvisor.py" "%~2" "%~3"
+exit /b %ERRORLEVEL%
+
+:enableoptadvisor
+if "%~2"=="" (
+  "%PYTHON%" "runable\optadvisorctl.py" enable 30
+) else (
+  "%PYTHON%" "runable\optadvisorctl.py" enable "%~2"
+)
+exit /b %ERRORLEVEL%
+
+:disableoptadvisor
+if "%~2"=="" (
+  "%PYTHON%" "runable\optadvisorctl.py" disable manual
+) else (
+  "%PYTHON%" "runable\optadvisorctl.py" disable "%~2"
+)
+exit /b %ERRORLEVEL%
+
+:optadvisorstatus
+"%PYTHON%" "runable\optadvisorctl.py" status
 exit /b %ERRORLEVEL%
 
 :addaction
@@ -173,6 +214,11 @@ echo    -  %~nx0 stopavl APP_SERVER SERVER_TYPE comment
 echo    -  %~nx0 startavl APP_SERVER SERVER_TYPE
 echo    -  %~nx0 addappstat SRV_TYPE APPSRV "{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\"}"
 echo    -  %~nx0 delappstat SRV_TYPE APPSRV
+echo    -  %~nx0 addoptadvisor SRV_TYPE APPSRV "{\"appsrvid\":\"MIDLEO_SERVER_ID\",\"usr\":\"USER\",\"pass\":\"PASS\",\"mngmport\":\"7001\"}"
+echo    -  %~nx0 deloptadvisor SRV_TYPE APPSRV
+echo    -  %~nx0 enableoptadvisor [days]
+echo    -  %~nx0 disableoptadvisor [reason]
+echo    -  %~nx0 optadvisorstatus
 echo    -  %~nx0 addaction APP_SERVER_TYPE.ERROR_CODE "{\"script\":\"C:\\actions\\restart.cmd\",\"args\":[\"{appserver_type}\",\"{error_code}\"],\"monid\":\"monaction\",\"appsrvid\":\"none\",\"appsrv\":\"tomcat01\",\"message\":\"Action already started recently\"}"
 echo    -  %~nx0 addaction "{\"action_key\":\"APP_SERVER_TYPE.ERROR_CODE\",\"script\":\"C:\\actions\\restart.cmd\"}"
 echo    -  %~nx0 rmaction APP_SERVER_TYPE.ERROR_CODE

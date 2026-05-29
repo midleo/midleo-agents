@@ -30,6 +30,51 @@ diff -qr automation/ansible/roles/midleoagent/templates/python automation/salt/m
 - `shlex`, `subprocess`, `asyncio`, `json`, and the other base imports used by the agent are Python standard-library modules and do not require separate installation.
 - IBM MQ local queue statistics require `pymqi` and IBM MQ client development libraries. Enable this only on MQ hosts.
 - MQ event collection requires `amqsevt` and `jq`.
+- Optimization Advisor telemetry requires two controls: the per-server
+  `confapplstat.json` opt-in and a time-limited local runtime window. Enable the
+  runtime window manually on the agent with `./magent.sh enableoptadvisor [days]`
+  for a maximum of 30 days, disable it with `./magent.sh disableoptadvisor
+  [reason]`, and inspect it with `./magent.sh optadvisorstatus`. When the window
+  expires, collection remains disabled until the next explicit enablement.
+- IBM MQ Optimization Advisor telemetry reuses the existing `confapplstat.json`
+  IBM MQ statistics entry. Enable it per queue manager with `optadvisor: true`,
+  `appcode`, and `server_id` matching an existing midleo.CORE application/server.
+  Existing `queues` and `channels` are reused, and optional `listeners` can be
+  supplied as a comma-separated list. The collector sends only safe operational
+  counters and never reads or sends message bodies or MQ connection secrets.
+- WebLogic Optimization Advisor telemetry reuses the existing WebLogic
+  `confapplstat.json` statistics entry and Java JMX connection. Enable it with
+  `optadvisor: true`, `appcode`, `server_id`, and optionally `appserver` or
+  `managed_server` when the managed server name differs from the connection host
+  key. It collects runtime counters for JVM, JDBC, thread pools, and JMS
+  destinations without sending WebLogic credentials, JNDI credentials, JMS
+  message bodies, or application payloads.
+- JBoss/WildFly Optimization Advisor telemetry reuses the existing JBoss
+  `confapplstat.json` statistics entry and Java management client. Enable it
+  with `optadvisor: true`, `appcode`, `server_id`, and optionally
+  `optadvisor_technology: wildfly` when the backend target should be stored
+  under WildFly metric definitions. It collects safe JVM, datasource, thread,
+  and deployment status metrics without sending credentials, SQL contents,
+  payloads, or sensitive application data.
+- IBM ACE Optimization Advisor telemetry reuses the `ibmace`
+  `confapplstat.json` statistics entry and the existing `midleoace.jar`
+  Integration Admin API client. Enable it with `optadvisor: true`, `appcode`,
+  `server_id`, and optionally `host`, `port`, and `server` for a specific
+  integration server. It currently collects safe integration server and message
+  flow status resources, plus safe default queue-manager relationship metadata
+  where exposed.
+- IBM IIB Optimization Advisor telemetry uses the `ibmiib`
+  `confapplstat.json` statistics entry and the existing `midleoiib.jar`
+  Integration API client. Enable it with `optadvisor: true`, `appcode`,
+  `server_id`, and optionally `host`, `port`, and `server`/`execution_group`.
+  It currently collects safe broker, execution-group, and message-flow status
+  resources, plus safe default queue-manager metadata where exposed.
+- Tibco EMS Optimization Advisor telemetry uses the `tibcoems`
+  `confapplstat.json` statistics entry and the existing `midleo_tibco.jar`
+  `TibjmsAdmin` client. Enable it with `optadvisor: true`, `appcode`,
+  `server_id`, `host`/`tibcosrv`, `port`/`tibcoport`, and encrypted
+  `pwd`/`tibcopass`. It collects safe server, queue and topic counters only;
+  it never browses, consumes or sends JMS message content.
 
 ## Security Defaults
 

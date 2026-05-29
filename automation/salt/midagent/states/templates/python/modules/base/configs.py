@@ -7,6 +7,7 @@ CONFIG_DIR = os.path.join(os.getcwd(), "config")
 CRONJOBS_FILE = os.path.join(CONFIG_DIR, "cronjobs.json")
 
 MON_FILE = os.path.join(CONFIG_DIR, "confapplstat.json")
+OPTADVISOR_FILE = os.path.join(CONFIG_DIR, "confoptadvisor.json")
 CERT_FILE = os.path.join(CONFIG_DIR, "certs.json")
 TRACK_FILE = os.path.join(CONFIG_DIR, "conftrack.json")
 AVL_FILE = os.path.join(CONFIG_DIR, "confavl.json")
@@ -16,6 +17,7 @@ FILE_TO_CRONJOBS = {
     "conftrack.json": ["runmqtracker.py"],
     "confavl.json": ["runappavllin.py", "resetappavl.py", "runmqevents.py"],
     "confapplstat.json": ["getapplstat.py", "resetapplstat.py"],
+    "confoptadvisor.json": ["getoptadvisor.py", "resetoptadvisor.py"],
 }
 
 SECTION_FILE_MAP = {
@@ -23,6 +25,7 @@ SECTION_FILE_MAP = {
     "conftrack": TRACK_FILE,
     "confavl": AVL_FILE,
     "confapplstat": MON_FILE,
+    "confoptadvisor": OPTADVISOR_FILE,
     "confactions": ACTIONS_FILE,
 }
 
@@ -164,6 +167,14 @@ def getmonData():
 
 def savemonData(data):
     _save_config(MON_FILE, data, "confapplstat.json")
+
+
+def getOptAdvisorData():
+    return _get_config(OPTADVISOR_FILE)
+
+
+def saveOptAdvisorData(data):
+    _save_config(OPTADVISOR_FILE, data, "confoptadvisor.json")
 
 
 def getcertData():

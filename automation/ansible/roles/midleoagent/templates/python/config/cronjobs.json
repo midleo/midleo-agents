@@ -41,6 +41,34 @@
             ]
         }
     },
+    "getoptadvisor.py": {
+        "enabled": false,
+        "config_file": "confoptadvisor.json",
+        "run": {
+            "minute_in": [
+                "00",
+                "10",
+                "20",
+                "30",
+                "40",
+                "50"
+            ]
+        }
+    },
+    "resetoptadvisor.py": {
+        "enabled": false,
+        "config_file": "confoptadvisor.json",
+        "run": {
+            "minute_in": [
+                "01",
+                "11",
+                "21",
+                "31",
+                "41",
+                "51"
+            ]
+        }
+    },
     "runappavllin.py": {
         "enabled": false,
         "config_file": "confavl.json",

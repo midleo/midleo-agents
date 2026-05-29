@@ -257,7 +257,7 @@ def _magent_json_args(cmd_str):
     if script not in ("magent.sh", "magent.bat"):
         return None
 
-    if args[1] not in ("enableavl", "addcert", "addappstat", "addaction"):
+    if args[1] not in ("enableavl", "addcert", "addappstat", "addoptadvisor", "addaction"):
         return None
 
     return args + [json_text]

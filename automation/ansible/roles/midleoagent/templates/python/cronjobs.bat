@@ -43,8 +43,9 @@ if not exist "%HOMEDIR%\certs.json" echo {}>"%HOMEDIR%\certs.json"
 if not exist "%HOMEDIR%\conftrack.json" echo {}>"%HOMEDIR%\conftrack.json"
 if not exist "%HOMEDIR%\confavl.json" echo {}>"%HOMEDIR%\confavl.json"
 if not exist "%HOMEDIR%\confapplstat.json" echo {}>"%HOMEDIR%\confapplstat.json"
+if not exist "%HOMEDIR%\confoptadvisor.json" echo {}>"%HOMEDIR%\confoptadvisor.json"
 
-"%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; configs.syncCronjobsForConfig('conftrack.json', configs.gettrackData()); configs.syncCronjobsForConfig('confavl.json', configs.getAvlData()); configs.syncCronjobsForConfig('confapplstat.json', configs.getmonData())"
+"%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; configs.syncCronjobsForConfig('conftrack.json', configs.gettrackData()); configs.syncCronjobsForConfig('confavl.json', configs.getAvlData()); configs.syncCronjobsForConfig('confapplstat.json', configs.getmonData()); configs.syncCronjobsForConfig('confoptadvisor.json', configs.getOptAdvisorData())"
 if errorlevel 1 goto end
 
 set "MWAGTDIR=%cd%"

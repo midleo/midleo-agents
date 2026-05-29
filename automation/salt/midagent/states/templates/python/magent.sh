@@ -60,6 +60,7 @@ for path in (
     os.path.join(cfgdir, "conftrack.json"),
     os.path.join(cfgdir, "confavl.json"),
     os.path.join(cfgdir, "confapplstat.json"),
+    os.path.join(cfgdir, "confoptadvisor.json"),
     os.path.join(cfgdir, "confactions.json"),
 ):
     if not os.path.isfile(path):
@@ -69,6 +70,7 @@ for path in (
 configs.syncCronjobsForConfig("conftrack.json", configs.gettrackData())
 configs.syncCronjobsForConfig("confavl.json", configs.getAvlData())
 configs.syncCronjobsForConfig("confapplstat.json", configs.getmonData())
+configs.syncCronjobsForConfig("confoptadvisor.json", configs.getOptAdvisorData())
 PY
 
 case "${1:-}" in
@@ -114,6 +116,12 @@ case "${1:-}" in
       require_arg "${4:-}"
       "$PYTHON" "runable/addappstat.py" "$2" "$3" "$4"
       ;;
+  addoptadvisor )
+      require_arg "${2:-}"
+      require_arg "${3:-}"
+      require_arg "${4:-}"
+      "$PYTHON" "runable/addoptadvisor.py" "$2" "$3" "$4"
+      ;;
   addaction )
       if [ -z "${2:-}" ]; then
         "$0"
@@ -129,6 +137,21 @@ case "${1:-}" in
       require_arg "${2:-}"
       require_arg "${3:-}"
       "$PYTHON" "runable/delappstat.py" "$2" "$3"
+      ;;
+  deloptadvisor )
+      require_arg "${2:-}"
+      require_arg "${3:-}"
+      "$PYTHON" "runable/deloptadvisor.py" "$2" "$3"
+      ;;
+  enableoptadvisor )
+      "$PYTHON" "runable/optadvisorctl.py" enable "${2:-30}"
+      ;;
+  disableoptadvisor )
+      shift
+      "$PYTHON" "runable/optadvisorctl.py" disable "${*:-manual}"
+      ;;
+  optadvisorstatus )
+      "$PYTHON" "runable/optadvisorctl.py" status
       ;;
   rmaction )
       if [ -z "${2:-}" ]; then
@@ -177,6 +200,11 @@ MQSC
       echo "   -  $0 startavl APP_SERVER SERVER_TYPE"
       echo "   -  $0 addappstat SRV_TYPE APPSRV '{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\"}'"
       echo "   -  $0 delappstat SRV_TYPE APPSRV"
+      echo "   -  $0 addoptadvisor SRV_TYPE APPSRV '{\"appsrvid\":\"MIDLEO_SERVER_ID\",\"usr\":\"USER\",\"pass\":\"PASS\",\"mngmport\":\"7001\"}'"
+      echo "   -  $0 deloptadvisor SRV_TYPE APPSRV"
+      echo "   -  $0 enableoptadvisor [days]       # max 30 days, requires per-server optadvisor config"
+      echo "   -  $0 disableoptadvisor [reason]"
+      echo "   -  $0 optadvisorstatus"
       echo "   -  $0 addaction APP_SERVER_TYPE.ERROR_CODE '{\"script\":\"/opt/midleo/actions/restart.sh\",\"args\":[\"{appserver_type}\",\"{error_code}\"],\"monid\":\"monaction\",\"appsrvid\":\"none\",\"appsrv\":\"tomcat01\",\"message\":\"Action already started recently\"}'"
       echo "   -  $0 addaction '{\"action_key\":\"APP_SERVER_TYPE.ERROR_CODE\",\"script\":\"/opt/midleo/actions/restart.sh\"}'"
       echo "   -  $0 rmaction APP_SERVER_TYPE.ERROR_CODE"

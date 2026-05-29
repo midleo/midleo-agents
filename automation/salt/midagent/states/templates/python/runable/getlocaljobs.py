@@ -113,6 +113,24 @@ def getLocalJobsBody():
             _append_job(jobs_map, "getapplstat.py", entry)
             _append_job(jobs_map, "resetapplstat.py", entry)
 
+    optadvisor_data = configs.getOptAdvisorData()
+    for srvtype, servers in optadvisor_data.items():
+        if not isinstance(servers, dict):
+            continue
+
+        for appserver, item in servers.items():
+            if not isinstance(item, dict):
+                continue
+
+            entry = {
+                "name": appserver,
+                "type": "optadvisor",
+                "value": {"srvtype": srvtype, "config": _sanitize_dict(item)},
+            }
+
+            _append_job(jobs_map, "getoptadvisor.py", entry)
+            _append_job(jobs_map, "resetoptadvisor.py", entry)
+
     track_data = configs.gettrackData()
     for qmgr, item in track_data.items():
         entry = {

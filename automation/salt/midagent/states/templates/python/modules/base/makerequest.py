@@ -51,6 +51,7 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
     options = _cfg()
     url = _base_url(webssl, website) + path
     verify = options["verify"]
+    sensitive_response = bool(kwargs.pop("sensitive_response", False))
 
     if not verify:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -65,9 +66,12 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
             timeout=options["timeout"],
             **kwargs,
         )
-        body = (res.content or b"")[:MAX_LOG_BODY_BYTES].decode(
-            "utf-8", errors="replace"
-        )
+        if sensitive_response:
+            body = "[redacted]"
+        else:
+            body = (res.content or b"")[:MAX_LOG_BODY_BYTES].decode(
+                "utf-8", errors="replace"
+            )
         classes.Err(method.upper() + " " + path + " HTTPResponse:" + str(res.status_code) + " " + body)
         return res
     except requests.exceptions.RequestException as ex:
@@ -100,6 +104,37 @@ def postibmmqCHData(webssl, website, qm, data):
         website,
         "/pubapi/updateibmmqchstat/" + quote(str(qm), safe=""),
         data,
+    )
+
+
+def postOptAdvisorTelemetry(webssl, website, data, inttoken=None):
+    headers = _headers()
+    payload = dict(data or {})
+    if inttoken:
+        payload["inttoken"] = str(inttoken)
+    return _request(
+        "post",
+        webssl,
+        website,
+        "/pubapi/updateoptadvisor",
+        json.dumps(payload),
+        headers=headers,
+    )
+
+
+def postOptAdvisorCollectorToken(webssl, website, data, inttoken=None):
+    headers = _headers()
+    payload = dict(data or {})
+    if inttoken:
+        payload["inttoken"] = str(inttoken)
+    return _request(
+        "post",
+        webssl,
+        website,
+        "/pubapi/optadvisorcollectortoken",
+        json.dumps(payload),
+        headers=headers,
+        sensitive_response=True,
     )
 
 
