@@ -113,8 +113,8 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
 
     appcode = _safe_text(config.get("appcode"))
     server_id = _safe_text(_get_server_id(config, thisnode))
-    if not appcode or not server_id:
-        classes.Err("tibcoems optadvisor disabled for missing appcode or server_id")
+    if not server_id:
+        classes.Err("tibcoems optadvisor disabled for missing server_id")
         return None
 
     resources = java_result.get("resources", [])
@@ -256,7 +256,7 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
     if not isinstance(thisdata, dict):
         return
     optadvisor_config, _ = _split_optadvisor_config(thisdata)
-    if not common.optadvisor_collection_enabled(optadvisor_config):
+    if not common.optadvisor_enabled(optadvisor_config):
         return
 
     file = _optadvisor_log_path(thisnode)

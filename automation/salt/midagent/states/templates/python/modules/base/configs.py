@@ -23,12 +23,14 @@ FILE_TO_CRONJOBS = {
 DEFAULT_CRONJOB_DEFS = {
     "getoptadvisor.py": {
         "config_file": "confoptadvisor.json",
+        "timeout_seconds": 300,
         "run": {
             "minute_in": ["00", "10", "20", "30", "40", "50"],
         },
     },
     "resetoptadvisor.py": {
         "config_file": "confoptadvisor.json",
+        "timeout_seconds": 300,
         "run": {
             "minute_in": ["05", "15", "25", "35", "45", "55"],
         },

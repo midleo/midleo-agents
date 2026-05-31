@@ -122,22 +122,6 @@ def postOptAdvisorTelemetry(webssl, website, data, inttoken=None):
     )
 
 
-def postOptAdvisorCollectorToken(webssl, website, data, inttoken=None):
-    headers = _headers()
-    payload = dict(data or {})
-    if inttoken:
-        payload["inttoken"] = str(inttoken)
-    return _request(
-        "post",
-        webssl,
-        website,
-        "/pubapi/optadvisorcollectortoken",
-        json.dumps(payload),
-        headers=headers,
-        sensitive_response=True,
-    )
-
-
 def getQRestStat(webssl, website, webport, qmgr, queue, usr, passwd):
     headers = {
         "Content-Type": "text/plain",

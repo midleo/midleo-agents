@@ -3,8 +3,13 @@ import os
 import socket
 import subprocess
 import uuid
+from urllib.parse import quote
 from datetime import datetime, timezone
 
+import requests
+import urllib3
+
+from modules.base import decrypt
 from modules.base import classes, makerequest
 from modules.statistics import common
 
@@ -29,9 +34,30 @@ OPTADVISOR_CONFIG_KEYS = {
     "integration_server",
     "usr",
     "pwd",
+    "srvuser",
+    "srvpass",
     "ssl",
+    "sslenabled",
     "truststore",
     "truststorepass",
+    "sslverify",
+    "ssl_verify",
+    "docker",
+    "contname",
+    "monitoring_mode",
+    "optadvisor_monitoring_mode",
+}
+ACE_REST_CONTAINER_NAMES = {
+    "applications",
+    "libraries",
+    "messageflows",
+    "policies",
+    "resources",
+    "restapis",
+    "schemas",
+    "services",
+    "statistics",
+    "subflows",
 }
 
 
@@ -102,20 +128,244 @@ def _java_payload_line(stdout):
     return ""
 
 
+def _rest_verify(config, values):
+    verify_value = values.get("sslverify") or values.get("ssl_verify") or config.get("sslverify") or config.get("ssl_verify") or "no"
+    return common.truthy(verify_value)
+
+
+def _rest_password(values):
+    pwd = values.get("pwd", "")
+    if not pwd:
+        return ""
+    try:
+        return decrypt.decryptPWD(pwd)
+    except Exception:
+        return str(pwd)
+
+
+def _rest_base_url(thisnode, config, values):
+    host = values.get("host") or config.get("host") or thisnode
+    port = values.get("port") or config.get("port") or "4414"
+    scheme = "https" if common.truthy(values.get("ssl") or config.get("ssl")) else "http"
+    return scheme + "://" + str(host).strip().rstrip("/") + ":" + str(port).strip()
+
+
+def _rest_get(base_url, path, auth, verify):
+    if not verify:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    try:
+        response = requests.get(
+            base_url.rstrip("/") + path,
+            auth=auth,
+            headers={"Accept": "application/json"},
+            timeout=common.DEFAULT_TIMEOUT_SECONDS,
+            verify=verify,
+        )
+        if response.status_code != 200:
+            classes.Err("ibmace optadvisor REST status:" + str(response.status_code) + " path:" + path)
+            return {}
+        data = response.json()
+        return data if isinstance(data, dict) else {}
+    except requests.exceptions.RequestException as err:
+        classes.Err("ibmace optadvisor REST error:" + str(err))
+    except (json.JSONDecodeError, TypeError, ValueError) as err:
+        classes.Err("ibmace optadvisor REST parse error:" + str(err))
+    return {}
+
+
+def _children(payload, child_key=None):
+    if not isinstance(payload, dict):
+        return []
+    if child_key and isinstance(payload.get("children"), dict):
+        child = payload["children"].get(child_key)
+        if isinstance(child, dict) and isinstance(child.get("children"), list):
+            return child["children"]
+    if isinstance(payload.get("children"), list):
+        return payload["children"]
+    if isinstance(payload.get("children"), dict):
+        return [value for value in payload["children"].values() if isinstance(value, dict)]
+    return []
+
+
+def _message_flow_children(payload):
+    candidates = _children(payload, "messageflows")
+    if not candidates:
+        candidates = _children(payload)
+    return [item for item in candidates if _is_message_flow(item)]
+
+
+def _is_message_flow(payload):
+    if not isinstance(payload, dict) or not _safe_text(payload.get("name")):
+        return False
+    name = _safe_text(payload.get("name")).lower()
+    if name in ACE_REST_CONTAINER_NAMES:
+        return False
+    uri = _safe_text(payload.get("uri")).lower()
+    if "/messageflows/" in uri:
+        return True
+    item_type = _safe_text(payload.get("type") or common.first_present(payload.get("properties", {}), "type")).lower()
+    if item_type:
+        return "messageflow" in item_type or "message flow" in item_type
+    return True
+
+
+def _status_from(payload, default="connected"):
+    if not isinstance(payload, dict):
+        return default
+    for source in (payload, payload.get("properties"), payload.get("active"), payload.get("descriptiveProperties")):
+        if isinstance(source, dict):
+            status = _safe_text(source.get("status") or source.get("state") or source.get("resourceState"))
+            if status:
+                return status.lower()
+            running = source.get("running")
+            if isinstance(running, bool):
+                return "running" if running else "stopped"
+    return default
+
+
+def _resource(resource_type, key, name, status, metadata, metrics, parent=None):
+    item = {
+        "resource_type": resource_type,
+        "technical_key": key,
+        "name": name,
+        "status": status,
+        "metadata": metadata if isinstance(metadata, dict) else {},
+        "metrics": metrics if isinstance(metrics, list) else [],
+    }
+    if parent:
+        item["parent_technical_key"] = parent
+    return item
+
+
+def _rest_collect_optadvisor(thisnode, config, values):
+    base_url = _rest_base_url(thisnode, config, values)
+    verify = _rest_verify(config, values)
+    auth = (values.get("usr", ""), _rest_password(values))
+    root = _rest_get(base_url, "/apiv2?depth=2", auth, verify)
+    if not root:
+        return None
+
+    node_name = _safe_text(root.get("name")) or _safe_text(values.get("host") or config.get("host") or thisnode)
+    target = {
+        "status": "connected",
+        "server_name": node_name,
+        "metadata": {
+            "integration_node": node_name,
+        },
+    }
+    version = common.first_present(root.get("descriptiveProperties", {}), "version")
+    if version:
+        target["metadata"]["version"] = str(version)
+
+    resources = []
+    servers = _children(root, "servers")
+    if not servers:
+        servers_payload = _rest_get(base_url, "/apiv2/servers?depth=2", auth, verify)
+        servers = _children(servers_payload)
+
+    for server in servers:
+        if not isinstance(server, dict) or not _safe_text(server.get("name")):
+            continue
+        server_name = _safe_text(server.get("name"))
+        server_detail = _rest_get(base_url, "/apiv2/servers/" + quote(server_name, safe="") + "?depth=3", auth, verify)
+        server_data = server_detail if server_detail else server
+        server_status = _status_from(server_data)
+        metadata = {}
+        properties = server_data.get("properties") if isinstance(server_data.get("properties"), dict) else {}
+        for key in ("defaultQueueManager", "brokerDefaultCCSID", "jvmMinHeapSize", "jvmMaxHeapSize"):
+            if properties.get(key) not in (None, ""):
+                metadata[key] = properties.get(key)
+        resources.append(_resource(
+            "ace_integration_server",
+            server_name,
+            server_name,
+            server_status,
+            metadata,
+            [common.metric_string("server_status", server_status)],
+        ))
+
+        apps = _children(server_data, "applications")
+        if not apps:
+            apps_payload = _rest_get(base_url, "/apiv2/servers/" + quote(server_name, safe="") + "/applications?depth=2", auth, verify)
+            apps = _children(apps_payload)
+        for app in apps:
+            if not isinstance(app, dict) or not _safe_text(app.get("name")):
+                continue
+            app_name = _safe_text(app.get("name"))
+            app_detail = _rest_get(
+                base_url,
+                "/apiv2/servers/" + quote(server_name, safe="") + "/applications/" + quote(app_name, safe="") + "?depth=3",
+                auth,
+                verify,
+            )
+            app_data = app_detail if app_detail else app
+            flows = _message_flow_children(app_data)
+            if not flows:
+                flows_payload = _rest_get(
+                    base_url,
+                    "/apiv2/servers/" + quote(server_name, safe="") + "/applications/" + quote(app_name, safe="") + "/messageflows?depth=2",
+                    auth,
+                    verify,
+                )
+                flows = _message_flow_children(flows_payload)
+            for flow in flows:
+                if not isinstance(flow, dict) or not _safe_text(flow.get("name")):
+                    continue
+                flow_name = _safe_text(flow.get("name"))
+                flow_status = _status_from(flow, "unknown")
+                resources.append(_resource(
+                    "ace_message_flow",
+                    server_name + "/" + app_name + "/" + flow_name,
+                    flow_name,
+                    flow_status,
+                    {"server": server_name, "application": app_name},
+                    [common.metric_string("flow_status", flow_status)],
+                    server_name,
+                ))
+
+    if not resources:
+        resources.append(_resource(
+            "ace_integration_server",
+            node_name,
+            node_name,
+            "connected",
+            {},
+            [common.metric_string("server_status", "connected")],
+        ))
+
+    return {"target": target, "resources": resources}
+
+
+def _java_result_error(java_result):
+    if not isinstance(java_result, dict):
+        return "invalid java result"
+    message = (
+        java_result.get("errorlog")
+        or java_result.get("log")
+        or java_result.get("message")
+        or java_result.get("error")
+        or java_result.get("err")
+        or "unknown error"
+    )
+    return _safe_text(message)[:common.MAX_LOG_BYTES]
+
+
 def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
     if not _optadvisor_enabled(config):
         return None
     if not isinstance(java_result, dict) or java_result.get("err") == "yes" or java_result.get("error") == "yes":
+        classes.Err("ibmace optadvisor collector error:" + _java_result_error(java_result))
         return None
 
     appcode = _safe_text(config.get("appcode"))
     server_id = _safe_text(_get_server_id(config, thisnode))
-    if not appcode or not server_id:
-        classes.Err("ibmace optadvisor disabled for missing appcode or server_id")
+    if not server_id:
+        classes.Err("ibmace optadvisor disabled for missing server_id")
         return None
 
     resources = java_result.get("resources", [])
     if not isinstance(resources, list) or len(resources) == 0:
+        classes.Err("ibmace optadvisor skipped no resources")
         return None
 
     node_id = "".join(ch if ch.isalnum() or ch in ("_", "-", ".") else "-" for ch in str(thisnode))[:24]
@@ -138,12 +388,11 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
 
 
 def _java_arg(thisnode, config, values):
-    server = (
-        values.get("server")
-        or config.get("server")
-        or config.get("integration_server")
-        or ""
-    )
+    server = values.get("integration_server") or config.get("integration_server") or ""
+    if not server:
+        candidate = values.get("server") or config.get("server") or ""
+        if _safe_text(candidate).lower() != _safe_text(thisnode).lower():
+            server = candidate
     payload = {
         "type": "OPTADVISOR",
         "host": values.get("host") or config.get("host") or thisnode,
@@ -162,11 +411,29 @@ def _java_arg(thisnode, config, values):
     return json.dumps(payload)
 
 
+def _java_classpath(jar_path):
+    return "/midleolibs/vendor/IntegrationAPI_ACE.jar:/midleolibs/libs/*:" + jar_path
+
+
+def _java_env():
+    env = os.environ.copy()
+    env["LANG"] = "C"
+    env["LC_ALL"] = "C"
+    return env
+
+
 def _collect_optadvisor(thisnode, config, values, jar_path):
+    rest_result = _rest_collect_optadvisor(thisnode, config, values)
+    if rest_result is not None:
+        payload = buildOptAdvisorPayload(thisnode, config, rest_result, _utc_now())
+        if payload is not None:
+            _append_optadvisor_payload(thisnode, payload)
+            return
+
     command = [
         "java",
         "-cp",
-        "/midleolibs/libs/*:/midleolibs/vendor/*:" + jar_path,
+        _java_classpath(jar_path),
         "midleoace.midleo_ace_main",
         _java_arg(thisnode, config, values),
     ]
@@ -178,6 +445,7 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
             universal_newlines=True,
             timeout=common.DEFAULT_TIMEOUT_SECONDS,
             check=False,
+            env=_java_env(),
         )
     except subprocess.TimeoutExpired:
         classes.Err("ibmace optadvisor timed out after " + str(common.DEFAULT_TIMEOUT_SECONDS) + " seconds")
@@ -213,14 +481,29 @@ def getStat(thisqm, inpdata):
             {
                 "usr": "",
                 "pwd": "",
+                "srvuser": "",
+                "srvpass": "",
                 "host": "",
                 "port": "4414",
                 "server": "",
+                "integration_server": "",
                 "ssl": "no",
+                "sslenabled": "",
+                "docker": "",
+                "contname": "",
                 "truststore": "",
                 "truststorepass": "",
+                "sslverify": "",
+                "ssl_verify": "",
             },
         )
+        if not values.get("usr") and values.get("srvuser"):
+            values["usr"] = values["srvuser"]
+        if not values.get("pwd") and values.get("srvpass"):
+            values["pwd"] = values["srvpass"]
+        if not values.get("ssl") or values.get("ssl") == "no":
+            if str(values.get("sslenabled", "")).strip() in ("1", "yes", "true", "on"):
+                values["ssl"] = "yes"
         optadvisor_config, _ = _split_optadvisor_config(metrics)
         if values.get("host"):
             optadvisor_config["host"] = values["host"]
@@ -244,7 +527,7 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
     if not isinstance(thisdata, dict):
         return
     optadvisor_config, _ = _split_optadvisor_config(thisdata)
-    if not common.optadvisor_collection_enabled(optadvisor_config):
+    if not common.optadvisor_enabled(optadvisor_config):
         return
 
     file = _optadvisor_log_path(thisnode)

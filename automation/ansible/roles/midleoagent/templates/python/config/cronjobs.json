@@ -44,6 +44,7 @@
     "getoptadvisor.py": {
         "enabled": false,
         "config_file": "confoptadvisor.json",
+        "timeout_seconds": 300,
         "run": {
             "minute_in": [
                 "00",
@@ -58,6 +59,7 @@
     "resetoptadvisor.py": {
         "enabled": false,
         "config_file": "confoptadvisor.json",
+        "timeout_seconds": 300,
         "run": {
             "minute_in": [
                 "05",

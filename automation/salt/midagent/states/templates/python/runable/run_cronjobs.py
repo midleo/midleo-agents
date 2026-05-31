@@ -163,7 +163,7 @@ def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
     return True
 
 
-def run_job(script_name, args):
+def run_job(script_name, args, job=None):
     python_bin = os.environ.get("PYTHON") or sys.executable
     script_path = os.path.join(RUNABLE_DIR, script_name)
 
@@ -182,6 +182,11 @@ def run_job(script_name, args):
     started_at = now_str()
 
     timeout_seconds = DEFAULT_JOB_TIMEOUT_SECONDS
+    if isinstance(job, dict) and job.get("timeout_seconds") is not None:
+        try:
+            timeout_seconds = int(job.get("timeout_seconds"))
+        except Exception:
+            pass
     try:
         timeout_seconds = int(os.environ.get("JOB_TIMEOUT_SECONDS", timeout_seconds))
     except Exception:
@@ -254,7 +259,7 @@ def main():
 
         args = resolve_args(job.get("args", []), context)
         log(f"{script_name} start args={args}")
-        result = run_job(script_name, args)
+        result = run_job(script_name, args, job)
         state[script_name] = result
         write_json_atomic(STATE_FILE, state)
 

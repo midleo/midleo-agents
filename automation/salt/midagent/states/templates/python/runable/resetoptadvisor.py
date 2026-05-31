@@ -15,6 +15,11 @@ MODULE_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
 
 try:
+    lock = common.acquire_optadvisor_lock("runtime")
+    if not lock:
+        classes.Err("resetoptadvisor skipped optadvisor runtime lock active")
+        raise SystemExit(0)
+
     opt_data = configs.getOptAdvisorData()
     config_data = configs.getcfgData()
     website = config_data["MWADMIN"]
@@ -36,8 +41,8 @@ try:
             if not isinstance(value, dict):
                 continue
             payload = dict(value)
-            payload["optadvisor"] = True
-            payload["optadvisor_enabled"] = True
+            if not common.optadvisor_enabled(payload):
+                continue
             payload["optadvisor_only"] = True
             payload.setdefault("server_id", payload.get("appsrvid", appserver))
             payload.setdefault("optadvisor_technology", srv_type)
@@ -48,3 +53,8 @@ try:
 
 except Exception as err:
     classes.Err("OPTADVISOR not configured err:" + str(err))
+finally:
+    try:
+        common.release_optadvisor_lock(lock)
+    except NameError:
+        pass

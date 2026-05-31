@@ -127,7 +127,7 @@ def avlCheck(thisapp,dcont="",cred=None):
     arr["ibmace"]="sudo -u "+q(aceusr)+" -i mqsilist | grep "+q(app)+" | grep running | wc -l"
     arr["ibmacedocker"]="/usr/bin/docker exec -t "+q(cont)+" /bin/bash -c "+q(". "+q(mqsiprofile)+" && mqsilist")+" | grep "+q(app)+" | grep running | wc -l"
     arr["ibmiib"]="sudo -u "+q(aceusr)+" -i mqsilist | grep "+q(app)+" | grep running | wc -l"
-    arr["ibmiibdocker"]="/usr/bin/docker exec -t "+q(cont)+" /bin/bash -c "+q(". "+q(iibmqsiprofile)+" && mqsilist")+" | grep "+q(app)+" | grep running | wc -l"
+    arr["ibmiibdocker"]="/usr/bin/docker exec -t "+q(cont)+" /bin/bash -c "+q("mqsilist")+" | grep "+q(app)+" | grep running | wc -l"
     arr["axwaycft"]="ps -ef|grep CFTMAIN | wc -l"
     arr["axwayst"]="ps -ef|grep Axway | grep catalina | wc -l"
     arr["kafka"] = (

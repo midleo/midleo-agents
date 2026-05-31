@@ -20,9 +20,8 @@ OPTADVISOR_CONFIG_KEYS = {
     "optimization_advisor",
     "optadvisor_collector_version",
     "optadvisor_technology",
-    "optadvisor_token",
-    "optadvisor_token_uid",
-    "optadvisor_token_expires_at",
+    "monitoring_mode",
+    "optadvisor_monitoring_mode",
     "appcode",
     "appsrvid",
     "server_id",
@@ -105,6 +104,24 @@ def _java_payload_line(stdout):
     return ""
 
 
+def _normalize_target(thisnode, java_result, resources):
+    target = java_result.get("target", {})
+    if not isinstance(target, dict):
+        target = {}
+    target = dict(target)
+    if not _safe_text(target.get("server_name")):
+        target["server_name"] = thisnode
+    status = _safe_text(target.get("status")).lower()
+    if status in ("", "unknown") and resources:
+        resource_statuses = [
+            _safe_text(resource.get("status")).lower()
+            for resource in resources
+            if isinstance(resource, dict)
+        ]
+        target["status"] = "running" if "running" in resource_statuses else "connected"
+    return target
+
+
 def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
     if not _optadvisor_enabled(config):
         return None
@@ -118,8 +135,8 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
 
     appcode = _safe_text(config.get("appcode"))
     server_id = _safe_text(_get_server_id(config, thisnode))
-    if not appcode or not server_id:
-        classes.Err("weblogic optadvisor disabled for missing appcode or server_id")
+    if not server_id:
+        classes.Err("weblogic optadvisor disabled for missing server_id")
         return None
 
     resources = java_result.get("resources", [])
@@ -141,7 +158,7 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
             "type": "local",
             "execution_host": socket.gethostname(),
         },
-        "target": java_result.get("target", {}),
+        "target": _normalize_target(thisnode, java_result, resources),
         "resources": resources,
     }
 
@@ -256,7 +273,7 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
     if not isinstance(thisdata, dict):
         return
     optadvisor_config, _ = _split_optadvisor_config(thisdata)
-    if not common.optadvisor_collection_enabled(optadvisor_config):
+    if not common.optadvisor_enabled(optadvisor_config):
         classes.Err("weblogic optadvisor flush skipped disabled")
         return
 

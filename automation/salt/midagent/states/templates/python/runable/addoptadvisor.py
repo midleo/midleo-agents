@@ -18,6 +18,12 @@ SECRET_KEYS = {
     "chlpass",
     "token",
 }
+REMOVED_OPTADVISOR_AUTH_KEYS = {
+    "optadvisor_token",
+    "optadvisor_token_uid",
+    "optadvisor_token_expires_at",
+    "collector_token",
+}
 
 
 def _arg(index, name):
@@ -62,9 +68,16 @@ def createOptAdvisorJson():
     opt_data[srvtype][appsrv]["optadvisor_only"] = True
     opt_data[srvtype][appsrv].setdefault("optadvisor_technology", srvtype)
     opt_data[srvtype][appsrv].setdefault("appserver", appsrv)
+    opt_data[srvtype][appsrv].setdefault("monitoring_mode", "read_only")
+    for removed_key in REMOVED_OPTADVISOR_AUTH_KEYS:
+        opt_data[srvtype][appsrv].pop(removed_key, None)
 
     for key, value in input_data.items():
-        store_key = "pwd" if str(key).lower() == "pass" and "pwd" not in input_data else str(key)
+        if str(key).lower() in REMOVED_OPTADVISOR_AUTH_KEYS:
+            continue
+        if str(key).lower() == "pass" and "pwd" in input_data:
+            continue
+        store_key = "pwd" if str(key).lower() == "pass" else str(key)
         opt_data[srvtype][appsrv][store_key] = _store_value(store_key, value)
 
     appsrvid = str(opt_data[srvtype][appsrv].get("appsrvid", "")).strip()

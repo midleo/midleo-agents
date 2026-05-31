@@ -489,8 +489,8 @@ def buildOptAdvisorPayload(
 
     appcode = _safe_text(inpdata.get("appcode"))
     server_id = _safe_text(_get_server_id(inpdata, thisqm))
-    if not appcode or not server_id:
-        classes.Err("ibmmq optadvisor disabled for missing appcode or server_id")
+    if not server_id:
+        classes.Err("ibmmq optadvisor disabled for missing server_id")
         return None
 
     resources = []
@@ -681,7 +681,7 @@ def depthperc(queue_info):
 
 
 def flushOptAdvisorTelemetry(thisqm, website, webssl, inttoken, thisdata):
-    if not isinstance(thisdata, dict) or not common.optadvisor_collection_enabled(thisdata):
+    if not isinstance(thisdata, dict) or not common.optadvisor_enabled(thisdata):
         return
 
     file = _optadvisor_log_path(thisqm)

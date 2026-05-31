@@ -4,6 +4,7 @@ import os
 import socket
 import subprocess
 import tempfile
+import time
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -21,6 +22,8 @@ OPTADVISOR_CONFIG_KEYS = {
     "optimization_advisor",
     "optadvisor_collector_version",
     "optadvisor_technology",
+    "monitoring_mode",
+    "optadvisor_monitoring_mode",
     "appcode",
     "appsrvid",
     "server_id",
@@ -28,6 +31,8 @@ OPTADVISOR_CONFIG_KEYS = {
     "srvid",
     "appserver",
     "managed_server",
+}
+REMOVED_OPTADVISOR_AUTH_KEYS = {
     "optadvisor_token",
     "optadvisor_token_uid",
     "optadvisor_token_expires_at",
@@ -100,6 +105,11 @@ def truthy(value):
 
 def optadvisor_state_path():
     return os.path.join(os.getcwd(), "config", "optadvisor.json")
+
+
+def optadvisor_lock_path(name="runtime"):
+    safe_name = "".join(ch if ch.isalnum() or ch in ("_", "-") else "-" for ch in str(name or "runtime"))
+    return os.path.join(os.getcwd(), "config", "optadvisor_" + safe_name + ".lock")
 
 
 def _parse_utc_datetime(value):
@@ -199,6 +209,86 @@ def optadvisor_runtime_enabled(now=None):
     return bool(optadvisor_runtime_status(now).get("active"))
 
 
+def _lock_stale_seconds(default=1800):
+    try:
+        value = int(os.environ.get("MIDLEO_OPTADVISOR_LOCK_STALE_SECONDS", str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(60, min(value, 86400))
+
+
+def _lock_is_stale(path, stale_seconds):
+    now = time.time()
+    created_ts = 0
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            created_ts = float(data.get("created_ts") or 0)
+    except Exception:
+        try:
+            created_ts = os.path.getmtime(path)
+        except OSError:
+            created_ts = now
+    return created_ts <= 0 or (now - created_ts) > stale_seconds
+
+
+def acquire_optadvisor_lock(name="runtime", stale_seconds=None):
+    if stale_seconds is None:
+        stale_seconds = _lock_stale_seconds()
+    path = optadvisor_lock_path(name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    for _ in range(2):
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "pid": os.getpid(),
+                        "host": socket.gethostname(),
+                        "created_at": iso_utc(),
+                        "created_ts": time.time(),
+                        "name": str(name or "runtime"),
+                    },
+                    f,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+                f.write("\n")
+            return {"path": path, "name": str(name or "runtime")}
+        except FileExistsError:
+            if _lock_is_stale(path, stale_seconds):
+                try:
+                    os.unlink(path)
+                    continue
+                except OSError:
+                    pass
+            return None
+        except OSError as err:
+            classes.Err("optadvisor lock error:" + str(err))
+            return None
+    return None
+
+
+def release_optadvisor_lock(lock):
+    if not lock:
+        return
+    path = lock.get("path") if isinstance(lock, dict) else str(lock)
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        pass
+    except OSError as err:
+        classes.Err("optadvisor lock release error:" + str(err))
+
+
+def optadvisor_run_seconds_limit(default=240):
+    try:
+        value = int(os.environ.get("MIDLEO_OPTADVISOR_MAX_RUN_SECONDS", str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(30, min(value, 3600))
+
+
 def safe_text(value):
     if value is None:
         return ""
@@ -218,13 +308,14 @@ def optadvisor_collection_enabled(config):
 
 
 def optadvisor_post_token(config, default_token):
+    # OptAdvisor telemetry uses the existing protected INTTOKEN path.
     return safe_text(default_token)
 
 
 def split_optadvisor_config(data, extra_keys=None):
     config = {}
     metrics = dict(data or {})
-    keys = set(OPTADVISOR_CONFIG_KEYS)
+    keys = set(OPTADVISOR_CONFIG_KEYS) | set(REMOVED_OPTADVISOR_AUTH_KEYS)
     if extra_keys:
         keys.update(extra_keys)
     for key in list(metrics.keys()):
@@ -261,7 +352,7 @@ def flush_optadvisor_telemetry(prefix, thisnode, website, webssl, inttoken, stat
     if not isinstance(stat_data, dict):
         return
     optadvisor_config, _ = split_optadvisor_config(stat_data, extra_keys)
-    if not optadvisor_collection_enabled(optadvisor_config):
+    if not optadvisor_enabled(optadvisor_config):
         classes.Err(prefix + " optadvisor flush skipped disabled")
         return
 

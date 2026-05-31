@@ -29,7 +29,12 @@ OPTADVISOR_CONFIG_KEYS = {
     "execution_group",
     "usr",
     "pwd",
+    "srvuser",
+    "srvpass",
     "ssl",
+    "sslenabled",
+    "monitoring_mode",
+    "optadvisor_monitoring_mode",
 }
 
 
@@ -88,8 +93,10 @@ def _optadvisor_log_path(thisnode):
 
 def _append_optadvisor_payload(thisnode, payload):
     os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
-    with open(_optadvisor_log_path(thisnode), "a", encoding="utf-8") as f:
+    file = _optadvisor_log_path(thisnode)
+    with open(file, "a", encoding="utf-8") as f:
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
+    classes.Err("ibmiib optadvisor payload queued:" + file)
 
 
 def _java_payload_line(stdout):
@@ -100,20 +107,36 @@ def _java_payload_line(stdout):
     return ""
 
 
+def _java_result_error(java_result):
+    if not isinstance(java_result, dict):
+        return "invalid java result"
+    message = (
+        java_result.get("errorlog")
+        or java_result.get("log")
+        or java_result.get("message")
+        or java_result.get("error")
+        or java_result.get("err")
+        or "unknown error"
+    )
+    return _safe_text(message)[:common.MAX_LOG_BYTES]
+
+
 def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
     if not _optadvisor_enabled(config):
         return None
     if not isinstance(java_result, dict) or java_result.get("err") == "yes" or java_result.get("error") == "yes":
+        classes.Err("ibmiib optadvisor collector error:" + _java_result_error(java_result))
         return None
 
     appcode = _safe_text(config.get("appcode"))
     server_id = _safe_text(_get_server_id(config, thisnode))
-    if not appcode or not server_id:
-        classes.Err("ibmiib optadvisor disabled for missing appcode or server_id")
+    if not server_id:
+        classes.Err("ibmiib optadvisor disabled for missing server_id")
         return None
 
     resources = java_result.get("resources", [])
     if not isinstance(resources, list) or len(resources) == 0:
+        classes.Err("ibmiib optadvisor skipped no resources")
         return None
 
     node_id = "".join(ch if ch.isalnum() or ch in ("_", "-", ".") else "-" for ch in str(thisnode))[:24]
@@ -135,19 +158,26 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
     }
 
 
+def _execution_group_filter(thisnode, config, values):
+    explicit = _safe_text(values.get("execution_group") or config.get("execution_group"))
+    if explicit:
+        return explicit
+
+    candidate = _safe_text(values.get("server") or config.get("server"))
+    if candidate and candidate.lower() != _safe_text(thisnode).lower():
+        return candidate
+
+    return ""
+
+
 def _java_arg(thisnode, config, values):
-    server = (
-        values.get("server")
-        or config.get("server")
-        or config.get("execution_group")
-        or ""
-    )
     return json.dumps(
         {
             "type": "OPTADVISOR",
             "host": values.get("host") or config.get("host") or thisnode,
             "port": int(values.get("port") or config.get("port") or 4414),
-            "server": server,
+            "node": thisnode,
+            "server": _execution_group_filter(thisnode, config, values),
             "usr": values.get("usr", ""),
             "pwd": values.get("pwd", ""),
             "ssl": values.get("ssl") or config.get("ssl") or "no",
@@ -155,11 +185,29 @@ def _java_arg(thisnode, config, values):
     )
 
 
+def _java_classpath(jar_path):
+    return (
+        "/midleolibs/vendor/bipbroker.jar:"
+        "/midleolibs/vendor/brokerutil.jar:"
+        "/midleolibs/vendor/IntegrationAPI_IIB.jar:"
+        "/midleolibs/libs/*:"
+        + jar_path
+    )
+
+
+def _java_env():
+    env = os.environ.copy()
+    env["LANG"] = "C"
+    env["LC_ALL"] = "C"
+    return env
+
+
 def _collect_optadvisor(thisnode, config, values, jar_path):
+    classes.Err("ibmiib optadvisor java start:" + str(thisnode))
     command = [
         "java",
         "-cp",
-        "/midleolibs/libs/*:/midleolibs/vendor/*:" + jar_path,
+        _java_classpath(jar_path),
         "midleoiib.midleo_iib_main",
         _java_arg(thisnode, config, values),
     ]
@@ -171,6 +219,7 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
             universal_newlines=True,
             timeout=common.DEFAULT_TIMEOUT_SECONDS,
             check=False,
+            env=_java_env(),
         )
     except subprocess.TimeoutExpired:
         classes.Err("ibmiib optadvisor timed out after " + str(common.DEFAULT_TIMEOUT_SECONDS) + " seconds")
@@ -179,6 +228,9 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
         classes.Err("ibmiib optadvisor failed to start:" + str(err))
         return
 
+    classes.Err("ibmiib optadvisor java exit code:" + str(result.returncode))
+    if result.stdout:
+        classes.Err("ibmiib optadvisor Output:" + result.stdout[-common.MAX_LOG_BYTES:])
     if result.stderr:
         classes.Err("ibmiib optadvisor Error:" + result.stderr[-common.MAX_LOG_BYTES:])
     if result.returncode != 0:
@@ -206,12 +258,23 @@ def getStat(thisqm, inpdata):
             {
                 "usr": "",
                 "pwd": "",
+                "srvuser": "",
+                "srvpass": "",
                 "host": "",
                 "port": "4414",
                 "server": "",
+                "execution_group": "",
                 "ssl": "no",
+                "sslenabled": "",
             },
         )
+        if not values.get("usr") and values.get("srvuser"):
+            values["usr"] = values["srvuser"]
+        if not values.get("pwd") and values.get("srvpass"):
+            values["pwd"] = values["srvpass"]
+        if not values.get("ssl") or values.get("ssl") == "no":
+            if str(values.get("sslenabled", "")).strip() in ("1", "yes", "true", "on"):
+                values["ssl"] = "yes"
         optadvisor_config, _ = _split_optadvisor_config(metrics)
         if values.get("host"):
             optadvisor_config["host"] = values["host"]
@@ -219,6 +282,8 @@ def getStat(thisqm, inpdata):
             optadvisor_config["port"] = values["port"]
         if values.get("server"):
             optadvisor_config["server"] = values["server"]
+        if values.get("execution_group"):
+            optadvisor_config["execution_group"] = values["execution_group"]
         if common.optadvisor_collection_enabled(optadvisor_config):
             jar_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
@@ -235,7 +300,7 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
     if not isinstance(thisdata, dict):
         return
     optadvisor_config, _ = _split_optadvisor_config(thisdata)
-    if not common.optadvisor_collection_enabled(optadvisor_config):
+    if not common.optadvisor_enabled(optadvisor_config):
         return
 
     file = _optadvisor_log_path(thisnode)
@@ -253,7 +318,12 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
                 payload.pop("inttoken", None)
                 res = makerequest.postOptAdvisorTelemetry(webssl, website, payload, common.optadvisor_post_token(optadvisor_config, inttoken))
                 if res is None or res.status_code < 200 or res.status_code >= 300:
+                    status = "no-response" if res is None else str(res.status_code)
+                    body = "" if res is None else str(res.text)[-common.MAX_LOG_BYTES:]
+                    classes.Err("ibmiib optadvisor post failed status:" + status + " body:" + body)
                     remaining.append(line)
+                else:
+                    classes.Err("ibmiib optadvisor post success status:" + str(res.status_code))
             except (json.JSONDecodeError, TypeError, ValueError) as err:
                 classes.Err("ibmiib optadvisor payload parse error:" + str(err))
             except Exception as err:
