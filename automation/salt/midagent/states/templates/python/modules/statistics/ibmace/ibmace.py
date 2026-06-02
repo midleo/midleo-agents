@@ -1,3 +1,5 @@
+import csv
+import glob
 import json
 import os
 import socket
@@ -120,6 +122,82 @@ def _append_optadvisor_payload(thisnode, payload):
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
 
 
+def _number(value):
+    try:
+        text = str(value).strip().replace(",", "")
+        if not text:
+            return None
+        return float(text)
+    except Exception:
+        return None
+
+
+def _queue_optadvisor_jvm_stats(thisnode, config, legacy_stat_data):
+    if not isinstance(legacy_stat_data, dict):
+        return
+    resources = {}
+    target_node = str(thisnode)
+
+    for subtype, logdir in legacy_stat_data.items():
+        if str(subtype).lower() != "jvm":
+            continue
+        pattern = str(logdir) + "ResourceStats_" + str(thisnode) + "_*_" + str(subtype) + ".txt"
+        for file_path in glob.glob(pattern):
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="ignore", newline="") as f:
+                    for row in csv.reader((line.replace("\0", "") for line in f), delimiter=","):
+                        if len(row) <= 9 or row[0] == "ResourceName":
+                            continue
+                        node_name = _safe_text(row[1])
+                        server_name = _safe_text(row[2])
+                        used_value = _number(row[7])
+                        max_value = _number(row[9])
+                        if not server_name or used_value is None:
+                            continue
+                        target_node = node_name or target_node
+                        resource = {
+                            "resource_type": "ace_integration_server",
+                            "technical_key": server_name,
+                            "name": server_name,
+                            "status": "running",
+                            "metadata": {},
+                            "metrics": [
+                                {
+                                    "key": "memory_used_bytes",
+                                    "value": used_value,
+                                    "value_type": "number",
+                                }
+                            ],
+                        }
+                        if max_value is not None:
+                            resource["metadata"]["jvmMaxHeapSize"] = max_value
+                        resources[server_name] = resource
+            except OSError as err:
+                classes.Err("ibmace optadvisor JVM stats read error:" + str(err))
+
+    if not resources:
+        return
+
+    payload = buildOptAdvisorPayload(
+        thisnode,
+        config,
+        {
+            "target": {
+                "status": "connected",
+                "server_name": target_node,
+                "metadata": {
+                    "integration_node": target_node,
+                    "source": "resource_stats",
+                },
+            },
+            "resources": list(resources.values()),
+        },
+        _utc_now(),
+    )
+    if payload is not None:
+        _append_optadvisor_payload(thisnode, payload)
+
+
 def _java_payload_line(stdout):
     lines = [line.strip() for line in str(stdout or "").splitlines() if line.strip()]
     for line in reversed(lines):
@@ -237,6 +315,15 @@ def _resource(resource_type, key, name, status, metadata, metrics, parent=None):
     return item
 
 
+def _copy_metadata(metadata, source, mappings):
+    if not isinstance(metadata, dict) or not isinstance(source, dict):
+        return
+    for src_key, dst_key in mappings:
+        value = source.get(src_key)
+        if value not in (None, ""):
+            metadata[dst_key] = value
+
+
 def _rest_collect_optadvisor(thisnode, config, values):
     base_url = _rest_base_url(thisnode, config, values)
     verify = _rest_verify(config, values)
@@ -272,9 +359,18 @@ def _rest_collect_optadvisor(thisnode, config, values):
         server_status = _status_from(server_data)
         metadata = {}
         properties = server_data.get("properties") if isinstance(server_data.get("properties"), dict) else {}
-        for key in ("defaultQueueManager", "brokerDefaultCCSID", "jvmMinHeapSize", "jvmMaxHeapSize"):
-            if properties.get(key) not in (None, ""):
-                metadata[key] = properties.get(key)
+        active = server_data.get("active") if isinstance(server_data.get("active"), dict) else {}
+        _copy_metadata(metadata, properties, (
+            ("defaultQueueManager", "default_queue_manager"),
+            ("brokerDefaultCCSID", "brokerDefaultCCSID"),
+            ("jvmMinHeapSize", "jvmMinHeapSize"),
+            ("jvmMaxHeapSize", "jvmMaxHeapSize"),
+            ("jvmDebugPort", "jvmDebugPort"),
+        ))
+        _copy_metadata(metadata, active, (
+            ("processId", "process_id"),
+            ("monitoring", "monitoring"),
+        ))
         resources.append(_resource(
             "ace_integration_server",
             server_name,
@@ -313,25 +409,46 @@ def _rest_collect_optadvisor(thisnode, config, values):
                     continue
                 flow_name = _safe_text(flow.get("name"))
                 flow_status = _status_from(flow, "unknown")
+                flow_metadata = {"server": server_name, "application": app_name}
+                flow_active = flow.get("active") if isinstance(flow.get("active"), dict) else {}
+                flow_properties = flow.get("properties") if isinstance(flow.get("properties"), dict) else {}
+                _copy_metadata(flow_metadata, flow_active, (
+                    ("threads", "threads"),
+                    ("threadsInUse", "threads_in_use"),
+                    ("threadsDemanded", "threads_demanded"),
+                    ("threadsCapacity", "threads_capacity"),
+                    ("resourceState", "resource_state"),
+                    ("monitoring", "monitoring"),
+                    ("monitoringProfile", "monitoring_profile"),
+                    ("openTelemetryEnabled", "open_telemetry_enabled"),
+                ))
+                _copy_metadata(flow_metadata, flow_properties, (
+                    ("startMode", "start_mode"),
+                    ("additionalInstances", "additional_instances"),
+                    ("maximumRateMsgsPerSec", "maximum_rate_msgs_per_sec"),
+                    ("notificationThresholdMsgsPerSec", "notification_threshold_msgs_per_sec"),
+                    ("processingTimeoutSec", "processing_timeout_sec"),
+                    ("processingTimeoutAction", "processing_timeout_action"),
+                    ("commitCount", "commit_count"),
+                    ("commitInterval", "commit_interval"),
+                    ("coordinatedTransaction", "coordinated_transaction"),
+                    ("wlmPolicy", "wlm_policy"),
+                    ("monitoringProfile", "monitoring_profile"),
+                    ("openTelemetryEnabled", "open_telemetry_enabled"),
+                ))
                 resources.append(_resource(
                     "ace_message_flow",
                     server_name + "/" + app_name + "/" + flow_name,
                     flow_name,
                     flow_status,
-                    {"server": server_name, "application": app_name},
+                    flow_metadata,
                     [common.metric_string("flow_status", flow_status)],
                     server_name,
                 ))
 
     if not resources:
-        resources.append(_resource(
-            "ace_integration_server",
-            node_name,
-            node_name,
-            "connected",
-            {},
-            [common.metric_string("server_status", "connected")],
-        ))
+        classes.Err("ibmace optadvisor REST discovered no integration servers; falling back to Java Integration API")
+        return None
 
     return {"target": target, "resources": resources}
 
@@ -559,7 +676,9 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
 
 
 def resetStat(thisnode, website, webssl, inttoken, stat_data):
-    _, legacy_stat_data = _split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {})
+    optadvisor_config, legacy_stat_data = _split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {})
+    if common.optadvisor_collection_enabled(optadvisor_config):
+        _queue_optadvisor_jvm_stats(thisnode, optadvisor_config, legacy_stat_data)
     common.post_csv_stats(
         "ibmace",
         lambda subtype: "ibmace" + subtype,
