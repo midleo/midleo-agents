@@ -229,11 +229,11 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
         return
 
     classes.Err("ibmiib optadvisor java exit code:" + str(result.returncode))
-    if result.stdout:
-        classes.Err("ibmiib optadvisor Output:" + result.stdout[-common.MAX_LOG_BYTES:])
     if result.stderr:
         classes.Err("ibmiib optadvisor Error:" + result.stderr[-common.MAX_LOG_BYTES:])
     if result.returncode != 0:
+        if result.stdout:
+            classes.Err("ibmiib optadvisor Output:" + result.stdout[-common.MAX_LOG_BYTES:])
         classes.Err("ibmiib optadvisor failed with exit code " + str(result.returncode))
         return
 
