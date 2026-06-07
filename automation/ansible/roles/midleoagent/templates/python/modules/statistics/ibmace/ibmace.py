@@ -256,13 +256,26 @@ def _children(payload, child_key=None):
         return []
     if child_key and isinstance(payload.get("children"), dict):
         child = payload["children"].get(child_key)
-        if isinstance(child, dict) and isinstance(child.get("children"), list):
-            return child["children"]
+        if isinstance(child, dict):
+            children = child.get("children")
+            if isinstance(children, list):
+                return children
+            if isinstance(children, dict):
+                return [value for value in children.values() if isinstance(value, dict)]
     if isinstance(payload.get("children"), list):
         return payload["children"]
     if isinstance(payload.get("children"), dict):
         return [value for value in payload["children"].values() if isinstance(value, dict)]
     return []
+
+
+def _children_reliable(payload, child_key=None):
+    if not isinstance(payload, dict):
+        return False
+    children = payload.get("children")
+    if child_key:
+        return isinstance(children, dict) and child_key in children
+    return "children" in payload or payload.get("hasChildren") is False
 
 
 def _message_flow_children(payload):
@@ -299,6 +312,11 @@ def _status_from(payload, default="connected"):
             if isinstance(running, bool):
                 return "running" if running else "stopped"
     return default
+
+
+def _is_active_flow_status(status):
+    normalized = _safe_text(status).lower()
+    return normalized in ("running", "started", "active", "statestarted")
 
 
 def _resource(resource_type, key, name, status, metadata, metrics, parent=None):
@@ -371,19 +389,15 @@ def _rest_collect_optadvisor(thisnode, config, values):
             ("processId", "process_id"),
             ("monitoring", "monitoring"),
         ))
-        resources.append(_resource(
-            "ace_integration_server",
-            server_name,
-            server_name,
-            server_status,
-            metadata,
-            [common.metric_string("server_status", server_status)],
-        ))
 
         apps = _children(server_data, "applications")
-        if not apps:
+        apps_reliable = _children_reliable(server_data, "applications")
+        if not apps and not apps_reliable:
             apps_payload = _rest_get(base_url, "/apiv2/servers/" + quote(server_name, safe="") + "/applications?depth=2", auth, verify)
+            apps_reliable = _children_reliable(apps_payload)
             apps = _children(apps_payload)
+        flow_resources = []
+        flow_counts_reliable = apps_reliable
         for app in apps:
             if not isinstance(app, dict) or not _safe_text(app.get("name")):
                 continue
@@ -396,14 +410,18 @@ def _rest_collect_optadvisor(thisnode, config, values):
             )
             app_data = app_detail if app_detail else app
             flows = _message_flow_children(app_data)
-            if not flows:
+            flows_reliable = _children_reliable(app_data, "messageflows")
+            if not flows and not flows_reliable:
                 flows_payload = _rest_get(
                     base_url,
                     "/apiv2/servers/" + quote(server_name, safe="") + "/applications/" + quote(app_name, safe="") + "/messageflows?depth=2",
                     auth,
                     verify,
                 )
+                flows_reliable = _children_reliable(flows_payload)
                 flows = _message_flow_children(flows_payload)
+            if not flows_reliable:
+                flow_counts_reliable = False
             for flow in flows:
                 if not isinstance(flow, dict) or not _safe_text(flow.get("name")):
                     continue
@@ -436,7 +454,7 @@ def _rest_collect_optadvisor(thisnode, config, values):
                     ("monitoringProfile", "monitoring_profile"),
                     ("openTelemetryEnabled", "open_telemetry_enabled"),
                 ))
-                resources.append(_resource(
+                flow_resources.append(_resource(
                     "ace_message_flow",
                     server_name + "/" + app_name + "/" + flow_name,
                     flow_name,
@@ -445,6 +463,23 @@ def _rest_collect_optadvisor(thisnode, config, values):
                     [common.metric_string("flow_status", flow_status)],
                     server_name,
                 ))
+
+        server_metrics = [common.metric_string("server_status", server_status)]
+        if flow_counts_reliable:
+            server_metrics.append(common.metric_number("deployed_flow_count", len(flow_resources)))
+            server_metrics.append(common.metric_number(
+                "active_flow_count",
+                sum(1 for flow in flow_resources if _is_active_flow_status(flow.get("status"))),
+            ))
+        resources.append(_resource(
+            "ace_integration_server",
+            server_name,
+            server_name,
+            server_status,
+            metadata,
+            [metric for metric in server_metrics if metric],
+        ))
+        resources.extend(flow_resources)
 
     if not resources:
         classes.Err("ibmace optadvisor REST discovered no integration servers; falling back to Java Integration API")

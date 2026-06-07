@@ -104,6 +104,19 @@ def _java_payload_line(stdout):
     return ""
 
 
+def _normalize_status(value):
+    text = _safe_text(value).lower().replace("-", "_").replace(" ", "_")
+    if "running" in text:
+        return "running"
+    if "shutdown" in text or "shutting_down" in text:
+        return "shutdown"
+    if "admin" in text or "standby" in text:
+        return "admin"
+    if "failed" in text or "critical" in text:
+        return "failed"
+    return "unknown"
+
+
 def _normalize_target(thisnode, java_result, resources):
     target = java_result.get("target", {})
     if not isinstance(target, dict):
@@ -111,15 +124,48 @@ def _normalize_target(thisnode, java_result, resources):
     target = dict(target)
     if not _safe_text(target.get("server_name")):
         target["server_name"] = thisnode
-    status = _safe_text(target.get("status")).lower()
-    if status in ("", "unknown") and resources:
+    status = _normalize_status(target.get("status"))
+    if status == "unknown" and resources:
         resource_statuses = [
-            _safe_text(resource.get("status")).lower()
+            _normalize_status(resource.get("status"))
             for resource in resources
             if isinstance(resource, dict)
         ]
-        target["status"] = "running" if "running" in resource_statuses else "connected"
+        status = "running" if "running" in resource_statuses else "unknown"
+    target["status"] = status
     return target
+
+
+def _normalize_resources(resources, target):
+    target_status = _normalize_status(target.get("status") if isinstance(target, dict) else "")
+    if target_status == "unknown":
+        return resources
+
+    normalized_resources = []
+    for resource in resources:
+        if not isinstance(resource, dict):
+            continue
+        item = dict(resource)
+        if item.get("resource_type") == "weblogic_server":
+            resource_status = _normalize_status(item.get("status"))
+            if resource_status == "unknown":
+                item["status"] = target_status
+            metrics = []
+            has_status_metric = False
+            for metric in item.get("metrics", []):
+                if not isinstance(metric, dict):
+                    continue
+                metric_item = dict(metric)
+                if metric_item.get("key") == "server_status":
+                    has_status_metric = True
+                    if _normalize_status(metric_item.get("value")) == "unknown":
+                        metric_item["value"] = target_status
+                metrics.append(metric_item)
+            if not has_status_metric:
+                metrics.append({"key": "server_status", "value": target_status, "value_type": "string"})
+            item["metrics"] = metrics
+        normalized_resources.append(item)
+    return normalized_resources
 
 
 def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
@@ -144,6 +190,8 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
         classes.Err("weblogic optadvisor returned no resources")
         return None
 
+    target = _normalize_target(thisnode, java_result, resources)
+    resources = _normalize_resources(resources, target)
     node_id = "".join(ch if ch.isalnum() or ch in ("_", "-", ".") else "-" for ch in str(thisnode))[:24]
     return {
         "schema_version": OPTADVISOR_SCHEMA_VERSION,
@@ -158,7 +206,7 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
             "type": "local",
             "execution_host": socket.gethostname(),
         },
-        "target": _normalize_target(thisnode, java_result, resources),
+        "target": target,
         "resources": resources,
     }
 
