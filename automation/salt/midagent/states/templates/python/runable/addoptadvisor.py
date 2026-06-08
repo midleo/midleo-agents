@@ -24,6 +24,18 @@ REMOVED_OPTADVISOR_AUTH_KEYS = {
     "optadvisor_token_expires_at",
     "collector_token",
 }
+IBMMQ_OPTADVISOR_DEFAULTS = {
+    "collection_mode": "summary_plus_topn",
+    "top_n_depth": 25,
+    "top_n_age": 25,
+    "max_queue_details_per_run": 100,
+    "depth_percent_threshold": 70,
+    "oldest_age_threshold_seconds": 1800,
+    "include_patterns": [],
+    "exclude_patterns": ["SYSTEM.*", "AMQ.*", "MQAI.*"],
+    "deep_scan_interval_hours": 24,
+    "collect_system_queues": False,
+}
 
 
 def _arg(index, name):
@@ -69,6 +81,9 @@ def createOptAdvisorJson():
     opt_data[srvtype][appsrv].setdefault("optadvisor_technology", srvtype)
     opt_data[srvtype][appsrv].setdefault("appserver", appsrv)
     opt_data[srvtype][appsrv].setdefault("monitoring_mode", "read_only")
+    if srvtype == "ibmmq":
+        for key, value in IBMMQ_OPTADVISOR_DEFAULTS.items():
+            opt_data[srvtype][appsrv].setdefault(key, value)
     for removed_key in REMOVED_OPTADVISOR_AUTH_KEYS:
         opt_data[srvtype][appsrv].pop(removed_key, None)
 

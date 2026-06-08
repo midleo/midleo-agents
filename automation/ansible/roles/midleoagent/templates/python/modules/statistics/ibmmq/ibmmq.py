@@ -1,4 +1,4 @@
-import json, glob, os, csv, socket, uuid
+import json, glob, os, csv, socket, uuid, fnmatch, time
 from modules.base import classes, file_utils, makerequest
 from modules.statistics import common
 from datetime import datetime, timezone
@@ -17,6 +17,24 @@ OPTADVISOR_SCHEMA_VERSION = "1.0"
 OPTADVISOR_COLLECTOR_NAME = "mq-pymqi-collector"
 OPTADVISOR_COLLECTOR_VERSION = "1.0.0"
 OPTADVISOR_TECHNOLOGY = "ibmmq"
+OPTADVISOR_COLLECTION_MODES = {
+    "summary_only",
+    "summary_plus_topn",
+    "include_list",
+    "deep_scan",
+}
+OPTADVISOR_DEFAULTS = {
+    "collection_mode": "summary_plus_topn",
+    "top_n_depth": 25,
+    "top_n_age": 25,
+    "max_queue_details_per_run": 100,
+    "depth_percent_threshold": 70,
+    "oldest_age_threshold_seconds": 1800,
+    "include_patterns": [],
+    "exclude_patterns": ["SYSTEM.*", "AMQ.*", "MQAI.*"],
+    "deep_scan_interval_hours": 24,
+    "collect_system_queues": False,
+}
 
 
 def qmConn(thisqm):
@@ -50,6 +68,77 @@ def _iso_utc(value):
 
 def _truthy(value):
     return str(value).strip().lower() in ("1", "y", "yes", "true", "on", "enabled")
+
+
+def _int_config(inpdata, key, default, min_value=0, max_value=1000000):
+    try:
+        value = int(inpdata.get(key, default))
+    except (TypeError, ValueError):
+        value = default
+    return max(min_value, min(value, max_value))
+
+
+def _parse_patterns(value):
+    if isinstance(value, list):
+        values = value
+    elif isinstance(value, str):
+        values = value.split(",")
+    else:
+        values = []
+    return [_safe_text(item) for item in values if _safe_text(item)]
+
+
+def _optadvisor_mq_config(inpdata):
+    cfg = {}
+    mode = _safe_text(inpdata.get("collection_mode") or inpdata.get("optadvisor_collection_mode")).lower()
+    if mode not in OPTADVISOR_COLLECTION_MODES:
+        mode = OPTADVISOR_DEFAULTS["collection_mode"]
+    cfg["collection_mode"] = mode
+    cfg["top_n_depth"] = _int_config(inpdata, "top_n_depth", OPTADVISOR_DEFAULTS["top_n_depth"], 0, 250)
+    cfg["top_n_age"] = _int_config(inpdata, "top_n_age", OPTADVISOR_DEFAULTS["top_n_age"], 0, 250)
+    cfg["max_queue_details_per_run"] = _int_config(
+        inpdata,
+        "max_queue_details_per_run",
+        OPTADVISOR_DEFAULTS["max_queue_details_per_run"],
+        1,
+        240,
+    )
+    cfg["depth_percent_threshold"] = _int_config(
+        inpdata,
+        "depth_percent_threshold",
+        OPTADVISOR_DEFAULTS["depth_percent_threshold"],
+        0,
+        100,
+    )
+    cfg["oldest_age_threshold_seconds"] = _int_config(
+        inpdata,
+        "oldest_age_threshold_seconds",
+        OPTADVISOR_DEFAULTS["oldest_age_threshold_seconds"],
+        0,
+        86400 * 30,
+    )
+    cfg["include_patterns"] = _parse_patterns(inpdata.get("include_patterns", OPTADVISOR_DEFAULTS["include_patterns"]))
+    cfg["collect_system_queues"] = _truthy(inpdata.get("collect_system_queues"))
+    raw_exclude_patterns = inpdata.get("exclude_patterns", None)
+    if raw_exclude_patterns is None and cfg["collect_system_queues"]:
+        cfg["exclude_patterns"] = []
+    else:
+        cfg["exclude_patterns"] = _parse_patterns(raw_exclude_patterns if raw_exclude_patterns is not None else OPTADVISOR_DEFAULTS["exclude_patterns"])
+    if not cfg["exclude_patterns"] and not cfg["collect_system_queues"]:
+        cfg["exclude_patterns"] = list(OPTADVISOR_DEFAULTS["exclude_patterns"])
+    cfg["deep_scan_interval_hours"] = _int_config(
+        inpdata,
+        "deep_scan_interval_hours",
+        OPTADVISOR_DEFAULTS["deep_scan_interval_hours"],
+        1,
+        24 * 31,
+    )
+    cfg["force_deep_scan"] = _truthy(
+        inpdata.get("force_deep_scan")
+        or inpdata.get("deep_scan_requested")
+        or inpdata.get("manual_deep_scan")
+    )
+    return cfg
 
 
 def _optadvisor_enabled(inpdata):
@@ -115,10 +204,57 @@ def _optadvisor_log_path(thisqm):
     return os.path.join(os.getcwd(), "logs", "ibmmq_" + str(thisqm) + "_optadvisor.jsonl")
 
 
+def _optadvisor_state_path(thisqm):
+    return os.path.join(os.getcwd(), "logs", "ibmmq_" + str(thisqm) + "_optadvisor_state.json")
+
+
 def _append_optadvisor_payload(thisqm, payload):
     os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
     with open(_optadvisor_log_path(thisqm), "a", encoding="utf-8") as f:
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
+
+
+def _read_optadvisor_state(thisqm):
+    path = _optadvisor_state_path(thisqm)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _write_optadvisor_state(thisqm, data):
+    try:
+        os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
+        with open(_optadvisor_state_path(thisqm), "w", encoding="utf-8") as f:
+            json.dump(data if isinstance(data, dict) else {}, f, separators=(",", ":"), sort_keys=True)
+    except Exception as ex:
+        classes.Err("ibmmq optadvisor state write error:" + str(ex))
+
+
+def _parse_iso_epoch(value):
+    try:
+        text = _safe_text(value).replace("Z", "+00:00")
+        if not text:
+            return 0
+        return datetime.fromisoformat(text).timestamp()
+    except Exception:
+        return 0
+
+
+def _deep_scan_allowed(thisqm, cfg):
+    if cfg.get("collection_mode") != "deep_scan":
+        return False, ""
+    state = _read_optadvisor_state(thisqm)
+    last = _safe_text(state.get("last_deep_scan_at"))
+    if cfg.get("force_deep_scan"):
+        return True, last
+    last_epoch = _parse_iso_epoch(last)
+    if last_epoch <= 0:
+        return True, last
+    interval_seconds = int(cfg.get("deep_scan_interval_hours") or 24) * 3600
+    return (time.time() - last_epoch) >= interval_seconds, last
 
 
 def _get_server_id(inpdata, thisqm):
@@ -178,6 +314,12 @@ def qStat(thisqm, q, queues):
                 queues[qname]["curdepth"] = queue_info[pymqi.CMQC.MQIA_CURRENT_Q_DEPTH]
                 queues[qname]["maxdepth"] = queue_info[pymqi.CMQC.MQIA_MAX_Q_DEPTH]
                 queues[qname]["percfull"] = depthperc(queue_info)
+                queues[qname]["qtype"] = "local"
+                usage = _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_USAGE", None))
+                if usage is not None:
+                    queues[qname]["usage"] = usage
+                    if usage == getattr(pymqi.CMQC, "MQUS_TRANSMISSION", -999):
+                        queues[qname]["qtype"] = "transmission"
                 queues[qname]["backthres"] = queue_info[
                     pymqi.CMQC.MQIA_BACKOUT_THRESHOLD
                 ]
@@ -233,37 +375,29 @@ def qStatInfo(thisqm, q, queues, include_empty=False):
             if qname not in queues:
                 queues[qname] = {}
             if qname:
-                queues[qname]["opincount"] = queue_info[
-                    pymqi.CMQC.MQIA_OPEN_INPUT_COUNT
-                ]
-                queues[qname]["opoutcount"] = queue_info[
-                    pymqi.CMQC.MQIA_OPEN_OUTPUT_COUNT
-                ]
-                queues[qname]["uncmess"] = queue_info[
-                    pymqi.CMQCFC.MQIACF_UNCOMMITTED_MSGS
-                ]
-                queues[qname]["oldmessage"] = queue_info[
-                    pymqi.CMQCFC.MQIACF_OLDEST_MSG_AGE
-                ]
-                queues[qname]["lastget"] = (
-                    queue_info[pymqi.CMQCFC.MQCACF_LAST_GET_DATE]
-                    .decode("utf-8")
-                    .strip()
-                    + " "
-                    + queue_info[pymqi.CMQCFC.MQCACF_LAST_GET_TIME]
-                    .decode("utf-8")
-                    .strip()
-                )
-                queues[qname]["lastput"] = (
-                    queue_info[pymqi.CMQCFC.MQCACF_LAST_PUT_DATE]
-                    .decode("utf-8")
-                    .strip()
-                    + " "
-                    + queue_info[pymqi.CMQCFC.MQCACF_LAST_PUT_TIME]
-                    .decode("utf-8")
-                    .strip()
-                )
+                op_in = _pcf_get(queue_info, pymqi.CMQC.MQIA_OPEN_INPUT_COUNT)
+                op_out = _pcf_get(queue_info, pymqi.CMQC.MQIA_OPEN_OUTPUT_COUNT)
+                uncommitted = _pcf_get(queue_info, pymqi.CMQCFC.MQIACF_UNCOMMITTED_MSGS)
+                oldest = _pcf_get(queue_info, pymqi.CMQCFC.MQIACF_OLDEST_MSG_AGE)
+                if op_in is not None:
+                    queues[qname]["opincount"] = op_in
+                if op_out is not None:
+                    queues[qname]["opoutcount"] = op_out
+                if uncommitted is not None:
+                    queues[qname]["uncmess"] = uncommitted
+                if oldest is not None:
+                    queues[qname]["oldmessage"] = oldest
+                last_get_date = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_GET_DATE))
+                last_get_time = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_GET_TIME))
+                last_put_date = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_PUT_DATE))
+                last_put_time = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_PUT_TIME))
+                if last_get_date or last_get_time:
+                    queues[qname]["lastget"] = (last_get_date + " " + last_get_time).strip()
+                if last_put_date or last_put_time:
+                    queues[qname]["lastput"] = (last_put_date + " " + last_put_time).strip()
     except MQ_ERROR as ex:
+        classes.Err("Exception:" + str(ex))
+    except Exception as ex:
         classes.Err("Exception:" + str(ex))
     return queues
 
@@ -348,13 +482,17 @@ def chStat(thisqm, ch, chls):
                 chls[chlname]["bytes_sent"] = chl_info[pymqi.CMQCFC.MQIACH_BYTES_SENT]
                 chls[chlname]["bytes_received"] = chl_info[pymqi.CMQCFC.MQIACH_BYTES_RECEIVED]
                 chls[chlname]["buff_sent"] = chl_info[pymqi.CMQCFC.MQIACH_BUFFERS_SENT]
-                chls[chlname]["buff_received"] = chl_info[
-                    pymqi.CMQCFC.MQIACH_BUFFERS_RCVD
-                ]
-                chls[chlname]["indoubt_status"] = chl_info[
-                    pymqi.CMQCFC.MQIACH_INDOUBT_STATUS
-                ]
+                chls[chlname]["buff_received"] = _pcf_get(
+                    chl_info,
+                    getattr(pymqi.CMQCFC, "MQIACH_BUFFERS_RCVD", getattr(pymqi.CMQCFC, "MQIACH_BUFFERS_RECEIVED", None)),
+                )
+                chls[chlname]["indoubt_status"] = _pcf_get(
+                    chl_info,
+                    pymqi.CMQCFC.MQIACH_INDOUBT_STATUS,
+                )
     except MQ_ERROR as ex:
+        classes.Err("Exception:" + str(ex))
+    except Exception as ex:
         classes.Err("Exception:" + str(ex))
     return chls
 
@@ -416,7 +554,257 @@ def listenerStat(thisqm, listener_name, listeners):
     return listeners
 
 
-def _queue_resource(qname, qdata, qmgr_info):
+def _is_system_queue(qname):
+    upper = _safe_text(qname).upper()
+    return upper.startswith("SYSTEM.") or upper.startswith("AMQ.") or upper.startswith("MQAI.")
+
+
+def _matches_any(name, patterns):
+    qname = _safe_text(name)
+    return any(fnmatch.fnmatchcase(qname.upper(), _safe_text(pattern).upper()) for pattern in patterns)
+
+
+def _depth_value(qdata):
+    try:
+        return float(qdata.get("curdepth") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _age_value(qdata):
+    try:
+        return float(qdata.get("oldmessage") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _open_input(qdata):
+    try:
+        return int(qdata.get("opincount") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _open_output(qdata):
+    try:
+        return int(qdata.get("opoutcount") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _depth_percent(qdata):
+    try:
+        return float(qdata.get("percfull") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _selection_reason_counts(selected):
+    counts = {}
+    for qdata in selected.values():
+        for reason in qdata.get("_selection_reasons", []):
+            counts[reason] = counts.get(reason, 0) + 1
+    return ",".join(key + "=" + str(counts[key]) for key in sorted(counts))
+
+
+def _queue_type(qdata):
+    text = _safe_text(qdata.get("qtype"))
+    return text if text else "local"
+
+
+def _select_detail_queues(thisqm, queues, qmgr_info, cfg):
+    mode = cfg["collection_mode"]
+    selected = {}
+    details_allowed = mode in ("summary_plus_topn", "include_list", "deep_scan")
+    deep_allowed, last_deep_scan = _deep_scan_allowed(thisqm, cfg)
+    effective_mode = mode
+    if mode == "deep_scan" and not deep_allowed:
+        details_allowed = False
+        effective_mode = "summary_only"
+
+    if not details_allowed:
+        return selected, {
+            "effective_mode": effective_mode,
+            "last_deep_scan_at": last_deep_scan,
+            "deep_scan_due": bool(deep_allowed),
+        }
+
+    details_limit = max(0, int(cfg.get("max_queue_details_per_run") or 0))
+    dlq = _safe_text(qmgr_info.get("dead_letter_queue"))
+    candidates = {}
+    for qname, qdata in sorted((queues or {}).items()):
+        qname = _safe_text(qname)
+        if not qname:
+            continue
+        system_object = _is_system_queue(qname)
+        if system_object and not cfg.get("collect_system_queues"):
+            continue
+        if cfg.get("exclude_patterns") and _matches_any(qname, cfg["exclude_patterns"]):
+            continue
+        candidates[qname] = qdata or {}
+
+    def mark(name, reason):
+        if name not in candidates:
+            return
+        if name not in selected:
+            selected[name] = dict(candidates[name])
+            selected[name]["_selection_reasons"] = []
+        if reason not in selected[name]["_selection_reasons"]:
+            selected[name]["_selection_reasons"].append(reason)
+
+    if mode == "deep_scan" and deep_allowed:
+        for qname in candidates:
+            mark(qname, "deep_scan")
+
+    if mode == "include_list":
+        for qname in candidates:
+            if _matches_any(qname, cfg.get("include_patterns", [])):
+                mark(qname, "include_pattern")
+
+    if mode == "summary_plus_topn":
+        for qname in candidates:
+            qdata = candidates[qname]
+            if _depth_percent(qdata) >= float(cfg["depth_percent_threshold"]):
+                mark(qname, "depth_percent_threshold")
+            if _depth_value(qdata) > 0 and _open_input(qdata) == 0:
+                mark(qname, "backlog_no_consumers")
+            if _age_value(qdata) >= float(cfg["oldest_age_threshold_seconds"]):
+                mark(qname, "oldest_age_threshold")
+            if dlq and qname == dlq and _depth_value(qdata) > 0:
+                mark(qname, "dead_letter_queue_depth")
+
+        by_depth = sorted(candidates.items(), key=lambda item: _depth_value(item[1]), reverse=True)
+        for qname, qdata in by_depth[: int(cfg["top_n_depth"] or 0)]:
+            if _depth_value(qdata) > 0:
+                mark(qname, "top_depth")
+
+        by_age = sorted(candidates.items(), key=lambda item: _age_value(item[1]), reverse=True)
+        for qname, qdata in by_age[: int(cfg["top_n_age"] or 0)]:
+            if _age_value(qdata) > 0:
+                mark(qname, "top_age")
+
+    if details_limit and len(selected) > details_limit:
+        selected = dict(sorted(
+            selected.items(),
+            key=lambda item: (
+                _depth_percent(item[1]),
+                _depth_value(item[1]),
+                _age_value(item[1]),
+                item[0],
+            ),
+            reverse=True,
+        )[:details_limit])
+
+    if mode == "deep_scan" and deep_allowed:
+        state = _read_optadvisor_state(thisqm)
+        state["last_deep_scan_at"] = _iso_utc()
+        _write_optadvisor_state(thisqm, state)
+        last_deep_scan = state["last_deep_scan_at"]
+
+    return selected, {
+        "effective_mode": effective_mode,
+        "last_deep_scan_at": last_deep_scan,
+        "deep_scan_due": bool(deep_allowed),
+    }
+
+
+def _qmgr_resource(thisqm, qmgr_info, queues, channels, listeners, selected_queues, cfg, selection_state):
+    dlq = _safe_text(qmgr_info.get("dead_letter_queue"))
+    app_queues = 0
+    system_queues = 0
+    transmission_queues = 0
+    total_depth = 0.0
+    max_depth_percent = 0.0
+    queues_with_depth = 0
+    queues_near_full = 0
+    queues_with_no_consumers = 0
+    queues_with_no_producers = 0
+    oldest_age_max = 0.0
+    dlq_depth = 0.0
+
+    for qname, qdata in sorted((queues or {}).items()):
+        qname = _safe_text(qname)
+        if not qname:
+            continue
+        if _is_system_queue(qname):
+            system_queues += 1
+        else:
+            app_queues += 1
+        if _queue_type(qdata) == "transmission":
+            transmission_queues += 1
+        depth = _depth_value(qdata)
+        depth_percent = _depth_percent(qdata)
+        total_depth += depth
+        max_depth_percent = max(max_depth_percent, depth_percent)
+        if depth > 0:
+            queues_with_depth += 1
+            if _open_input(qdata) == 0:
+                queues_with_no_consumers += 1
+            if _open_output(qdata) == 0:
+                queues_with_no_producers += 1
+        if depth_percent >= float(cfg["depth_percent_threshold"]):
+            queues_near_full += 1
+        oldest_age_max = max(oldest_age_max, _age_value(qdata))
+        if dlq and qname == dlq:
+            dlq_depth = depth
+
+    running_channels = sum(1 for ch in (channels or {}).values() if _safe_text(ch.get("status")).lower() == "running")
+    stopped_channels = sum(1 for ch in (channels or {}).values() if _safe_text(ch.get("status")).lower() in ("stopped", "inactive", "retrying", "paused"))
+    running_listeners = sum(1 for item in (listeners or {}).values() if _safe_text(item.get("status")).lower() == "running")
+    stopped_listeners = sum(1 for item in (listeners or {}).values() if _safe_text(item.get("status")).lower() in ("stopped", "stopping", "retrying"))
+
+    metrics = []
+    _add_metric(metrics, _string_metric("qmgr_status", qmgr_info.get("status") or "running"))
+    _add_metric(metrics, _number_metric("total_queue_count", len(queues or {})))
+    _add_metric(metrics, _number_metric("local_queue_count", len(queues or {})))
+    _add_metric(metrics, _number_metric("application_queue_count", app_queues))
+    _add_metric(metrics, _number_metric("system_queue_count", system_queues))
+    _add_metric(metrics, _number_metric("transmission_queue_count", transmission_queues))
+    _add_metric(metrics, _number_metric("total_current_depth", total_depth))
+    _add_metric(metrics, _number_metric("max_queue_depth_percent", max_depth_percent))
+    _add_metric(metrics, _number_metric("queues_with_depth_count", queues_with_depth))
+    _add_metric(metrics, _number_metric("queues_near_full_count", queues_near_full))
+    _add_metric(metrics, _number_metric("queues_with_no_consumers_count", queues_with_no_consumers))
+    _add_metric(metrics, _number_metric("queues_with_no_producers_count", queues_with_no_producers))
+    _add_metric(metrics, _number_metric("oldest_message_age_max", oldest_age_max))
+    _add_metric(metrics, _number_metric("dead_letter_queue_depth", dlq_depth))
+    _add_metric(metrics, _number_metric("running_channel_count", running_channels))
+    _add_metric(metrics, _number_metric("stopped_channel_count", stopped_channels))
+    _add_metric(metrics, _number_metric("listener_running_count", running_listeners))
+    _add_metric(metrics, _number_metric("listener_stopped_count", stopped_listeners))
+
+    queue_details_emitted = len(selected_queues or {})
+    queues_scanned = len(queues or {})
+    metadata = {
+        "collection_mode": cfg["collection_mode"],
+        "effective_collection_mode": selection_state.get("effective_mode") or cfg["collection_mode"],
+        "queue_details_emitted": queue_details_emitted,
+        "queues_scanned": queues_scanned,
+        "queues_suppressed": max(0, queues_scanned - queue_details_emitted),
+        "selection_reason_counts": _selection_reason_counts(selected_queues or {}),
+        "top_n_depth": cfg["top_n_depth"],
+        "top_n_age": cfg["top_n_age"],
+        "max_queue_details_per_run": cfg["max_queue_details_per_run"],
+        "depth_percent_threshold": cfg["depth_percent_threshold"],
+        "oldest_age_threshold_seconds": cfg["oldest_age_threshold_seconds"],
+        "collect_system_queues": bool(cfg["collect_system_queues"]),
+        "deep_scan_interval_hours": cfg["deep_scan_interval_hours"],
+    }
+    if selection_state.get("last_deep_scan_at"):
+        metadata["last_deep_scan_at"] = selection_state["last_deep_scan_at"]
+
+    return {
+        "resource_type": "mq_qmgr",
+        "technical_key": str(thisqm),
+        "name": str(thisqm),
+        "status": _safe_text(qmgr_info.get("status")) or "running",
+        "parent_technical_key": None,
+        "metadata": metadata,
+        "metrics": metrics,
+    }
+
+
+def _queue_resource(qname, qdata, qmgr_info, selection_reasons=None):
     metrics = []
     _add_metric(metrics, _number_metric("current_depth", qdata.get("curdepth")))
     _add_metric(metrics, _number_metric("max_depth", qdata.get("maxdepth")))
@@ -426,6 +814,8 @@ def _queue_resource(qname, qdata, qmgr_info):
     _add_metric(metrics, _number_metric("oldest_message_age_seconds", qdata.get("oldmessage")))
     _add_metric(metrics, _boolean_metric("inhibit_get", qdata.get("inhibit_get")))
     _add_metric(metrics, _boolean_metric("inhibit_put", qdata.get("inhibit_put")))
+    _add_metric(metrics, _number_metric("consumer_count", qdata.get("opincount")))
+    _add_metric(metrics, _number_metric("producer_count", qdata.get("opoutcount")))
 
     dlq = _safe_text(qmgr_info.get("dead_letter_queue"))
     return {
@@ -435,8 +825,10 @@ def _queue_resource(qname, qdata, qmgr_info):
         "status": "running",
         "parent_technical_key": None,
         "metadata": {
-            "queue_type": "local",
+            "queue_type": _queue_type(qdata),
             "is_dead_letter_queue": bool(dlq and qname == dlq),
+            "system_object": _is_system_queue(qname),
+            "selection_reason": ",".join(selection_reasons or []),
         },
         "metrics": metrics,
     }
@@ -493,19 +885,29 @@ def buildOptAdvisorPayload(
         classes.Err("ibmmq optadvisor disabled for missing server_id")
         return None
 
+    mq_cfg = _optadvisor_mq_config(inpdata)
+    selected_queues, selection_state = _select_detail_queues(thisqm, queues or {}, qmgr_info or {}, mq_cfg)
     resources = []
-    for qname, qdata in sorted((queues or {}).items()):
-        resource = _queue_resource(_safe_text(qname), qdata or {}, qmgr_info or {})
-        if resource["metrics"]:
-            resources.append(resource)
+    qmgr_resource = _qmgr_resource(
+        thisqm,
+        qmgr_info or {"status": "running"},
+        queues or {},
+        channels or {},
+        listeners or {},
+        selected_queues,
+        mq_cfg,
+        selection_state,
+    )
+    if qmgr_resource["metrics"]:
+        resources.append(qmgr_resource)
 
-    for chname, chdata in sorted((channels or {}).items()):
-        resource = _channel_resource(_safe_text(chname), chdata or {})
-        if resource["metrics"]:
-            resources.append(resource)
-
-    for listener_name, listener_data in sorted((listeners or {}).items()):
-        resource = _listener_resource(_safe_text(listener_name), listener_data or {})
+    for qname, qdata in sorted((selected_queues or {}).items()):
+        resource = _queue_resource(
+            _safe_text(qname),
+            qdata or {},
+            qmgr_info or {},
+            (qdata or {}).get("_selection_reasons", []),
+        )
         if resource["metrics"]:
             resources.append(resource)
 
@@ -623,6 +1025,25 @@ def getStat(thisqm, inpdata):
         if optadvisor_collect:
             for listener_name in listener_names:
                 opt_listeners = listenerStat(qmgr, listener_name, opt_listeners)
+
+            scanned_queues = {}
+            scanned_queues = qStat(qmgr, "*", scanned_queues)
+            scanned_queues = qStatInfo(qmgr, "*", scanned_queues, True)
+            if scanned_queues:
+                opt_queues = scanned_queues
+
+            try:
+                scanned_channels = chStat(qmgr, "*", {})
+                if scanned_channels:
+                    opt_channels = scanned_channels
+            except Exception as ex:
+                classes.Err("ibmmq optadvisor channel summary error:" + str(ex))
+
+            try:
+                if not opt_listeners:
+                    opt_listeners = listenerStat(qmgr, "*", opt_listeners)
+            except Exception as ex:
+                classes.Err("ibmmq optadvisor listener summary error:" + str(ex))
 
             payload = buildOptAdvisorPayload(
                 thisqm,
