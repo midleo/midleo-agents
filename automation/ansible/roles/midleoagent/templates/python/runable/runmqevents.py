@@ -60,7 +60,6 @@ try:
     config_data = configs.getcfgData()
     website = config_data["MWADMIN"]
     webssl = config_data["SSLENABLED"]
-    inttoken = config_data["INTTOKEN"]
     uid = config_data["SRVUID"]
 
     for srvtype, srvinfo in avl_data.items():
@@ -88,8 +87,7 @@ try:
                         "srvtype": srvtype,
                         "alerttime": event.get("eventCreation", {}).get("timeStamp", ""),
                         "message": event.get("eventReason", {}).get("name", "") + event_table,
-                        "inttoken": inttoken,
-                        "object": event_data.get("baseObjectName", ""),
+                                    "object": event_data.get("baseObjectName", ""),
                     }
                     makerequest.postMonAl(webssl, website, json.dumps(ret))
             except subprocess.TimeoutExpired:

@@ -32,7 +32,6 @@ try:
     config_data = configs.getcfgData()
     website = config_data["MWADMIN"]
     webssl = config_data["SSLENABLED"]
-    inttoken = config_data["INTTOKEN"]
     uid = config_data["SRVUID"]
 
     mdl_dir = os.path.join(parentdir, "extchecks")
@@ -80,8 +79,7 @@ try:
 
         if data:
             payload = {
-                "inttoken": inttoken,
-                "srvid": uid,
+                    "srvid": uid,
                 "data": data,
             }
             makerequest.postMonCheck(webssl, website, json.dumps(payload))

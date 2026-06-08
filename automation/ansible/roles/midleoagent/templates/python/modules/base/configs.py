@@ -2,9 +2,11 @@ import json
 import os
 import tempfile
 import uuid
+from datetime import datetime, timezone
 
 CONFIG_DIR = os.path.join(os.getcwd(), "config")
 CRONJOBS_FILE = os.path.join(CONFIG_DIR, "cronjobs.json")
+AGENT_IDENTITY_FILE = os.path.join(CONFIG_DIR, "agent.identity")
 
 MON_FILE = os.path.join(CONFIG_DIR, "confapplstat.json")
 OPTADVISOR_FILE = os.path.join(CONFIG_DIR, "confoptadvisor.json")
@@ -78,6 +80,64 @@ def _write_json_atomic(path, data):
     finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
+
+
+def _write_identity_atomic(data):
+    _ensure_dir()
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=".tmp_identity_" + str(uuid.uuid4()) + "_", dir=os.path.dirname(AGENT_IDENTITY_FILE)
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
+            json.dump(data, tmp_file, ensure_ascii=False, indent=2, sort_keys=True)
+            tmp_file.write("\n")
+        os.replace(tmp_path, AGENT_IDENTITY_FILE)
+        try:
+            os.chmod(AGENT_IDENTITY_FILE, 0o600)
+        except Exception:
+            pass
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+
+def getAgentIdentity():
+    env_agent_id = os.environ.get("MIDLEO_AGENT_ID", "").strip()
+    env_agent_token = os.environ.get("MIDLEO_AGENT_TOKEN", "").strip()
+    if env_agent_id and env_agent_token:
+        return {"agent_id": env_agent_id, "agent_token": env_agent_token, "source": "env"}
+    data = _read_json_file(AGENT_IDENTITY_FILE, {})
+    if data.get("agent_id") and data.get("agent_token"):
+        data["source"] = "file"
+        return data
+    return {}
+
+
+def getInstallationId():
+    env_installation_id = (
+        os.environ.get("MIDLEO_AGENT_INSTALLATION_ID", "")
+        or os.environ.get("MIDLEO_INSTALLATION_ID", "")
+    ).strip()
+    if env_installation_id:
+        return env_installation_id
+    data = _read_json_file(AGENT_IDENTITY_FILE, {})
+    if data.get("installation_id"):
+        return str(data["installation_id"])
+    data["installation_id"] = str(uuid.uuid4())
+    data["created_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    _write_identity_atomic(data)
+    return data["installation_id"]
+
+
+def saveAgentIdentity(agent_id, agent_token, extra=None):
+    if not agent_id or not agent_token:
+        return
+    data = _read_json_file(AGENT_IDENTITY_FILE, {})
+    data.update(extra or {})
+    data["agent_id"] = str(agent_id)
+    data["agent_token"] = str(agent_token)
+    data["updated_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    _write_identity_atomic(data)
 
 
 def _has_items(data):

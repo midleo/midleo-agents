@@ -30,7 +30,7 @@ def _credentials(item):
     return cred
 
 
-def _send_offline_alert(webssl, website, uid, inttoken, srvtype, appsrv, item):
+def _send_offline_alert(webssl, website, uid, srvtype, appsrv, item):
     if "monid" not in item:
         return
     req = {
@@ -41,7 +41,6 @@ def _send_offline_alert(webssl, website, uid, inttoken, srvtype, appsrv, item):
         "srvtype": srvtype,
         "message": "Server not available",
         "alerttime": current_time,
-        "inttoken": inttoken,
     }
     makerequest.postMonAl(webssl, website, json.dumps(req))
 
@@ -51,7 +50,6 @@ try:
     config_data = configs.getcfgData()
     website = config_data["MWADMIN"]
     webssl = config_data["SSLENABLED"]
-    inttoken = config_data["INTTOKEN"]
     uid = config_data["SRVUID"]
 
     for srvtype, srvinfo in avl_data.items():
@@ -84,7 +82,7 @@ try:
                     classes.WriteData("online", "avl_" + srvtype + "_" + appsrv + ".csv")
                 else:
                     classes.WriteData("offline", "avl_" + srvtype + "_" + appsrv + ".csv")
-                    _send_offline_alert(webssl, website, uid, inttoken, srvtype, appsrv, item)
+                    _send_offline_alert(webssl, website, uid, srvtype, appsrv, item)
             except subprocess.TimeoutExpired:
                 classes.Err("avlCheck timed out:" + str(srvtype) + "/" + str(appsrv))
 

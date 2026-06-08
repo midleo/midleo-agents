@@ -14,7 +14,6 @@ def create():
     try:
         config_data = configs.getcfgData()
         uid = config_data['SRVUID']
-        inttoken = config_data['INTTOKEN']
 
         if len(sys.argv) < 2:
             return {"error": "usage: setmaintenance.py on|off [comment]"}
@@ -27,7 +26,6 @@ def create():
 
         return {
             "uid": uid,
-            "inttoken": inttoken,
             "srvmaintenance": 1 if state == "on" else 0,
             "comment": comment
         }

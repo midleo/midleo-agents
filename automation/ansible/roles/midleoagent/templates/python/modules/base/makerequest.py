@@ -1,5 +1,8 @@
 import base64
 import json
+import socket
+import time
+import uuid
 from urllib.parse import quote
 
 import requests
@@ -9,6 +12,7 @@ from modules.base import classes, configs
 
 DEFAULT_TIMEOUT_SECONDS = 20
 MAX_LOG_BODY_BYTES = 2048
+_REGISTER_ATTEMPTED = False
 
 
 def _cfg():
@@ -38,6 +42,17 @@ def _headers():
     }
 
 
+def _with_agent_headers(headers):
+    merged = dict(headers or {})
+    identity = configs.getAgentIdentity()
+    if identity.get("agent_id") and identity.get("agent_token"):
+        merged["X-Midleo-Agent-Id"] = str(identity["agent_id"])
+        merged["X-Midleo-Agent-Token"] = str(identity["agent_token"])
+        merged["X-Midleo-Timestamp"] = str(int(time.time()))
+        merged["X-Midleo-Nonce"] = uuid.uuid4().hex
+    return merged
+
+
 def _base_url(webssl, website):
     website = str(website or "").strip().rstrip("/")
     if website.startswith("http://") or website.startswith("https://"):
@@ -47,11 +62,103 @@ def _base_url(webssl, website):
     return scheme + "://" + website
 
 
+def _drop_inttoken(value):
+    if isinstance(value, dict):
+        cleaned = dict(value)
+        cleaned.pop("inttoken", None)
+        return cleaned
+    if isinstance(value, list):
+        return [_drop_inttoken(item) for item in value]
+    return value
+
+
+def _strip_legacy_auth_payload(data):
+    if data is None:
+        return None
+    if isinstance(data, (dict, list)):
+        return _drop_inttoken(data)
+    if isinstance(data, bytes):
+        raw = data.decode("utf-8", errors="replace")
+    elif isinstance(data, str):
+        raw = data
+    else:
+        return data
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return data
+    cleaned = _drop_inttoken(parsed)
+    return json.dumps(cleaned)
+
+
+def _register_agent_identity(webssl, website):
+    global _REGISTER_ATTEMPTED
+    if configs.getAgentIdentity():
+        return True
+    if _REGISTER_ATTEMPTED:
+        return False
+    _REGISTER_ATTEMPTED = True
+    cfg = configs.getcfgData() or {}
+    inttoken = str(cfg.get("INTTOKEN", "")).strip()
+    if not inttoken:
+        return False
+    payload = {
+        "inttoken": inttoken,
+        "hostname": socket.gethostname(),
+        "serverid": str(cfg.get("SRVUID", "")).strip(),
+        "appsrv_id": str(cfg.get("APPSRV_ID", "")).strip(),
+        "environment": str(cfg.get("ENVIRONMENT", cfg.get("ENV", ""))).strip(),
+        "agent_name": str(cfg.get("AGENT_NAME", socket.gethostname())).strip(),
+        "agent_version": AGENT_VER,
+        "agent_type": str(cfg.get("AGENT_TYPE", "python")).strip() or "python",
+        "installation_id": configs.getInstallationId(),
+    }
+    res = _request(
+        "post",
+        webssl,
+        website,
+        "/pubapi/registeragent",
+        json.dumps(payload),
+        headers=_headers(),
+        sensitive_response=True,
+        skip_agent_enrollment=True,
+    )
+    if res is None or res.status_code != 200:
+        return False
+    try:
+        body = res.json()
+    except Exception:
+        return False
+    agent_id = body.get("agent_id")
+    agent_token = body.get("agent_token")
+    if agent_id and agent_token:
+        configs.saveAgentIdentity(
+            agent_id,
+            agent_token,
+            {
+                "installation_id": payload["installation_id"],
+                "enrollment_mode": body.get("enrollment_mode", "auto"),
+                "status": body.get("status", "active"),
+            },
+        )
+        classes.Err("Agent identity saved for " + str(agent_id))
+        return True
+    return False
+
+
 def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
     options = _cfg()
     url = _base_url(webssl, website) + path
     verify = options["verify"]
     sensitive_response = bool(kwargs.pop("sensitive_response", False))
+    skip_agent_enrollment = bool(kwargs.pop("skip_agent_enrollment", False))
+    request_headers = headers or _headers()
+    if path.startswith("/pubapi/") and not skip_agent_enrollment:
+        if not _register_agent_identity(webssl, website):
+            classes.Err("Agent identity is missing; request not sent for " + path)
+            return None
+        request_headers = _with_agent_headers(request_headers)
+        data = _strip_legacy_auth_payload(data)
 
     if not verify:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -61,7 +168,7 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
             method,
             url,
             data=data,
-            headers=headers or _headers(),
+            headers=request_headers,
             verify=verify,
             timeout=options["timeout"],
             **kwargs,
@@ -110,8 +217,6 @@ def postibmmqCHData(webssl, website, qm, data):
 def postOptAdvisorTelemetry(webssl, website, data, inttoken=None):
     headers = _headers()
     payload = dict(data or {})
-    if inttoken:
-        payload["inttoken"] = str(inttoken)
     return _request(
         "post",
         webssl,

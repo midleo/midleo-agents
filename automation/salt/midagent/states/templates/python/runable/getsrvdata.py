@@ -158,10 +158,10 @@ def create():
     try:
         config_data = _safe_get_config()
         uid = config_data["SRVUID"]
+        inttoken = config_data["INTTOKEN"]
         groupid = config_data["GROUPID"]
         updint = int(config_data["UPDINT"])
-        inttoken = config_data["INTTOKEN"]
-
+    
         certs = _safe_cert_check(uid)
         jobsdata = _safe_jobsdata()
 

@@ -24,7 +24,6 @@ try:
     config_data = configs.getcfgData()
     website = config_data["MWADMIN"]
     webssl = config_data["SSLENABLED"]
-    inttoken = config_data["INTTOKEN"]
     uid = config_data["SRVUID"]
     if len(avl_data) > 0:
         for srvtype, srvinfo in avl_data.items():
@@ -37,7 +36,6 @@ try:
                             item["appsrvid"] if "appsrvid" in item else "none"
                         )
                         ret["srvid"] = uid
-                        ret["inttoken"] = inttoken
                         ret["srvtype"] = srvtype
                         ret["thismonth"] = YM
                         ret["thisdate"] = WD

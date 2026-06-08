@@ -48,7 +48,6 @@ try:
     config_data = configs.getcfgData()
     website = config_data["MWADMIN"]
     webssl = config_data["SSLENABLED"]
-    inttoken = config_data["INTTOKEN"]
 
     for qmgr in track_data.keys():
         try:
@@ -69,8 +68,7 @@ try:
                             "channelName": channel_name,
                             "connectionName": connection_name,
                             "trackdata": act,
-                            "inttoken": inttoken,
-                        }
+                                        }
                         makerequest.postTrackData(webssl, website, json.dumps(ret))
         except subprocess.TimeoutExpired:
             classes.Err("amqsevt timed out for " + str(qmgr))
