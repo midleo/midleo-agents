@@ -24,7 +24,7 @@ try:
     config_data = configs.getcfgData()
     website = config_data["MWADMIN"]
     webssl = config_data["SSLENABLED"]
-    _legacy_token = config_data["_legacy_token"]
+    _legacy_token = config_data.get("_legacy_token", "")
 
     for srv_type, servers in opt_data.items():
         if not isinstance(servers, dict) or not MODULE_NAME_RE.fullmatch(str(srv_type)):
