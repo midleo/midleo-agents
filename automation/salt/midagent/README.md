@@ -10,11 +10,11 @@ Create `midagent.conf`:
 midleo_website_base_url="MIDLEO_BASE_URL"
 midleo_website_base_url_ssl="y"
 group_id="MIDLEO_GROUP_ID"
-int_token="MIDLEO_INTERNAL_TOKEN"
+agent_bootstrap_token="MIDLEO_AGENT_BOOTSTRAP_TOKEN"
 update_interval_minutes="5"
 install_pymqi="false"
 
-pillar='{"INPUT":{"midleo_website_base_url":"'$midleo_website_base_url'","midleo_website_base_url_ssl":"'$midleo_website_base_url_ssl'","group_id":"'$group_id'","int_token":"'$int_token'","update_interval_minutes":"'$update_interval_minutes'","install_pymqi":"'$install_pymqi'"}}'
+pillar='{"INPUT":{"midleo_website_base_url":"'$midleo_website_base_url'","midleo_website_base_url_ssl":"'$midleo_website_base_url_ssl'","group_id":"'$group_id'","agent_bootstrap_token":"'$agent_bootstrap_token'","update_interval_minutes":"'$update_interval_minutes'","install_pymqi":"'$install_pymqi'"}}'
 ```
 
 Apply the state:
@@ -31,7 +31,7 @@ Runtime input:
 - `INPUT:midleo_website_base_url`: Midleo Core host or base URL.
 - `INPUT:midleo_website_base_url_ssl`: `y` for HTTPS, `n` for HTTP.
 - `INPUT:group_id`: Midleo Core group ID.
-- `INPUT:int_token`: integration token used in payloads.
+- `INPUT:agent_bootstrap_token`: bootstrap token used only for first agent registration. Runtime requests use the per-agent identity saved during registration.
 - `INPUT:update_interval_minutes`: server inventory update interval.
 - `INPUT:install_pymqi`: optional, install `pymqi` on IBM MQ hosts only.
 

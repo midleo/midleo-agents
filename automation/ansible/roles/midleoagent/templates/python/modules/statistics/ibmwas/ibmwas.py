@@ -237,15 +237,15 @@ def getStat(thisqm, inpdata):
         classes.Err("Error in ibmwas statistics:" + str(err))
 
 
-def resetStat(thisnode, website, webssl, inttoken, stat_data):
+def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = common.split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {}, OPTADVISOR_CONFIG_KEYS)
     common.post_csv_stats(
         "ibmwas",
         "ibmwas",
         website,
         webssl,
-        inttoken,
+        _legacy_token,
         legacy_stat_data,
         lambda logdir, subtype: logdir + "Statistics_" + subtype + ".csv",
     )
-    common.flush_optadvisor_telemetry("ibmwas", thisnode, website, webssl, inttoken, stat_data, OPTADVISOR_CONFIG_KEYS)
+    common.flush_optadvisor_telemetry("ibmwas", thisnode, website, webssl, _legacy_token, stat_data, OPTADVISOR_CONFIG_KEYS)

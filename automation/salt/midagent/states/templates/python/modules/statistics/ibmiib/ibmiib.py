@@ -296,7 +296,7 @@ def getStat(thisqm, inpdata):
         classes.Err("Error in ibmiib statistics:" + str(err))
 
 
-def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
+def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata):
     if not isinstance(thisdata, dict):
         return
     optadvisor_config, _ = _split_optadvisor_config(thisdata)
@@ -315,8 +315,8 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
         for line in lines:
             try:
                 payload = json.loads(line)
-                payload.pop("inttoken", None)
-                res = makerequest.postOptAdvisorTelemetry(webssl, website, payload, common.optadvisor_post_token(optadvisor_config, inttoken))
+                payload.pop("_legacy_token", None)
+                res = makerequest.postOptAdvisorTelemetry(webssl, website, payload, common.optadvisor_post_token(optadvisor_config, _legacy_token))
                 if res is None or res.status_code < 200 or res.status_code >= 300:
                     status = "no-response" if res is None else str(res.status_code)
                     body = "" if res is None else str(res.text)[-common.MAX_LOG_BYTES:]
@@ -336,5 +336,5 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
         classes.Err("ibmiib optadvisor file error:" + str(err))
 
 
-def resetStat(thisnode, website, webssl, inttoken, stat_data):
-    flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, stat_data)
+def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
+    flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, stat_data)

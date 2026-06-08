@@ -20,7 +20,7 @@ Set these per host or group:
 - `midleo_website_base_url_ssl`: `y` for HTTPS, `n` for HTTP.
 - `update_interval_minutes`: server inventory update interval.
 - `midleo_mwuser`: Linux service account, normally `mwadmin`.
-- `inttoken`: integration token sent with monitoring payloads.
+- `agent_bootstrap_token`: bootstrap token used only for first agent registration. Runtime requests use the per-agent identity saved during registration.
 - `allowed_commands`: command allowlist for remote operations.
 
 Windows inventory also needs:

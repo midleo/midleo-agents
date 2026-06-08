@@ -675,7 +675,7 @@ def getStat(thisqm, inpdata):
         classes.Err("Error in ibmace statistics:" + str(err))
 
 
-def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
+def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata):
     if not isinstance(thisdata, dict):
         return
     optadvisor_config, _ = _split_optadvisor_config(thisdata)
@@ -694,8 +694,8 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
         for line in lines:
             try:
                 payload = json.loads(line)
-                payload.pop("inttoken", None)
-                res = makerequest.postOptAdvisorTelemetry(webssl, website, payload, common.optadvisor_post_token(optadvisor_config, inttoken))
+                payload.pop("_legacy_token", None)
+                res = makerequest.postOptAdvisorTelemetry(webssl, website, payload, common.optadvisor_post_token(optadvisor_config, _legacy_token))
                 if res is None or res.status_code < 200 or res.status_code >= 300:
                     remaining.append(line)
             except (json.JSONDecodeError, TypeError, ValueError) as err:
@@ -710,7 +710,7 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, thisdata):
         classes.Err("ibmace optadvisor file error:" + str(err))
 
 
-def resetStat(thisnode, website, webssl, inttoken, stat_data):
+def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     optadvisor_config, legacy_stat_data = _split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {})
     if common.optadvisor_collection_enabled(optadvisor_config):
         _queue_optadvisor_jvm_stats(thisnode, optadvisor_config, legacy_stat_data)
@@ -719,8 +719,8 @@ def resetStat(thisnode, website, webssl, inttoken, stat_data):
         lambda subtype: "ibmace" + subtype,
         website,
         webssl,
-        inttoken,
+        _legacy_token,
         legacy_stat_data,
         lambda logdir, subtype: logdir + "ResourceStats_" + thisnode + "_*_" + subtype + ".txt",
     )
-    flushOptAdvisorTelemetry(thisnode, website, webssl, inttoken, stat_data)
+    flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, stat_data)

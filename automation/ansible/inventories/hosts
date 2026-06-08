@@ -16,7 +16,8 @@ midleo_website_base_url="MIDLEO_BASE_URL"
 midleo_website_base_url_ssl="n"
 update_interval_minutes="5"
 midleo_mwuser="mwadmin"
-inttoken=""
+# Bootstrap only. Runtime requests use the registered agent identity.
+agent_bootstrap_token=""
 allowed_commands=['magent.bat','net']
 
 [linux:vars]
@@ -24,7 +25,8 @@ midleo_website_base_url="MIDLEO_BASE_URL"
 midleo_website_base_url_ssl="n"
 update_interval_minutes="5"
 midleo_mwuser="mwadmin"
-inttoken=""
+# Bootstrap only. Runtime requests use the registered agent identity.
+agent_bootstrap_token=""
 allowed_commands=['magent.sh','dspmq','dspmqver','uptime']
 
 [middleware:children]

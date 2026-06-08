@@ -680,7 +680,7 @@ def depthperc(queue_info):
     return depthperc
 
 
-def flushOptAdvisorTelemetry(thisqm, website, webssl, inttoken, thisdata):
+def flushOptAdvisorTelemetry(thisqm, website, webssl, _legacy_token, thisdata):
     if not isinstance(thisdata, dict) or not common.optadvisor_enabled(thisdata):
         return
 
@@ -696,8 +696,8 @@ def flushOptAdvisorTelemetry(thisqm, website, webssl, inttoken, thisdata):
         for line in lines:
             try:
                 payload = json.loads(line)
-                payload.pop("inttoken", None)
-                res = makerequest.postOptAdvisorTelemetry(webssl, website, payload, common.optadvisor_post_token(thisdata, inttoken))
+                payload.pop("_legacy_token", None)
+                res = makerequest.postOptAdvisorTelemetry(webssl, website, payload, common.optadvisor_post_token(thisdata, _legacy_token))
                 if res is None or res.status_code < 200 or res.status_code >= 300:
                     remaining.append(line)
             except (json.JSONDecodeError, TypeError, ValueError) as err:
@@ -712,14 +712,14 @@ def flushOptAdvisorTelemetry(thisqm, website, webssl, inttoken, thisdata):
         classes.Err("ibmmq optadvisor file error:" + str(err))
 
 
-def resetStat(thisqm, website, webssl, inttoken, thisdata):
+def resetStat(thisqm, website, webssl, _legacy_token, thisdata):
     try:
         files = glob.glob(
             os.path.join(os.getcwd(), "logs", "ibmmq_" + thisqm + "_queues.csv")
         )
         for file in files:
             if os.path.isfile(file):
-                statlist = {"inttoken": inttoken}
+                statlist = {}
                 with open(file, newline="", encoding="utf-8") as f:
                     reader_obj = csv.reader(f, delimiter=",")
                     for linearr in reader_obj:
@@ -757,7 +757,7 @@ def resetStat(thisqm, website, webssl, inttoken, thisdata):
         )
         for file in files:
             if os.path.isfile(file):
-                statlist = {"inttoken": inttoken}
+                statlist = {}
                 with open(file, newline="", encoding="utf-8") as f:
                     reader_obj = csv.reader(f, delimiter=",")
                     for linearr in reader_obj:
@@ -789,4 +789,4 @@ def resetStat(thisqm, website, webssl, inttoken, thisdata):
     except (json.JSONDecodeError, csv.Error, IndexError, TypeError, ValueError) as err:
         classes.Err("Error parsing channels file:" + str(err))
 
-    flushOptAdvisorTelemetry(thisqm, website, webssl, inttoken, thisdata)
+    flushOptAdvisorTelemetry(thisqm, website, webssl, _legacy_token, thisdata)

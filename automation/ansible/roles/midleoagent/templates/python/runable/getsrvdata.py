@@ -33,7 +33,7 @@ def _safe_get_config():
     if not config_data:
         raise RuntimeError("configs.getcfgData() returned empty data")
 
-    required_keys = ("SRVUID", "GROUPID", "UPDINT", "INTTOKEN", "MWADMIN", "SSLENABLED")
+    required_keys = ("SRVUID", "GROUPID", "UPDINT", "MWADMIN", "SSLENABLED")
     missing = [key for key in required_keys if key not in config_data or config_data[key] in (None, "")]
     if missing:
         raise RuntimeError("Missing required configuration keys: " + ",".join(missing))
@@ -80,7 +80,7 @@ def _safe_jobsdata():
     return {"jobs": []}
 
 
-def _build_windows_config(uid, inttoken, groupid, updint, certs):
+def _build_windows_config(uid, groupid, updint, certs):
     cpu = classes.CPU(win_utils.getCPUName(), win_utils.getCPUCoreCount())
     hw_config = classes.HWConfig(
         win_utils.getName(),
@@ -97,7 +97,6 @@ def _build_windows_config(uid, inttoken, groupid, updint, certs):
 
     return classes.Config(
         uid,
-        inttoken,
         groupid,
         AGENT_VER,
         updint,
@@ -108,7 +107,7 @@ def _build_windows_config(uid, inttoken, groupid, updint, certs):
     )
 
 
-def _build_linux_config(uid, inttoken, groupid, updint, certs):
+def _build_linux_config(uid, groupid, updint, certs):
     cpu = classes.CPU(lin_utils.getCPUName(), lin_utils.getCPUCoreCount())
     hw_config = classes.HWConfig(
         lin_utils.getName(),
@@ -125,7 +124,6 @@ def _build_linux_config(uid, inttoken, groupid, updint, certs):
 
     return classes.Config(
         uid,
-        inttoken,
         groupid,
         AGENT_VER,
         updint,
@@ -158,7 +156,6 @@ def create():
     try:
         config_data = _safe_get_config()
         uid = config_data["SRVUID"]
-        inttoken = config_data["INTTOKEN"]
         groupid = config_data["GROUPID"]
         updint = int(config_data["UPDINT"])
     
@@ -166,9 +163,9 @@ def create():
         jobsdata = _safe_jobsdata()
 
         if OS_TYPE == "Windows":
-            config = _build_windows_config(uid, inttoken, groupid, updint, certs)
+            config = _build_windows_config(uid, groupid, updint, certs)
         elif OS_TYPE == "Linux":
-            config = _build_linux_config(uid, inttoken, groupid, updint, certs)
+            config = _build_linux_config(uid, groupid, updint, certs)
         else:
             raise RuntimeError("Unsupported operating system: " + OS_TYPE)
 

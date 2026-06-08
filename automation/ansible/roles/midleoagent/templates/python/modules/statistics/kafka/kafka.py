@@ -230,15 +230,15 @@ def getStat(thisqm, inpdata):
         classes.Err("Error in kafka statistics:" + str(err))
 
 
-def resetStat(thisnode, website, webssl, inttoken, stat_data):
+def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = common.split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {}, KAFKA_CONFIG_KEYS)
     common.post_csv_stats(
         "kafka",
         "kafka",
         website,
         webssl,
-        inttoken,
+        _legacy_token,
         legacy_stat_data,
         lambda logdir, subtype: logdir + "Statistics_" + subtype + ".csv",
     )
-    common.flush_optadvisor_telemetry("kafka", thisnode, website, webssl, inttoken, stat_data, KAFKA_CONFIG_KEYS)
+    common.flush_optadvisor_telemetry("kafka", thisnode, website, webssl, _legacy_token, stat_data, KAFKA_CONFIG_KEYS)

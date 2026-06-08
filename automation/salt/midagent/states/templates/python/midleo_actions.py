@@ -83,7 +83,6 @@ def _load_runtime_config():
         "uid": str(cfg.get("SRVUID", "")),
         "website": str(cfg.get("MWADMIN", "")),
         "webssl": str(cfg.get("SSLENABLED", "n")),
-        "inttoken": str(cfg.get("INTTOKEN", "")),
         "action_roots": action_roots,
     }
 
@@ -235,7 +234,6 @@ def _build_alert(runtime_cfg, action_key, action_cfg, state_entry, payload):
         "srvtype": appserver_type,
         "message": str(action_cfg.get("message", default_message)),
         "alerttime": _now_str(),
-        "inttoken": runtime_cfg["inttoken"],
         "errorcode": str(payload.get("error_code", "")),
         "actionkey": action_key,
         "laststarted": last_started,
@@ -245,7 +243,7 @@ def _build_alert(runtime_cfg, action_key, action_cfg, state_entry, payload):
 
 
 def _send_alert(runtime_cfg, action_key, action_cfg, state_entry, payload):
-    if not runtime_cfg["website"] or not runtime_cfg["inttoken"] or not runtime_cfg["uid"]:
+    if not runtime_cfg["website"] or not runtime_cfg["uid"]:
         classes.Err("midleo_actions missing backend configuration for alert " + action_key)
         return
 

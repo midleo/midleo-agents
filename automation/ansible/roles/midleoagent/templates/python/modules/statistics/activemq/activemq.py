@@ -221,15 +221,15 @@ def getStat(thisqm, inpdata):
         classes.Err("Error in activemq statistics:" + str(err))
 
 
-def resetStat(thisnode, website, webssl, inttoken, stat_data):
+def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = common.split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {}, ACTIVEMQ_CONFIG_KEYS)
     common.post_csv_stats(
         "activemq",
         "activemq",
         website,
         webssl,
-        inttoken,
+        _legacy_token,
         legacy_stat_data,
         lambda logdir, subtype: logdir + "Statistics_" + subtype + ".csv",
     )
-    common.flush_optadvisor_telemetry("activemq", thisnode, website, webssl, inttoken, stat_data, ACTIVEMQ_CONFIG_KEYS)
+    common.flush_optadvisor_telemetry("activemq", thisnode, website, webssl, _legacy_token, stat_data, ACTIVEMQ_CONFIG_KEYS)

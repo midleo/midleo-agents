@@ -62,13 +62,13 @@ def _base_url(webssl, website):
     return scheme + "://" + website
 
 
-def _drop_inttoken(value):
+def _drop_legacy_auth_payload_field(value):
     if isinstance(value, dict):
         cleaned = dict(value)
         cleaned.pop("inttoken", None)
         return cleaned
     if isinstance(value, list):
-        return [_drop_inttoken(item) for item in value]
+        return [_drop_legacy_auth_payload_field(item) for item in value]
     return value
 
 
@@ -76,7 +76,7 @@ def _strip_legacy_auth_payload(data):
     if data is None:
         return None
     if isinstance(data, (dict, list)):
-        return _drop_inttoken(data)
+        return _drop_legacy_auth_payload_field(data)
     if isinstance(data, bytes):
         raw = data.decode("utf-8", errors="replace")
     elif isinstance(data, str):
@@ -87,7 +87,7 @@ def _strip_legacy_auth_payload(data):
         parsed = json.loads(raw)
     except Exception:
         return data
-    cleaned = _drop_inttoken(parsed)
+    cleaned = _drop_legacy_auth_payload_field(parsed)
     return json.dumps(cleaned)
 
 
@@ -99,11 +99,11 @@ def _register_agent_identity(webssl, website):
         return False
     _REGISTER_ATTEMPTED = True
     cfg = configs.getcfgData() or {}
-    inttoken = str(cfg.get("INTTOKEN", "")).strip()
-    if not inttoken:
+    bootstrap_token = str(cfg.get("INTTOKEN", "")).strip()
+    if not bootstrap_token:
         return False
     payload = {
-        "inttoken": inttoken,
+        "inttoken": bootstrap_token,
         "hostname": socket.gethostname(),
         "serverid": str(cfg.get("SRVUID", "")).strip(),
         "appsrv_id": str(cfg.get("APPSRV_ID", "")).strip(),
@@ -214,7 +214,7 @@ def postibmmqCHData(webssl, website, qm, data):
     )
 
 
-def postOptAdvisorTelemetry(webssl, website, data, inttoken=None):
+def postOptAdvisorTelemetry(webssl, website, data, _legacy_token=None):
     headers = _headers()
     payload = dict(data or {})
     return _request(

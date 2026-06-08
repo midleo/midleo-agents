@@ -161,5 +161,5 @@ def getStat(thisqm, inpdata):
         classes.Err("Error in rabbitmq statistics:" + str(err))
 
 
-def resetStat(thisnode, website, webssl, inttoken, stat_data):
-    common.flush_optadvisor_telemetry("rabbitmq", thisnode, website, webssl, inttoken, stat_data, RABBITMQ_CONFIG_KEYS)
+def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
+    common.flush_optadvisor_telemetry("rabbitmq", thisnode, website, webssl, _legacy_token, stat_data, RABBITMQ_CONFIG_KEYS)

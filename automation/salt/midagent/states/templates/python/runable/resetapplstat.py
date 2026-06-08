@@ -28,7 +28,7 @@ try:
     config_data = configs.getcfgData()
     website = config_data["MWADMIN"]
     webssl = config_data["SSLENABLED"]
-    inttoken = config_data["INTTOKEN"]
+    _legacy_token = config_data["_legacy_token"]
     stat_modules = _load_statistics_modules()
 
     for srvtype, servers in mon_data.items():
@@ -39,7 +39,7 @@ try:
         if not isinstance(servers, dict):
             continue
         for appserver, value in servers.items():
-            module.resetStat(appserver, website, webssl, inttoken, value)
+            module.resetStat(appserver, website, webssl, _legacy_token, value)
 
 except Exception as err:
     classes.Err("MQSTAT not configured err:" + str(err))

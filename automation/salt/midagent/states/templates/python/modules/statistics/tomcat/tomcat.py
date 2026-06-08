@@ -239,15 +239,15 @@ def getStat(thisqm, inpdata):
         classes.Err("Error in tomcat statistics:" + str(err))
 
 
-def resetStat(thisnode, website, webssl, inttoken, stat_data):
+def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = common.split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {})
     common.post_csv_stats(
         "tomcat",
         "tomcat",
         website,
         webssl,
-        inttoken,
+        _legacy_token,
         legacy_stat_data,
         lambda logdir, subtype: logdir + "Statistics_" + subtype + ".csv",
     )
-    common.flush_optadvisor_telemetry("tomcat", thisnode, website, webssl, inttoken, stat_data)
+    common.flush_optadvisor_telemetry("tomcat", thisnode, website, webssl, _legacy_token, stat_data)

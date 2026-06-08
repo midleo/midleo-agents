@@ -308,8 +308,8 @@ def optadvisor_collection_enabled(config):
 
 
 def optadvisor_post_token(config, default_token):
-    # OptAdvisor telemetry uses the existing protected INTTOKEN path.
-    return safe_text(default_token)
+    # OptAdvisor telemetry now authenticates through the registered agent identity.
+    return ""
 
 
 def split_optadvisor_config(data, extra_keys=None):
@@ -348,7 +348,7 @@ def append_optadvisor_payload(prefix, thisnode, payload):
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
 
 
-def flush_optadvisor_telemetry(prefix, thisnode, website, webssl, inttoken, stat_data, extra_keys=None):
+def flush_optadvisor_telemetry(prefix, thisnode, website, webssl, _legacy_token, stat_data, extra_keys=None):
     if not isinstance(stat_data, dict):
         return
     optadvisor_config, _ = split_optadvisor_config(stat_data, extra_keys)
@@ -369,12 +369,12 @@ def flush_optadvisor_telemetry(prefix, thisnode, website, webssl, inttoken, stat
         for line in lines:
             try:
                 payload = json.loads(line)
-                payload.pop("inttoken", None)
+                payload.pop("_legacy_token", None)
                 res = makerequest.postOptAdvisorTelemetry(
                     webssl,
                     website,
                     payload,
-                    optadvisor_post_token(optadvisor_config, inttoken),
+                    optadvisor_post_token(optadvisor_config, _legacy_token),
                 )
                 if res is None or res.status_code < 200 or res.status_code >= 300:
                     status = "no-response" if res is None else str(res.status_code)
@@ -515,7 +515,7 @@ def tag_value(metric_key, tag):
     return metric_key.split(marker, 1)[1].split(";", 1)[0]
 
 
-def post_csv_stats(stat_type, func_name, website, webssl, inttoken, stat_data, pattern_fn):
+def post_csv_stats(stat_type, func_name, website, webssl, _legacy_token, stat_data, pattern_fn):
     try:
         if not isinstance(stat_data, dict) or len(stat_data) == 0:
             return
@@ -535,7 +535,6 @@ def post_csv_stats(stat_type, func_name, website, webssl, inttoken, stat_data, p
 
                 payload = {
                     "type": stat_type,
-                    "inttoken": inttoken,
                     "subtype": subtype,
                     "data": retarr,
                 }

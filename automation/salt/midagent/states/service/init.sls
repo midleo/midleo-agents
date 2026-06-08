@@ -6,7 +6,7 @@
 {% set midleo_website_base_url = salt['pillar.get']('INPUT:midleo_website_base_url') %}
 {% set midleo_website_base_url_ssl = salt['pillar.get']('INPUT:midleo_website_base_url_ssl') %}
 {% set group_id = salt['pillar.get']('INPUT:group_id') %}
-{% set int_token = salt['pillar.get']('INPUT:int_token') %}
+{% set agent_bootstrap_token = salt['pillar.get']('INPUT:agent_bootstrap_token') %}
 {% set update_interval_minutes = salt['pillar.get']('INPUT:update_interval_minutes') %}
 {% set osfam = grains.get('os_family', '') %}
 {% set agent_unique_id = salt['cmd.run'](cmd="head -c 8 /dev/urandom | xxd -p", python_shell=True) %}
@@ -158,7 +158,7 @@ midagent_create_config:
         midleo_website_base_url: "{{midleo_website_base_url}}"
         midleo_website_base_url_ssl: "{{midleo_website_base_url_ssl}}"
         group_id: "{{group_id}}"
-        inttoken: "{{int_token}}"
+        agent_bootstrap_token: "{{agent_bootstrap_token}}"
         agent_install_dir: "{{agent_install_dir}}"
         allowed_commands: 
           - magent.sh
