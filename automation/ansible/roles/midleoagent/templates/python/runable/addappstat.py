@@ -41,6 +41,11 @@ def createMonJson():
     if appsrv not in mon_data[srvtype] or not isinstance(mon_data[srvtype].get(appsrv), dict):
         mon_data[srvtype][appsrv] = {}
 
+    if "pass" in stjsdata and "pwd" not in stjsdata:
+        stjsdata["pwd"] = stjsdata.pop("pass")
+    if "conntype" not in stjsdata:
+        stjsdata["conntype"] = "jms"
+
     for k, item in stjsdata.items():
         mon_data[srvtype][appsrv][k] = decrypt.encryptPWD(item) if k == "pwd" and item else item
 

@@ -2,6 +2,7 @@ import json
 import os
 import socket
 import subprocess
+import urllib.parse
 import uuid
 from datetime import datetime, timezone
 
@@ -269,12 +270,220 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
         classes.Err("weblogic optadvisor payload parse error:" + str(err))
 
 
+def _weblogic_rest_path(subtype):
+    subtype = str(subtype or "").strip()
+    paths = {
+        "JVMRuntime": "/management/weblogic/latest/serverRuntime/JVMRuntime",
+        "ThreadPoolRuntime": "/management/weblogic/latest/serverRuntime/threadPoolRuntime",
+        "ConnectorConnectionPoolRuntime": "/management/weblogic/latest/serverRuntime/connectorServiceRuntime/connectorConnectionPoolRuntimeMBeans",
+        "JDBCDataSourceRuntime": "/management/weblogic/latest/serverRuntime/JDBCServiceRuntime/JDBCDataSourceRuntimeMBeans",
+        "JDBCDataSourceRuntimeMBeans": "/management/weblogic/latest/serverRuntime/JDBCServiceRuntime/JDBCDataSourceRuntimeMBeans",
+        "JDBCServiceRuntime": "/management/weblogic/latest/serverRuntime/JDBCServiceRuntime/JDBCDataSourceRuntimeMBeans",
+        "ApplicationRuntimes": "/management/weblogic/latest/serverRuntime/applicationRuntimes",
+        "ServerRuntime": "/management/weblogic/latest/serverRuntime",
+    }
+    if subtype.startswith("/"):
+        return subtype
+    return paths.get(subtype, "")
+
+
+WEBLOGIC_REST_LEGACY_FIELDS = {
+    "JVMRuntime": (
+        ("HeapFreeCurrent", ("heapFreeCurrent", "HeapFreeCurrent")),
+        ("HeapSizeCurrent", ("heapSizeCurrent", "HeapSizeCurrent")),
+        ("HeapFreePercent", ("heapFreePercent", "HeapFreePercent")),
+        ("JavaVersion", ("javaVersion", "JavaVersion")),
+        ("Uptime", ("uptime", "Uptime")),
+    ),
+    "ThreadPoolRuntime": (
+        ("ExecuteThreadTotalCount", ("executeThreadTotalCount", "ExecuteThreadTotalCount")),
+        ("HoggingThreadCount", ("hoggingThreadCount", "HoggingThreadCount")),
+        ("PendingUserRequestCount", ("pendingUserRequestCount", "PendingUserRequestCount")),
+        ("Throughput", ("throughput", "Throughput")),
+    ),
+    "ConnectorConnectionPoolRuntime": (
+        ("ConnectionsTotalCount", ("connectionsTotalCount", "ConnectionsTotalCount")),
+        ("ConnectionsInUseCurrentCount", ("connectionsInUseCurrentCount", "ConnectionsInUseCurrentCount")),
+        ("ConnectionsWaitingCurrentCount", ("connectionsWaitingCurrentCount", "ConnectionsWaitingCurrentCount")),
+    ),
+    "JDBCDataSourceRuntime": (
+        ("ActiveConnectionsCurrentCount", ("activeConnectionsCurrentCount", "ActiveConnectionsCurrentCount")),
+        ("ActiveConnectionsHighCount", ("activeConnectionsHighCount", "ActiveConnectionsHighCount")),
+        ("CurrCapacity", ("currCapacity", "CurrCapacity")),
+        ("CurrCapacityHighCount", ("currCapacityHighCount", "CurrCapacityHighCount")),
+        ("State", ("state", "State")),
+    ),
+    "JDBCDataSourceRuntimeMBeans": (
+        ("ActiveConnectionsCurrentCount", ("activeConnectionsCurrentCount", "ActiveConnectionsCurrentCount")),
+        ("ActiveConnectionsHighCount", ("activeConnectionsHighCount", "ActiveConnectionsHighCount")),
+        ("CurrCapacity", ("currCapacity", "CurrCapacity")),
+        ("CurrCapacityHighCount", ("currCapacityHighCount", "CurrCapacityHighCount")),
+        ("State", ("state", "State")),
+    ),
+    "ServerRuntime": (
+        ("State", ("state", "State")),
+        ("OpenSocketsCurrentCount", ("openSocketsCurrentCount", "OpenSocketsCurrentCount")),
+        ("ListenPort", ("listenPort", "ListenPort")),
+        ("AdminServer", ("adminServer", "AdminServer")),
+    ),
+}
+
+
+def _legacy_timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _legacy_value(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return "{:,.2f}".format(float(value))
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return "{:,.2f}".format(float(text))
+    except ValueError:
+        return text
+
+
+def _case_value(source, names):
+    if not isinstance(source, dict):
+        return None
+    lower_map = {str(key).lower(): value for key, value in source.items()}
+    for name in names:
+        if name in source:
+            return source[name]
+        lowered = str(name).lower()
+        if lowered in lower_map:
+            return lower_map[lowered]
+    return None
+
+
+def _weblogic_rest_sources(payload):
+    items = _weblogic_rest_items(payload)
+    return items if items else ([payload] if isinstance(payload, dict) else [])
+
+
+def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
+    formatted = _legacy_value(value)
+    if formatted is None:
+        return
+    os.makedirs(str(logdir), exist_ok=True)
+    file_path = os.path.join(str(logdir), "Statistics_" + str(subtype) + ".csv")
+    new_file = not os.path.isfile(file_path) or os.path.getsize(file_path) == 0
+    with open(file_path, "a", encoding="utf-8", newline="") as f:
+        if new_file:
+            f.write("key,server,timestamp,value\n")
+        f.write(str(key) + "," + str(server) + "," + str(timestamp) + "," + formatted + "\n")
+
+
+def _write_weblogic_rest_legacy(logdir, subtype, thisnode, payload):
+    fields = WEBLOGIC_REST_LEGACY_FIELDS.get(str(subtype))
+    if not fields:
+        return False
+    timestamp = _legacy_timestamp()
+    wrote = False
+    for source in _weblogic_rest_sources(payload):
+        for legacy_name, rest_names in fields:
+            value = _case_value(source, rest_names)
+            if value is None:
+                continue
+            _write_legacy_stat_row(logdir, subtype, legacy_name, thisnode, timestamp, value)
+            wrote = True
+    return wrote
+
+
+def _collect_rest_statistics(thisnode, values, metrics):
+    base_url, _ = common.rest_base_url(thisnode, values, values.get("mngmport") or "7001")
+    for subtype, logdir in metrics.items():
+        path = _weblogic_rest_path(subtype)
+        if not path:
+            classes.Err("weblogic rest statistics unsupported subtype:" + str(subtype))
+            continue
+        try:
+            payload = common.rest_json_request(base_url, path, values)
+            if not _write_weblogic_rest_legacy(logdir, subtype, thisnode, payload):
+                common.write_numeric_tree(logdir, subtype, thisnode, payload)
+        except Exception as err:
+            classes.Err("weblogic rest statistics error:" + str(err))
+
+
+def _weblogic_rest_items(payload):
+    if not isinstance(payload, dict):
+        return []
+    for key in ("items", "Items", "result", "data"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return value
+        if isinstance(value, dict):
+            nested = _weblogic_rest_items(value)
+            if nested:
+                return nested
+    return []
+
+
+def _weblogic_rest_state(payload, appserver):
+    if not isinstance(payload, dict):
+        return ""
+    name = common.safe_text(
+        payload.get("name") or payload.get("Name") or payload.get("serverName")
+    )
+    state = payload.get("state") or payload.get("State") or payload.get("serverState")
+    appserver = common.safe_text(appserver)
+    if state and (not name or not appserver or name.lower() == appserver.lower()):
+        return common.safe_text(state)
+    for item in _weblogic_rest_items(payload):
+        state = _weblogic_rest_state(item, appserver)
+        if state:
+            return state
+    return ""
+
+
+def restAvailabilityCheck(thisnode, values):
+    appserver = common.safe_text(
+        values.get("appserver") or values.get("managed_server") or thisnode
+    )
+    base_url, _ = common.rest_base_url(thisnode, values, values.get("mngmport") or "7001")
+    encoded_server = urllib.parse.quote(appserver, safe="")
+    paths = [
+        "/management/weblogic/latest/domainRuntime/serverRuntimes/" + encoded_server,
+        "/management/weblogic/latest/serverRuntime",
+        "/management/weblogic/latest/domainRuntime/serverRuntimes",
+    ]
+    for path in paths:
+        try:
+            payload = common.rest_json_request(base_url, path, values)
+            state_match = "" if path.endswith("/serverRuntime") else appserver
+            state = _weblogic_rest_state(payload, state_match)
+            if state.upper() == "RUNNING":
+                return 1
+        except Exception:
+            continue
+    return 0
+
+
 def getStat(thisqm, inpdata):
     try:
         inpdata = common.parse_json_object(inpdata)
         values, metrics = common.pop_fields(
-            inpdata, {"usr": "", "pwd": "", "mngmport": "", "ssl": "no"}
+            inpdata,
+            {
+                "usr": "",
+                "pwd": "",
+                "mngmport": "",
+                "jmxport": "",
+                "port": "",
+                "webport": "",
+                "host": "",
+                "ssl": "no",
+                "conntype": "jms",
+            },
         )
+        if not values.get("mngmport"):
+            values["mngmport"] = values.get("jmxport") or values.get("port") or values.get("webport") or ""
         optadvisor_config, metrics = _split_optadvisor_config(metrics)
         if common.truthy(optadvisor_config.get("optadvisor_only")):
             metrics = {}
@@ -283,7 +492,9 @@ def getStat(thisqm, inpdata):
             "resources",
             "midleo_weblogic.jar",
         )
-        if metrics:
+        if metrics and common.connection_type(values) == "rest":
+            _collect_rest_statistics(thisqm, values, metrics)
+        elif metrics:
             java_arg = json.dumps(
                 {
                     "logdir": common.first_value(metrics),

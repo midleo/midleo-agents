@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+from datetime import datetime
 
 from modules.base import classes
 from modules.statistics import common
@@ -193,19 +194,164 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
         common.append_optadvisor_payload("ibmwas", thisnode, payload)
 
 
+def _ibmwas_rest_path(subtype):
+    subtype = str(subtype or "").strip()
+    if subtype.startswith("/"):
+        return subtype
+    paths = {
+        "JVM": "/IBMJMXConnectorREST/mbeans/WebSphere:type=JVM,name=JVM,*/attributes",
+        "WMQJCAResourceAdapter": "/IBMJMXConnectorREST/mbeans/WebSphere:type=ThreadPool,name=WMQJCAResourceAdapter,*/attributes",
+        "MessageListenerThreadPool": "/IBMJMXConnectorREST/mbeans/WebSphere:type=ThreadPool,name=MessageListenerThreadPool,*/attributes",
+        "AriesThreadPool": "/IBMJMXConnectorREST/mbeans/WebSphere:type=ThreadPool,name=AriesThreadPool,*/attributes",
+        "HAManager.thread.pool": "/IBMJMXConnectorREST/mbeans/WebSphere:type=ThreadPool,name=HAManager.thread.pool,*/attributes",
+        "SoapConnectorThreadPool": "/IBMJMXConnectorREST/mbeans/WebSphere:type=ThreadPool,name=SoapConnectorThreadPool,*/attributes",
+        "ORB.thread.pool": "/IBMJMXConnectorREST/mbeans/WebSphere:type=ThreadPool,name=ORB.thread.pool,*/attributes",
+        "SessionManager": "/IBMJMXConnectorREST/mbeans/WebSphere:type=SessionManager,name=ORB.thread.pool,*/attributes",
+    }
+    if subtype in paths:
+        return paths[subtype]
+    return "/IBMJMXConnectorREST/mbeans/WebSphere:feature=kernel,name=ServerInfo/attributes"
+
+
+def _legacy_timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _legacy_number(value):
+    number = common.numeric_value(value)
+    if number is None:
+        return None
+    return "{:,.2f}".format(float(number))
+
+
+def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
+    formatted = _legacy_number(value)
+    if formatted is None:
+        return False
+    os.makedirs(str(logdir), exist_ok=True)
+    file_path = os.path.join(str(logdir), "Statistics_" + str(subtype) + ".csv")
+    new_file = not os.path.isfile(file_path) or os.path.getsize(file_path) == 0
+    with open(file_path, "a", encoding="utf-8", newline="") as f:
+        if new_file:
+            f.write("key,server,timestamp,value\n")
+        f.write(str(key) + "," + str(server) + "," + str(timestamp) + "," + formatted + "\n")
+    return True
+
+
+def _ibmwas_attributes(payload):
+    attrs = {}
+
+    def add_pair(name, value):
+        name = common.safe_text(name)
+        if name:
+            attrs[name] = value
+
+    def walk(value):
+        if isinstance(value, list):
+            for item in value:
+                walk(item)
+        elif isinstance(value, dict):
+            name = value.get("name") or value.get("Name") or value.get("attribute") or value.get("Attribute")
+            if name and ("value" in value or "Value" in value):
+                add_pair(name, value.get("value") if "value" in value else value.get("Value"))
+                return
+            for key in ("attributes", "Attributes", "result", "data", "value", "Value"):
+                if key in value:
+                    walk(value[key])
+            for key, item in value.items():
+                if key not in ("attributes", "Attributes", "result", "data", "value", "Value"):
+                    add_pair(key, item)
+
+    walk(payload)
+    return attrs
+
+
+def _case_value(source, names):
+    if not isinstance(source, dict):
+        return None
+    lower_map = {str(key).lower(): value for key, value in source.items()}
+    for name in names:
+        if name in source:
+            return source[name]
+        lowered = str(name).lower()
+        if lowered in lower_map:
+            return lower_map[lowered]
+    return None
+
+
+def _write_ibmwas_rest_legacy(logdir, subtype, thisnode, payload):
+    attrs = _ibmwas_attributes(payload)
+    timestamp = _legacy_timestamp()
+    wrote = False
+
+    if str(subtype) == "JVM":
+        total = _case_value(attrs, ("getTotalMemory", "totalMemory", "TotalMemory", "heapSize", "maxHeap"))
+        free = _case_value(attrs, ("getFreeMemory", "freeMemory", "FreeMemory"))
+        wrote = _write_legacy_stat_row(logdir, subtype, "getTotalMemory", thisnode, timestamp, total) or wrote
+        wrote = _write_legacy_stat_row(logdir, subtype, "getFreeMemory", thisnode, timestamp, free) or wrote
+        return wrote
+
+    for key, value in attrs.items():
+        wrote = _write_legacy_stat_row(logdir, subtype, key, thisnode, timestamp, value) or wrote
+    return wrote
+
+
+def _collect_rest_statistics(thisnode, values, metrics):
+    base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "9443")
+    for subtype, logdir in metrics.items():
+        try:
+            payload = common.rest_json_request(base_url, _ibmwas_rest_path(subtype), values)
+            if not _write_ibmwas_rest_legacy(logdir, subtype, thisnode, payload):
+                common.write_numeric_tree(logdir, subtype, thisnode, payload)
+        except Exception as err:
+            classes.Err("ibmwas rest statistics error:" + str(err))
+
+
+def restAvailabilityCheck(thisnode, values):
+    base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "9443")
+    try:
+        payload = common.rest_json_request(
+            base_url,
+            "/IBMJMXConnectorREST/mbeans/WebSphere:feature=kernel,name=ServerInfo/attributes",
+            values,
+        )
+    except Exception:
+        return 0
+    if isinstance(payload, list) and payload:
+        return 1
+    if isinstance(payload, dict) and (payload.get("value") or payload.get("Name") or payload.get("attributes")):
+        return 1
+    return 0
+
+
 def getStat(thisqm, inpdata):
     try:
         inpdata = common.parse_json_object(inpdata)
         values, metrics = common.pop_fields(
-            inpdata, {"usr": "", "pwd": "", "soapport": "", "ssl": "no"}
+            inpdata,
+            {
+                "usr": "",
+                "pwd": "",
+                "soapport": "",
+                "mngmport": "",
+                "port": "",
+                "webport": "",
+                "host": "",
+                "ssl": "no",
+                "conntype": "jms",
+            },
         )
+        if not values.get("soapport"):
+            values["soapport"] = values.get("mngmport") or values.get("port") or values.get("webport") or ""
         optadvisor_config, metrics = common.split_optadvisor_config(metrics, OPTADVISOR_CONFIG_KEYS)
         jar_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             "resources",
             "midleo_ibmwas.jar",
         )
-        if metrics:
+        if metrics and common.connection_type(values) == "rest":
+            _collect_rest_statistics(thisqm, values, metrics)
+        elif metrics:
             java_arg = json.dumps(
                 {
                     "logdir": common.first_value(metrics),

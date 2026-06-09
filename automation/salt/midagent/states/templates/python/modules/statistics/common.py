@@ -1,3 +1,4 @@
+import base64
 import glob
 import json
 import os
@@ -5,10 +6,13 @@ import socket
 import subprocess
 import tempfile
 import time
+import ssl as ssl_module
+import urllib.error
+import urllib.request
 import uuid
 from datetime import datetime, timezone, timedelta
 
-from modules.base import classes, file_utils, makerequest, statarr
+from modules.base import classes, decrypt, file_utils, makerequest, statarr
 
 DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_STAT_TIMEOUT_SECONDS", "45"))
 MAX_LOG_BYTES = 4000
@@ -101,6 +105,121 @@ def iso_utc(value=None):
 
 def truthy(value):
     return str(value).strip().lower() in ("1", "y", "yes", "true", "on", "enabled")
+
+
+def decrypt_password(value):
+    if not value:
+        return ""
+    try:
+        return decrypt.decryptPWD(value)
+    except Exception:
+        return str(value)
+
+
+def connection_type(values):
+    return str((values or {}).get("conntype") or "jms").strip().lower()
+
+
+def rest_base_url(thisnode, values, default_port=""):
+    values = values or {}
+    host = safe_text(values.get("host") or thisnode)
+    port = safe_text(
+        values.get("port")
+        or values.get("webport")
+        or values.get("mngmport")
+        or values.get("jmxport")
+        or values.get("soapport")
+        or default_port
+    )
+    use_ssl = truthy(values.get("ssl"))
+    scheme = "https" if use_ssl else "http"
+    return scheme + "://" + host + (":" + port if port else ""), use_ssl
+
+
+def rest_json_request(base_url, path, values, method="GET", payload=None, auth="basic"):
+    values = values or {}
+    url = base_url + path
+    usr = safe_text(values.get("usr"))
+    pwd = decrypt_password(values.get("pwd") or "")
+    use_ssl = url.lower().startswith("https://")
+    headers = {
+        "Accept": "application/json",
+        "X-Requested-By": "Midleo",
+    }
+    data = None
+    if payload is not None:
+        data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    if auth == "basic" and usr:
+        token = base64.b64encode((usr + ":" + pwd).encode("utf-8")).decode("ascii")
+        headers["Authorization"] = "Basic " + token
+
+    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    handlers = []
+    if auth == "digest" and usr:
+        passman = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+        passman.add_password(None, url, usr, pwd)
+        handlers.append(urllib.request.HTTPDigestAuthHandler(passman))
+    if use_ssl:
+        handlers.append(urllib.request.HTTPSHandler(context=ssl_module._create_unverified_context()))
+
+    if handlers:
+        opener = urllib.request.build_opener(*handlers)
+        with opener.open(request, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+            body = response.read().decode("utf-8", errors="replace")
+    else:
+        options = {"timeout": DEFAULT_TIMEOUT_SECONDS}
+        if use_ssl:
+            options["context"] = ssl_module._create_unverified_context()
+        with urllib.request.urlopen(request, **options) as response:
+            body = response.read().decode("utf-8", errors="replace")
+    return json.loads(body) if body else {}
+
+
+def write_stat_row(logdir, subtype, row):
+    if not logdir or not subtype or not row:
+        return
+    os.makedirs(str(logdir), exist_ok=True)
+    file_path = os.path.join(str(logdir), "Statistics_" + str(subtype) + ".csv")
+    with open(file_path, "a", encoding="utf-8", newline="") as f:
+        f.write(",".join(str(item).replace(",", " ") for item in row) + "\n")
+
+
+def write_simple_stat(logdir, subtype, server, key, value, timestamp=None):
+    number = numeric_value(value)
+    if number is None:
+        return
+    if timestamp is None:
+        timestamp = iso_utc()
+    write_stat_row(logdir, subtype, [key, server, timestamp, number])
+
+
+def write_numeric_tree(logdir, subtype, server, data, prefix="", timestamp=None, limit=250):
+    if timestamp is None:
+        timestamp = iso_utc()
+    written = 0
+
+    def walk(value, path):
+        nonlocal written
+        if written >= limit:
+            return
+        if isinstance(value, dict):
+            for key, item in value.items():
+                safe_key = safe_text(key)
+                if not safe_key:
+                    continue
+                walk(item, path + "." + safe_key if path else safe_key)
+        elif isinstance(value, list):
+            for index, item in enumerate(value):
+                walk(item, path + "." + str(index) if path else str(index))
+        else:
+            number = numeric_value(value)
+            if number is not None and path:
+                write_stat_row(logdir, subtype, [path, server, timestamp, number])
+                written += 1
+
+    walk(data, prefix)
+    return written
 
 
 def optadvisor_state_path():

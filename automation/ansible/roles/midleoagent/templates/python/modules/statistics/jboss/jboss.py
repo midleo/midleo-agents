@@ -188,19 +188,187 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
         classes.Err("jboss optadvisor payload parse error:" + str(err))
 
 
+def _management_address(value):
+    text = str(value or "").strip()
+    if not text.startswith("/"):
+        return []
+    address = []
+    for item in text.strip("/").split("/"):
+        if "=" not in item:
+            continue
+        key, val = item.split("=", 1)
+        if key and val:
+            address.append({key: val})
+    return address
+
+
+JBOSS_REST_SIMPLE_FIELDS = {
+    "Threading": ("/core-service=platform-mbean/type=threading", ("thread-count", "ThreadCount")),
+    "ThreadingPeak": ("/core-service=platform-mbean/type=threading", ("peak-thread-count", "PeakThreadCount")),
+    "ThreadingDaemon": ("/core-service=platform-mbean/type=threading", ("daemon-thread-count", "DaemonThreadCount")),
+    "ClassLoading": ("/core-service=platform-mbean/type=class-loading", ("loaded-class-count", "LoadedClassCount")),
+    "ClassLoadingTotal": ("/core-service=platform-mbean/type=class-loading", ("total-loaded-class-count", "TotalLoadedClassCount")),
+    "ClassLoadingUnloaded": ("/core-service=platform-mbean/type=class-loading", ("unloaded-class-count", "UnloadedClassCount")),
+    "OSProcessCpuLoad": ("/core-service=platform-mbean/type=operating-system", ("process-cpu-load", "ProcessCpuLoad")),
+    "OSSystemCpuLoad": ("/core-service=platform-mbean/type=operating-system", ("system-cpu-load", "SystemCpuLoad")),
+    "OSFreePhysicalMemory": ("/core-service=platform-mbean/type=operating-system", ("free-physical-memory-size", "FreePhysicalMemorySize")),
+    "DatasourceActiveCount": ("/subsystem=datasources/data-source=ExampleDS/statistics=pool", ("ActiveCount", "active-count")),
+    "DatasourceInUseCount": ("/subsystem=datasources/data-source=ExampleDS/statistics=pool", ("InUseCount", "in-use-count")),
+    "DatasourceAvailableCount": ("/subsystem=datasources/data-source=ExampleDS/statistics=pool", ("AvailableCount", "available-count")),
+    "UndertowRequestCount": ("/subsystem=undertow/server=default-server/http-listener=default", ("RequestCount", "request-count")),
+    "UndertowErrorCount": ("/subsystem=undertow/server=default-server/http-listener=default", ("ErrorCount", "error-count")),
+    "G1YoungGenCollectionCount": ("/core-service=platform-mbean/type=garbage-collector/name=G1 Young Generation", ("collection-count", "CollectionCount")),
+    "G1YoungGenCollectionTime": ("/core-service=platform-mbean/type=garbage-collector/name=G1 Young Generation", ("collection-time", "CollectionTime")),
+    "G1OldGenCollectionCount": ("/core-service=platform-mbean/type=garbage-collector/name=G1 Old Generation", ("collection-count", "CollectionCount")),
+    "G1OldGenCollectionTime": ("/core-service=platform-mbean/type=garbage-collector/name=G1 Old Generation", ("collection-time", "CollectionTime")),
+}
+
+
+def _rest_address_for_subtype(subtype):
+    if str(subtype).startswith("/"):
+        return subtype
+    if str(subtype) in ("MemoryHeapMemoryUsage", "MemoryNonHeapMemoryUsage"):
+        return "/core-service=platform-mbean/type=memory"
+    config = JBOSS_REST_SIMPLE_FIELDS.get(str(subtype))
+    return config[0] if config else ""
+
+
+def _legacy_timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _legacy_number(value):
+    number = common.numeric_value(value)
+    if number is None:
+        return None
+    return str(int(number)) if float(number).is_integer() else str(number)
+
+
+def _case_value(source, names):
+    if not isinstance(source, dict):
+        return None
+    lower_map = {str(key).lower(): value for key, value in source.items()}
+    for name in names:
+        if name in source:
+            return source[name]
+        lowered = str(name).lower()
+        if lowered in lower_map:
+            return lower_map[lowered]
+    return None
+
+
+def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
+    formatted = _legacy_number(value)
+    if formatted is None:
+        return False
+    os.makedirs(str(logdir), exist_ok=True)
+    file_path = os.path.join(str(logdir), "Statistics_" + str(subtype) + ".csv")
+    new_file = not os.path.isfile(file_path) or os.path.getsize(file_path) == 0
+    with open(file_path, "a", encoding="utf-8", newline="") as f:
+        if new_file:
+            f.write("key,server,timestamp,value\n")
+        f.write(str(key) + "," + str(server) + "," + str(timestamp) + "," + formatted + "\n")
+    return True
+
+
+def _write_jboss_memory_usage(logdir, subtype, thisnode, result):
+    field = "heap-memory-usage" if str(subtype) == "MemoryHeapMemoryUsage" else "non-heap-memory-usage"
+    usage = result.get(field) if isinstance(result, dict) and isinstance(result.get(field), dict) else {}
+    timestamp = _legacy_timestamp()
+    wrote = False
+    for key in ("committed", "init", "max", "used"):
+        value = common.numeric_value(_case_value(usage, (key, key.replace("-", "_"))))
+        if value is None:
+            continue
+        wrote = _write_legacy_stat_row(logdir, subtype, key + "_mb", thisnode, timestamp, value / 1048576) or wrote
+    return wrote
+
+
+def _write_jboss_rest_legacy(logdir, subtype, thisnode, payload):
+    result = payload.get("result") if isinstance(payload, dict) and isinstance(payload.get("result"), dict) else {}
+    if str(subtype) in ("MemoryHeapMemoryUsage", "MemoryNonHeapMemoryUsage"):
+        return _write_jboss_memory_usage(logdir, subtype, thisnode, result)
+    config = JBOSS_REST_SIMPLE_FIELDS.get(str(subtype))
+    if not config:
+        return False
+    value = _case_value(result, config[1])
+    return _write_legacy_stat_row(logdir, subtype, subtype, thisnode, _legacy_timestamp(), value)
+
+
+def _collect_rest_statistics(thisnode, values, metrics):
+    base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "9990")
+    for subtype, logdir in metrics.items():
+        request_payload = {
+            "operation": "read-resource",
+            "include-runtime": True,
+            "recursive": True,
+        }
+        address = _management_address(_rest_address_for_subtype(subtype))
+        if address:
+            request_payload["address"] = address
+        try:
+            payload = common.rest_json_request(
+                base_url,
+                "/management",
+                values,
+                method="POST",
+                payload=request_payload,
+                auth="digest",
+            )
+            if not _write_jboss_rest_legacy(logdir, subtype, thisnode, payload):
+                common.write_numeric_tree(logdir, subtype, thisnode, payload)
+        except Exception as err:
+            classes.Err("jboss rest statistics error:" + str(err))
+
+
+def restAvailabilityCheck(thisnode, values):
+    base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "9990")
+    try:
+        payload = common.rest_json_request(
+            base_url,
+            "/management",
+            values,
+            method="POST",
+            payload={"operation": "read-resource", "include-runtime": True},
+            auth="digest",
+        )
+    except Exception:
+        return 0
+    result = payload.get("result") if isinstance(payload, dict) else {}
+    if not isinstance(result, dict):
+        return 0
+    state = result.get("server-state") or result.get("state") or result.get("status")
+    return 1 if common.safe_text(state).lower() == "running" else 0
+
+
 def getStat(thisqm, inpdata):
     try:
         inpdata = common.parse_json_object(inpdata)
         values, metrics = common.pop_fields(
-            inpdata, {"usr": "", "pwd": "", "mngmport": ""}
+            inpdata,
+            {
+                "usr": "",
+                "pwd": "",
+                "mngmport": "",
+                "jmxport": "",
+                "port": "",
+                "webport": "",
+                "host": "",
+                "ssl": "no",
+                "conntype": "jms",
+            },
         )
+        if not values.get("mngmport"):
+            values["mngmport"] = values.get("jmxport") or values.get("port") or values.get("webport") or ""
         optadvisor_config, metrics = _split_optadvisor_config(metrics)
         jar_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             "resources",
             "midleo_jboss.jar",
         )
-        if metrics:
+        if metrics and common.connection_type(values) == "rest":
+            _collect_rest_statistics(thisqm, values, metrics)
+        elif metrics:
             java_arg = json.dumps(
                 {
                     "logdir": common.first_value(metrics),

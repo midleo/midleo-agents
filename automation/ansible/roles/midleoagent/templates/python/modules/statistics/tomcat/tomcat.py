@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+from datetime import datetime
 
 from modules.base import classes
 from modules.statistics import common
@@ -196,19 +197,185 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
         common.append_optadvisor_payload("tomcat", thisnode, payload)
 
 
+TOMCAT_REST_LEGACY_FIELDS = {
+    "ThreadPoolCurrentBusy": ("connector_thread", ("currentThreadsBusy", "current_threads_busy")),
+    "ThreadPoolCurrentThreadCount": ("connector_thread", ("currentThreadCount", "current_thread_count")),
+    "ThreadPoolMaxThreads": ("connector_thread", ("maxThreads", "max_threads")),
+    "ThreadPoolAcceptCount": ("connector_thread", ("acceptCount", "accept_count")),
+    "ThreadPoolConnectionCount": ("connector_thread", ("connectionCount", "connection_count")),
+    "ThreadPoolKeepAliveCount": ("connector_thread", ("keepAliveCount", "keep_alive_count")),
+    "ThreadPoolMinSpareThreads": ("connector_thread", ("minSpareThreads", "min_spare_threads")),
+    "HttpBytesReceived": ("connector_request", ("bytesReceived", "bytes_received")),
+    "HttpBytesSent": ("connector_request", ("bytesSent", "bytes_sent")),
+    "HttpErrorCount": ("connector_request", ("errorCount", "error_count")),
+    "HttpRequestCount": ("connector_request", ("requestCount", "request_count")),
+    "HttpProcessingTime": ("connector_request", ("processingTime", "processing_time")),
+    "ServerUptime": ("tomcat", ("uptime", "Uptime")),
+    "ServerStartup": ("tomcat", ("startTime", "startup", "started")),
+    "ThreadCount": ("threading", ("threadCount", "thread.count")),
+    "PeakThreadCount": ("threading", ("peakThreadCount", "thread.peak")),
+    "DaemonThreadCount": ("threading", ("daemonThreadCount", "thread.daemon")),
+    "ClassLoadingLoadedClassCount": ("classloading", ("loadedClassCount", "classesLoaded")),
+    "ClassLoadingTotalLoadedClassCount": ("classloading", ("totalLoadedClassCount", "classesTotalLoaded")),
+    "ClassLoadingUnloadedClassCount": ("classloading", ("unloadedClassCount", "classesUnloaded")),
+    "OSProcessCpuLoad": ("os", ("processCpuLoad", "process_cpu_load")),
+    "OSSystemCpuLoad": ("os", ("systemCpuLoad", "system_cpu_load")),
+    "OSFreePhysicalMemory": ("os", ("freePhysicalMemorySize", "free_physical_memory")),
+}
+
+
+def _legacy_timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _legacy_number(value):
+    number = common.numeric_value(value)
+    if number is None:
+        return None
+    return str(int(number)) if float(number).is_integer() else str(number)
+
+
+def _case_value(source, names):
+    if not isinstance(source, dict):
+        return None
+    lower_map = {str(key).lower(): value for key, value in source.items()}
+    for name in names:
+        if name in source:
+            return source[name]
+        lowered = str(name).lower()
+        if lowered in lower_map:
+            return lower_map[lowered]
+    return None
+
+
+def _tomcat_payload_root(payload):
+    if not isinstance(payload, dict):
+        return {}
+    tomcat = payload.get("tomcat")
+    return tomcat if isinstance(tomcat, dict) else payload
+
+
+def _tomcat_connectors(root):
+    connectors = root.get("connectors") if isinstance(root, dict) else []
+    if isinstance(connectors, dict):
+        return list(connectors.values())
+    return connectors if isinstance(connectors, list) else []
+
+
+def _connector_section(root, section):
+    for connector in _tomcat_connectors(root):
+        if not isinstance(connector, dict):
+            continue
+        value = connector.get(section)
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
+    formatted = _legacy_number(value)
+    if formatted is None:
+        return False
+    os.makedirs(str(logdir), exist_ok=True)
+    file_path = os.path.join(str(logdir), "Statistics_" + str(subtype) + ".csv")
+    new_file = not os.path.isfile(file_path) or os.path.getsize(file_path) == 0
+    with open(file_path, "a", encoding="utf-8", newline="") as f:
+        if new_file:
+            f.write("key,server,timestamp,value\n")
+        f.write(str(key) + "," + str(server) + "," + str(timestamp) + "," + formatted + "\n")
+    return True
+
+
+def _write_tomcat_memory_usage(logdir, subtype, thisnode, root):
+    jvm = root.get("jvm") if isinstance(root, dict) and isinstance(root.get("jvm"), dict) else {}
+    free_memory = common.numeric_value(_case_value(jvm, ("freeMemory", "free_memory")))
+    total_memory = common.numeric_value(_case_value(jvm, ("totalMemory", "total_memory")))
+    max_memory = common.numeric_value(_case_value(jvm, ("maxMemory", "max_memory")))
+    timestamp = _legacy_timestamp()
+    wrote = False
+    if total_memory is not None and free_memory is not None:
+        wrote = _write_legacy_stat_row(logdir, subtype, "used_mb", thisnode, timestamp, (total_memory - free_memory) / 1048576) or wrote
+        wrote = _write_legacy_stat_row(logdir, subtype, "committed_mb", thisnode, timestamp, total_memory / 1048576) or wrote
+    if max_memory is not None:
+        wrote = _write_legacy_stat_row(logdir, subtype, "max_mb", thisnode, timestamp, max_memory / 1048576) or wrote
+    return wrote
+
+
+def _write_tomcat_rest_legacy(logdir, subtype, thisnode, payload):
+    root = _tomcat_payload_root(payload)
+    if str(subtype) == "MemoryHeapMemoryUsage":
+        return _write_tomcat_memory_usage(logdir, subtype, thisnode, root)
+
+    config = TOMCAT_REST_LEGACY_FIELDS.get(str(subtype))
+    if not config:
+        return False
+    source_type, field_names = config
+    if source_type == "connector_thread":
+        source = _connector_section(root, "threadInfo")
+    elif source_type == "connector_request":
+        source = _connector_section(root, "requestInfo")
+    else:
+        source = root.get(source_type) if isinstance(root.get(source_type), dict) else root
+    value = _case_value(source, field_names)
+    return _write_legacy_stat_row(logdir, subtype, subtype, thisnode, _legacy_timestamp(), value)
+
+
+def _collect_rest_statistics(thisnode, values, metrics):
+    base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "8080")
+    cache = {}
+    for subtype, logdir in metrics.items():
+        path = str(subtype or "").strip()
+        if not path.startswith("/"):
+            path = "/manager/status/all?JSON=true"
+        try:
+            if path not in cache:
+                cache[path] = common.rest_json_request(base_url, path, values)
+            if not _write_tomcat_rest_legacy(logdir, subtype, thisnode, cache[path]):
+                common.write_numeric_tree(logdir, subtype, thisnode, cache[path])
+        except Exception as err:
+            classes.Err("tomcat rest statistics error:" + str(err))
+
+
+def restAvailabilityCheck(thisnode, values):
+    base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "8080")
+    try:
+        payload = common.rest_json_request(base_url, "/manager/status/all?JSON=true", values)
+    except Exception:
+        return 0
+    tomcat = payload.get("tomcat") if isinstance(payload, dict) else None
+    if isinstance(tomcat, dict) and (tomcat.get("jvm") or tomcat.get("serverInfo")):
+        return 1
+    return 0
+
+
 def getStat(thisqm, inpdata):
     try:
         inpdata = common.parse_json_object(inpdata)
         values, metrics = common.pop_fields(
-            inpdata, {"usr": "", "pwd": "", "mngmport": ""}
+            inpdata,
+            {
+                "usr": "",
+                "pwd": "",
+                "mngmport": "",
+                "jmxport": "",
+                "port": "",
+                "webport": "",
+                "host": "",
+                "ssl": "no",
+                "conntype": "jms",
+            },
         )
+        if not values.get("mngmport"):
+            values["mngmport"] = values.get("jmxport") or values.get("port") or values.get("webport") or ""
         optadvisor_config, metrics = common.split_optadvisor_config(metrics)
         jar_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             "resources",
             "midleo_tomcat.jar",
         )
-        if metrics:
+        if metrics and common.connection_type(values) == "rest":
+            _collect_rest_statistics(thisqm, values, metrics)
+        elif metrics:
             java_arg = json.dumps(
                 {
                     "logdir": common.first_value(metrics),

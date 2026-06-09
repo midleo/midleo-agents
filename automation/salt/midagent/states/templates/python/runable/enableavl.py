@@ -72,6 +72,18 @@ def _parse_json_arg(value):
     return parsed
 
 
+def _json_value(data, *keys, default=""):
+    for key in keys:
+        if key in data and data[key] not in (None, ""):
+            return data[key]
+    return default
+
+
+def _normalize_conntype(value):
+    value = str(value or "jms").strip().lower()
+    return value if value in ("jms", "rest") else "jms"
+
+
 def createAvlJson():
     appsrv = _arg(1, "APPSRV")
     appsrvtype = _arg(2, "APPSRVTYPE")
@@ -92,15 +104,27 @@ def createAvlJson():
     if appsrvtype not in avl_data or not isinstance(avl_data.get(appsrvtype), dict):
         avl_data[appsrvtype] = {}
 
+    mngmport = _json_value(monjsdata, "mngmport", "jmxport", "soapport", "port")
+    rest_port = _json_value(monjsdata, "port", "webport", "mngmport", "jmxport", "soapport")
+    raw_pwd = _json_value(monjsdata, "pass", "pwd")
+
     avl_data[appsrvtype][appsrv] = {
         "enabled": "yes",
         "monid": "monapplavl",
         "dockercont": monjsdata["docker"] if "docker" in monjsdata else "",
-        "usr": monjsdata["user"] if "user" in monjsdata else "",
+        "usr": _json_value(monjsdata, "user", "usr"),
         "ssl": monjsdata["ssl"] if "ssl" in monjsdata else "no",
         "appsrvid": monjsdata["appsrvid"] if "appsrvid" in monjsdata else "none",
-        "mngmport": monjsdata["mngmport"] if "mngmport" in monjsdata else "",
-        "pwd": decrypt.encryptPWD(monjsdata["pass"]) if "pass" in monjsdata else "",
+        "mngmport": mngmport,
+        "port": rest_port,
+        "jmxport": _json_value(monjsdata, "jmxport"),
+        "soapport": _json_value(monjsdata, "soapport"),
+        "webport": _json_value(monjsdata, "webport"),
+        "host": _json_value(monjsdata, "host"),
+        "servtype": _json_value(monjsdata, "servtype"),
+        "appserver": _json_value(monjsdata, "appserver", "managed_server", "appsrv"),
+        "conntype": _normalize_conntype(_json_value(monjsdata, "conntype", default="jms")),
+        "pwd": decrypt.encryptPWD(str(raw_pwd)) if raw_pwd else "",
     }
 
     configs.saveAvlData(avl_data)

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import requests
 import urllib3
 
-from modules.base import decrypt
+from modules.base import decrypt, file_utils
 from modules.base import classes, makerequest
 from modules.statistics import common
 
@@ -44,6 +44,10 @@ OPTADVISOR_CONFIG_KEYS = {
     "truststorepass",
     "sslverify",
     "ssl_verify",
+    "conntype",
+    "mngmport",
+    "jmxport",
+    "webport",
     "docker",
     "contname",
     "monitoring_mode",
@@ -488,6 +492,106 @@ def _rest_collect_optadvisor(thisnode, config, values):
     return {"target": target, "resources": resources}
 
 
+def _rest_statistics_subtype(subtype):
+    text = _safe_text(subtype) or "apiv2"
+    if text.startswith("/"):
+        text = text.strip("/") or "apiv2"
+    normalized = "".join(ch if ch.isalnum() or ch in ("_", "-") else "_" for ch in text)
+    return normalized[:80] or "apiv2"
+
+
+def _ace_rest_path(subtype, values):
+    text = _safe_text(subtype)
+    lower = text.lower()
+    if text.startswith("/"):
+        return text
+    if lower in ("node", "integration_node", "integrationnode", "apiv2"):
+        return "/apiv2?depth=2"
+    if lower in ("jvm", "odbc", "servers", "integration_servers", "integrationservers"):
+        return "/apiv2/servers?depth=3"
+    server_name = _safe_text(values.get("server") or values.get("integration_server"))
+    if lower in ("applications", "messageflows", "flows") and server_name:
+        return "/apiv2/servers/" + quote(server_name, safe="") + "?depth=3"
+    return "/apiv2?depth=2"
+
+
+def _collect_rest_statistics(thisnode, values, metrics):
+    base_url = _rest_base_url(thisnode, {}, values)
+    verify = _rest_verify({}, values)
+    auth = (values.get("usr", ""), _rest_password(values))
+    cache = {}
+
+    for subtype, logdir in metrics.items():
+        path = _ace_rest_path(subtype, values)
+        try:
+            if path not in cache:
+                cache[path] = _rest_get(base_url, path, auth, verify)
+            common.write_numeric_tree(
+                logdir,
+                _rest_statistics_subtype(subtype),
+                thisnode,
+                cache[path],
+            )
+        except Exception as err:
+            classes.Err("ibmace rest statistics error:" + str(err))
+
+
+def restAvailabilityCheck(thisnode, values):
+    base_url = _rest_base_url(thisnode, {}, values)
+    verify = _rest_verify({}, values)
+    auth = (values.get("usr", ""), _rest_password(values))
+    payload = _rest_get(base_url, "/apiv2?depth=2", auth, verify)
+    if not isinstance(payload, dict):
+        return 0
+    if _safe_text(payload.get("type")).lower() == "integrationnode" and _safe_text(payload.get("name")):
+        return 1
+    active = payload.get("active") if isinstance(payload.get("active"), dict) else {}
+    if active.get("processId"):
+        return 1
+    descriptive = payload.get("descriptiveProperties") if isinstance(payload.get("descriptiveProperties"), dict) else {}
+    if descriptive.get("version") or descriptive.get("productName"):
+        return 1
+    return 0
+
+
+def _generic_stat_mapping():
+    return {
+        "noteq": "key",
+        "node": 1,
+        "server": 1,
+        "keys": {
+            "timestamp": 2,
+            "count": 3,
+        },
+    }
+
+
+def _post_rest_statistics(website, webssl, stat_data):
+    if not isinstance(stat_data, dict):
+        return
+    mapping = _generic_stat_mapping()
+    for subtype, logdir in stat_data.items():
+        file_path = os.path.join(str(logdir), "Statistics_" + _rest_statistics_subtype(subtype) + ".csv")
+        ret = file_utils.csv_json(file_path, mapping, "", True)
+        try:
+            retarr = json.loads(ret)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            retarr = {}
+        if not retarr:
+            continue
+        makerequest.postStatData(
+            webssl,
+            website,
+            json.dumps(
+                {
+                    "type": "ibmace",
+                    "subtype": _rest_statistics_subtype(subtype),
+                    "data": retarr,
+                }
+            ),
+        )
+
+
 def _java_result_error(java_result):
     if not isinstance(java_result, dict):
         return "invalid java result"
@@ -647,6 +751,7 @@ def getStat(thisqm, inpdata):
                 "truststorepass": "",
                 "sslverify": "",
                 "ssl_verify": "",
+                "conntype": "jms",
             },
         )
         if not values.get("usr") and values.get("srvuser"):
@@ -663,6 +768,8 @@ def getStat(thisqm, inpdata):
             optadvisor_config["port"] = values["port"]
         if values.get("server"):
             optadvisor_config["server"] = values["server"]
+        if metrics and common.connection_type(values) == "rest":
+            _collect_rest_statistics(thisqm, values, metrics)
         if common.optadvisor_collection_enabled(optadvisor_config):
             jar_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
@@ -712,8 +819,34 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata)
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     optadvisor_config, legacy_stat_data = _split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {})
+    _, legacy_stat_data = common.pop_fields(
+        legacy_stat_data,
+        {
+            "usr": "",
+            "pwd": "",
+            "srvuser": "",
+            "srvpass": "",
+            "host": "",
+            "port": "",
+            "mngmport": "",
+            "jmxport": "",
+            "webport": "",
+            "server": "",
+            "integration_server": "",
+            "ssl": "",
+            "sslenabled": "",
+            "conntype": "",
+            "docker": "",
+            "contname": "",
+            "truststore": "",
+            "truststorepass": "",
+            "sslverify": "",
+            "ssl_verify": "",
+        },
+    )
     if common.optadvisor_collection_enabled(optadvisor_config):
         _queue_optadvisor_jvm_stats(thisnode, optadvisor_config, legacy_stat_data)
+    _post_rest_statistics(website, webssl, legacy_stat_data)
     common.post_csv_stats(
         "ibmace",
         lambda subtype: "ibmace" + subtype,
