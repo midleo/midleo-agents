@@ -1,101 +1,154 @@
+import os
+import shutil
 import subprocess as sp
-from os import path
-import re
 
-def run(cmd, shell=False):
-    return sp.check_output(cmd, shell=shell, stderr=sp.DEVNULL).decode("utf-8", errors="ignore").splitlines()
+DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_PACKAGE_SCAN_TIMEOUT_SECONDS", "30"))
+MAX_SOFTWARE_ITEMS = int(os.environ.get("MIDLEO_MAX_SOFTWARE_ITEMS", "20000"))
+
+
+def _which(*names):
+    for name in names:
+        found = shutil.which(name)
+        if found:
+            return found
+    return ""
+
+
+def run(cmd, timeout=DEFAULT_TIMEOUT_SECONDS):
+    try:
+        return sp.check_output(
+            cmd,
+            stderr=sp.DEVNULL,
+            timeout=timeout,
+        ).decode("utf-8", errors="ignore").splitlines()
+    except Exception:
+        return []
+
+
+def _append(software_list, name, version="", publisher="", description=""):
+    if not name or len(software_list) >= MAX_SOFTWARE_ITEMS:
+        return
+    software_list.append(
+        {
+            "name": str(name).strip(),
+            "version": str(version or "").strip(),
+            "publisher": str(publisher or "").strip(),
+            "description": str(description or "").strip(),
+        }
+    )
+
 
 def get_flatpak():
-    return run(["flatpak", "list", "--app"])
+    flatpak = _which("flatpak")
+    if not flatpak:
+        return []
+    return run([flatpak, "list", "--app", "--columns=application,version"])
+
 
 def get_apt():
-    return run(["dpkg", "-l"])
+    dpkg_query = _which("dpkg-query")
+    if dpkg_query:
+        return run([dpkg_query, "-W", "-f=${Package}\t${Version}\t${binary:Summary}\n"])
+    dpkg = _which("dpkg")
+    if dpkg:
+        return run([dpkg, "-l"])
+    return []
 
-def get_yum():
-    return run(["yum", "list", "installed"])
 
 def get_rpm():
-    return run('rpm -qa --qf "%{NAME} %{VERSION} %{VENDOR}\n"', shell=True)
+    rpm = _which("rpm")
+    if not rpm:
+        return []
+    return run([rpm, "-qa", "--qf", "%{NAME}\t%{VERSION}-%{RELEASE}\t%{VENDOR}\n"])
+
 
 def get_pkginfo():
-    return run('pkginfo -l | egrep "(PKGINST|VERSION)" | sed "s/  *//g" | awk "{print}" ORS=" "', shell=True)
+    pkginfo = _which("pkginfo")
+    if not pkginfo:
+        return []
+    return run([pkginfo, "-l"])
+
 
 def get_pkgs11():
-    return run(["pkg", "list", "-H"])
+    pkg = _which("pkg")
+    if not pkg:
+        return []
+    return run([pkg, "list", "-H"])
+
+
+def _collect_flatpak(software_list):
+    for line in get_flatpak():
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            _append(software_list, parts[0], parts[1], "flatpak")
+        elif line.strip():
+            _append(software_list, line.split()[0], "", "flatpak")
+
+
+def _collect_debian(software_list):
+    for line in get_apt():
+        if "\t" in line:
+            parts = line.split("\t", 2)
+            if len(parts) >= 2:
+                _append(
+                    software_list,
+                    parts[0],
+                    parts[1],
+                    "debian",
+                    parts[2] if len(parts) > 2 else "",
+                )
+            continue
+
+        if line.startswith("ii"):
+            parts = line.split(None, 4)
+            if len(parts) >= 5:
+                _append(software_list, parts[1], parts[2], "debian", parts[4])
+
+
+def _collect_rpm(software_list):
+    for line in get_rpm():
+        parts = line.split("\t", 2)
+        if len(parts) >= 2:
+            _append(
+                software_list,
+                parts[0],
+                parts[1],
+                parts[2] if len(parts) > 2 else "rpm",
+            )
+
+
+def _collect_pkginfo(software_list):
+    name = version = None
+    for raw_line in get_pkginfo():
+        line = raw_line.strip()
+        if line.startswith("PKGINST:"):
+            name = line.split(":", 1)[1].strip()
+        elif line.startswith("VERSION:"):
+            version = line.split(":", 1)[1].strip()
+        if name and version:
+            _append(software_list, name, version, "solaris")
+            name = version = None
+
+
+def _collect_pkgs11(software_list):
+    for line in get_pkgs11():
+        parts = line.split()
+        if len(parts) >= 2:
+            _append(software_list, parts[0], parts[1], "solaris")
+
 
 def getSoftware():
     software_list = []
 
-    if path.exists("/usr/bin/flatpak"):
-        for pkg in get_flatpak():
-            if pkg:
-                software_list.append({"name": pkg.split()[0], "version": "", "publisher": "flatpak", "description": ""})
-        return software_list
+    _collect_flatpak(software_list)
 
-    if path.exists("/usr/bin/dpkg"):
-        for line in get_apt():
-            if line.startswith("ii"):
-                parts = line.split(None, 4)
-                if len(parts) >= 5:
-                    software_list.append({
-                        "name": parts[1],
-                        "version": parts[2],
-                        "publisher": "debian",
-                        "description": parts[4]
-                    })
-        return software_list
-
-    if path.exists("/usr/bin/yum"):
-        for pkg in get_yum():
-            parts = pkg.split()
-            if len(parts) >= 3 and "." in parts[0]:
-                software_list.append({
-                    "name": parts[0],
-                    "version": parts[1],
-                    "publisher": parts[2],
-                    "description": ""
-                })
-        return software_list
-
-    if path.exists("/usr/bin/rpm"):
-        for pkg in get_rpm():
-            parts = pkg.split(None, 2)
-            if len(parts) == 3:
-                software_list.append({
-                    "name": parts[0],
-                    "version": parts[1],
-                    "publisher": parts[2],
-                    "description": ""
-                })
-        return software_list
-
-    if path.exists("/usr/bin/pkginfo"):
-        name = version = None
-        for line in get_pkginfo():
-            if line.startswith("PKGINST:"):
-                name = line.split(":", 1)[1]
-            elif line.startswith("VERSION:"):
-                version = line.split(":", 1)[1]
-            if name and version:
-                software_list.append({
-                    "name": name,
-                    "version": version,
-                    "publisher": "solaris",
-                    "description": ""
-                })
-                name = version = None
-        return software_list
-
-    if path.exists("/usr/bin/pkg"):
-        for pkg in get_pkgs11():
-            parts = pkg.split()
-            if len(parts) >= 2:
-                software_list.append({
-                    "name": parts[0],
-                    "version": parts[1],
-                    "publisher": "solaris",
-                    "description": ""
-                })
-        return software_list
+    if _which("dpkg-query", "dpkg"):
+        _collect_debian(software_list)
+    elif _which("rpm"):
+        _collect_rpm(software_list)
+    elif _which("pkginfo"):
+        _collect_pkginfo(software_list)
+    elif _which("pkg"):
+        _collect_pkgs11(software_list)
 
     return software_list

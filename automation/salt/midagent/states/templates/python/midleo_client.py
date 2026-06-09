@@ -12,7 +12,7 @@ from datetime import datetime
 from modules.base import classes, configs, decrypt, secrets
 
 PORT_NUMBER = 5550
-AGENT_VER = "1.26.05"
+AGENT_VER = "1.26.06"
 
 MAX_FRAME_BYTES = 2 * 1024 * 1024
 MAX_FILE_BYTES = 5 * 1024 * 1024

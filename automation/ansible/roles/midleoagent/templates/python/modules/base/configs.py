@@ -52,6 +52,10 @@ SECTION_FILE_MAP = {
 
 def _ensure_dir():
     os.makedirs(CONFIG_DIR, exist_ok=True)
+    try:
+        os.chmod(CONFIG_DIR, 0o700)
+    except Exception:
+        pass
 
 
 def _read_json_file(path, default=None):
@@ -73,6 +77,7 @@ def _write_json_atomic(path, data):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
             json.dump(data, tmp_file, ensure_ascii=False, indent=2, sort_keys=True)
+            tmp_file.write("\n")
         os.replace(tmp_path, path)
         try:
             os.chmod(path, 0o600)

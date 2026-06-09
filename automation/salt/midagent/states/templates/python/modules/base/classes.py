@@ -17,6 +17,10 @@ def _safe_text(value):
 
 def _ensure_log_dir():
     os.makedirs(LOG_DIR, exist_ok=True)
+    try:
+        os.chmod(LOG_DIR, 0o700)
+    except Exception:
+        pass
 
 
 def _rotate_log(path):
