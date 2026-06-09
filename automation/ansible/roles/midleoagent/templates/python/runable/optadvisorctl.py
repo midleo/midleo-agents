@@ -8,15 +8,10 @@ parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
 from modules.statistics import common
-from modules.base import configs
+from modules.base import configs, secrets
 
 
-REMOVED_OPTADVISOR_AUTH_KEYS = {
-    "optadvisor_token",
-    "optadvisor_token_uid",
-    "optadvisor_token_expires_at",
-    "collector_token",
-}
+REMOVED_OPTADVISOR_AUTH_KEYS = secrets.REMOVED_AUTH_KEYS
 
 
 def _print_state(state):

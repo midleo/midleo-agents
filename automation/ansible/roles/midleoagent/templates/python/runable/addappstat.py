@@ -7,7 +7,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
-from modules.base import decrypt, configs
+from modules.base import decrypt, configs, secrets
 
 
 def _arg(index, name):
@@ -47,7 +47,11 @@ def createMonJson():
         stjsdata["conntype"] = "jms"
 
     for k, item in stjsdata.items():
-        mon_data[srvtype][appsrv][k] = decrypt.encryptPWD(item) if k == "pwd" and item else item
+        mon_data[srvtype][appsrv][k] = (
+            decrypt.encryptPWD(str(item))
+            if secrets.is_encrypted_secret_key(k) and item
+            else item
+        )
 
     configs.savemonData(mon_data)
     print(appsrv + " of type " + srvtype + " have been added")

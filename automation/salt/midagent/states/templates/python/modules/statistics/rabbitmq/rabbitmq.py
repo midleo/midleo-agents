@@ -11,7 +11,7 @@ from modules.statistics import common
 
 OPTADVISOR_COLLECTOR_NAME = "rabbitmq-management-collector"
 OPTADVISOR_TECHNOLOGY = "rabbitmq"
-RABBITMQ_CONFIG_KEYS = {"usr", "pwd", "mngmport", "port", "ssl", "vhost"}
+RABBITMQ_CONFIG_KEYS = {"usr", "pwd", "mngmport", "port", "ssl", "sslverify", "ssl_verify", "vhost"}
 
 
 def _decode_password(value):
@@ -152,7 +152,7 @@ def getStat(thisqm, inpdata):
         inpdata = common.parse_json_object(inpdata)
         values, metrics = common.pop_fields(
             inpdata,
-            {"usr": "", "pwd": "", "mngmport": "15672", "port": "", "ssl": "no", "vhost": ""},
+            {"usr": "", "pwd": "", "mngmport": "15672", "port": "", "ssl": "no", "sslverify": "", "ssl_verify": "", "vhost": ""},
         )
         optadvisor_config, _ = common.split_optadvisor_config(metrics, RABBITMQ_CONFIG_KEYS)
         if common.optadvisor_collection_enabled(optadvisor_config):

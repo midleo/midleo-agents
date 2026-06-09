@@ -7,23 +7,9 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
-from modules.base import decrypt, configs
+from modules.base import decrypt, configs, secrets
 
-SECRET_KEYS = {
-    "pwd",
-    "pass",
-    "password",
-    "srvpass",
-    "cpass",
-    "chlpass",
-    "token",
-}
-REMOVED_OPTADVISOR_AUTH_KEYS = {
-    "optadvisor_token",
-    "optadvisor_token_uid",
-    "optadvisor_token_expires_at",
-    "collector_token",
-}
+REMOVED_OPTADVISOR_AUTH_KEYS = secrets.REMOVED_AUTH_KEYS
 IBMMQ_OPTADVISOR_DEFAULTS = {
     "collection_mode": "summary_plus_topn",
     "top_n_depth": 25,
@@ -50,7 +36,7 @@ def _arg(index, name):
 
 
 def _store_value(key, value):
-    if key.lower() in SECRET_KEYS and value:
+    if secrets.is_encrypted_secret_key(key) and value:
         return decrypt.encryptPWD(str(value))
     return value
 

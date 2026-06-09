@@ -338,6 +338,8 @@ def getStat(thisqm, inpdata):
                 "webport": "",
                 "host": "",
                 "ssl": "no",
+                "sslverify": "",
+                "ssl_verify": "",
                 "conntype": "jms",
             },
         )

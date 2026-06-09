@@ -114,6 +114,7 @@ def createAvlJson():
         "dockercont": monjsdata["docker"] if "docker" in monjsdata else "",
         "usr": _json_value(monjsdata, "user", "usr"),
         "ssl": monjsdata["ssl"] if "ssl" in monjsdata else "no",
+        "sslverify": _json_value(monjsdata, "sslverify", "ssl_verify"),
         "appsrvid": monjsdata["appsrvid"] if "appsrvid" in monjsdata else "none",
         "mngmport": mngmport,
         "port": rest_port,

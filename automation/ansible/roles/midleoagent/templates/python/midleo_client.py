@@ -9,7 +9,7 @@ import tempfile
 import zlib
 from datetime import datetime
 
-from modules.base import classes, configs, decrypt
+from modules.base import classes, configs, decrypt, secrets
 
 PORT_NUMBER = 5550
 AGENT_VER = "1.26.05"
@@ -41,12 +41,6 @@ FORBIDDEN_PATTERNS = [
 
 SHELL_META_CHARS = set("|&;<>\n`")
 AGENT_SCRIPT_COMMANDS = {"magent.sh", "magent.bat", "cronjobs.sh", "cronjobs.bat"}
-SECRET_RE = re.compile(
-    r'("?(?:pwd|pass|password|srvpass|cpass|chlpass)"?\s*:\s*)'
-    r'(".*?"|\'.*?\'|[^,\}\s]+)',
-    flags=re.IGNORECASE,
-)
-
 
 def _get_cfg():
     cfg = configs.getcfgData() or {}
@@ -122,7 +116,7 @@ def _reply(now_str, parts, cfgkey):
 
 
 def _sanitize(text):
-    return SECRET_RE.sub(r'\1"..."', str(text))
+    return secrets.redact_text(text)
 
 
 def _split_commands(raw):

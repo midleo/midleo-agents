@@ -12,7 +12,7 @@ import urllib.request
 import uuid
 from datetime import datetime, timezone, timedelta
 
-from modules.base import classes, decrypt, file_utils, makerequest, statarr
+from modules.base import classes, decrypt, file_utils, makerequest, secrets, statarr
 
 DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_STAT_TIMEOUT_SECONDS", "45"))
 MAX_LOG_BYTES = 4000
@@ -36,11 +36,7 @@ OPTADVISOR_CONFIG_KEYS = {
     "appserver",
     "managed_server",
 }
-REMOVED_OPTADVISOR_AUTH_KEYS = {
-    "optadvisor_token",
-    "optadvisor_token_uid",
-    "optadvisor_token_expires_at",
-}
+REMOVED_OPTADVISOR_AUTH_KEYS = secrets.REMOVED_AUTH_KEYS
 
 
 def parse_json_object(payload):
@@ -107,6 +103,18 @@ def truthy(value):
     return str(value).strip().lower() in ("1", "y", "yes", "true", "on", "enabled")
 
 
+def rest_verify_enabled(values):
+    values = values or {}
+    verify_value = None
+    for key in ("ssl_verify", "sslverify"):
+        if key in values and values.get(key) is not None and str(values.get(key)).strip() != "":
+            verify_value = values.get(key)
+            break
+    if verify_value is None or str(verify_value).strip() == "":
+        verify_value = "yes"
+    return truthy(verify_value)
+
+
 def decrypt_password(value):
     if not value:
         return ""
@@ -142,6 +150,7 @@ def rest_json_request(base_url, path, values, method="GET", payload=None, auth="
     usr = safe_text(values.get("usr"))
     pwd = decrypt_password(values.get("pwd") or "")
     use_ssl = url.lower().startswith("https://")
+    verify_ssl = rest_verify_enabled(values)
     headers = {
         "Accept": "application/json",
         "X-Requested-By": "Midleo",
@@ -160,7 +169,7 @@ def rest_json_request(base_url, path, values, method="GET", payload=None, auth="
         passman = urllib.request.HTTPPasswordMgrWithDefaultRealm()
         passman.add_password(None, url, usr, pwd)
         handlers.append(urllib.request.HTTPDigestAuthHandler(passman))
-    if use_ssl:
+    if use_ssl and not verify_ssl:
         handlers.append(urllib.request.HTTPSHandler(context=ssl_module._create_unverified_context()))
 
     if handlers:
@@ -169,7 +178,7 @@ def rest_json_request(base_url, path, values, method="GET", payload=None, auth="
             body = response.read().decode("utf-8", errors="replace")
     else:
         options = {"timeout": DEFAULT_TIMEOUT_SECONDS}
-        if use_ssl:
+        if use_ssl and not verify_ssl:
             options["context"] = ssl_module._create_unverified_context()
         with urllib.request.urlopen(request, **options) as response:
             body = response.read().decode("utf-8", errors="replace")

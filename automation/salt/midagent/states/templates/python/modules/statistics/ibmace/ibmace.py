@@ -40,8 +40,6 @@ OPTADVISOR_CONFIG_KEYS = {
     "srvpass",
     "ssl",
     "sslenabled",
-    "truststore",
-    "truststorepass",
     "sslverify",
     "ssl_verify",
     "conntype",
@@ -211,8 +209,12 @@ def _java_payload_line(stdout):
 
 
 def _rest_verify(config, values):
-    verify_value = values.get("sslverify") or values.get("ssl_verify") or config.get("sslverify") or config.get("ssl_verify") or "no"
-    return common.truthy(verify_value)
+    for source in (values or {}, config or {}):
+        for key in ("ssl_verify", "sslverify"):
+            value = source.get(key)
+            if value is not None and str(value).strip() != "":
+                return common.truthy(value)
+    return True
 
 
 def _rest_password(values):
@@ -658,12 +660,6 @@ def _java_arg(thisnode, config, values):
         "pwd": values.get("pwd", ""),
         "ssl": values.get("ssl") or config.get("ssl") or "no",
     }
-    truststore = values.get("truststore") or config.get("truststore")
-    truststorepass = values.get("truststorepass") or config.get("truststorepass")
-    if truststore:
-        payload["truststore"] = truststore
-    if truststorepass:
-        payload["truststorepass"] = truststorepass
     return json.dumps(payload)
 
 
@@ -747,8 +743,6 @@ def getStat(thisqm, inpdata):
                 "sslenabled": "",
                 "docker": "",
                 "contname": "",
-                "truststore": "",
-                "truststorepass": "",
                 "sslverify": "",
                 "ssl_verify": "",
                 "conntype": "jms",
@@ -838,8 +832,6 @@ def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
             "conntype": "",
             "docker": "",
             "contname": "",
-            "truststore": "",
-            "truststorepass": "",
             "sslverify": "",
             "ssl_verify": "",
         },

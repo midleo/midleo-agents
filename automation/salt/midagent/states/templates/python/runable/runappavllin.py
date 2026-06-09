@@ -39,6 +39,8 @@ def _credentials(item):
         "jmxport",
         "soapport",
         "webport",
+        "sslverify",
+        "ssl_verify",
         "servtype",
         "appserver",
         "managed_server",

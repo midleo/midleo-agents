@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, parentdir)
 
-from modules.base import configs
+from modules.base import configs, secrets
 
 CRON_STATE_FILE = os.path.join(os.getcwd(), "config", "cron_state.json")
 
@@ -24,18 +24,10 @@ def _read_json(path):
 
 
 def _sanitize_dict(data):
-    if not isinstance(data, dict):
-        return {}
-
-    hidden_keys = {"pwd", "pass", "usr", "user", "cpass", "ssl", "mngmport"}
-    result = {}
-
-    for key, value in data.items():
-        if key in hidden_keys:
-            continue
-        result[key] = value
-
-    return result
+    return secrets.redact_data(
+        data if isinstance(data, dict) else {},
+        drop_keys={"usr", "user", "ssl", "mngmport"},
+    )
 
 
 def _append_job(jobs_map, job_name, item):

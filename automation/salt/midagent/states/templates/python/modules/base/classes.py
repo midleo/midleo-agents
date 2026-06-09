@@ -1,23 +1,18 @@
 import os
 import platform
-import re
 import threading
 from datetime import datetime
+
+from modules.base import secrets
 
 LOG_DIR = os.path.join(os.getcwd(), "logs")
 AGENT_LOG = os.path.join(LOG_DIR, "midleoagent.log")
 MAX_LOG_BYTES = int(os.environ.get("MIDLEO_MAX_LOG_BYTES", str(5 * 1024 * 1024)))
 _LOG_LOCK = threading.Lock()
-_SECRET_RE = re.compile(
-    r'("?(?:pwd|pass|password|srvpass|cpass|chlpass|inttoken|token)"?\s*[:=]\s*)'
-    r'(".*?"|\'.*?\'|[^,\}\s]+)',
-    re.IGNORECASE,
-)
 
 
 def _safe_text(value):
-    text = str(value)
-    return _SECRET_RE.sub(r'\1"..."', text)
+    return secrets.redact_text(value)
 
 
 def _ensure_log_dir():

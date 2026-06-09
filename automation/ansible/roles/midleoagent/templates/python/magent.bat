@@ -209,13 +209,13 @@ echo usage:
 echo    -  %~nx0 addcert "{\"tool\":\"keytool\",\"keystore\":\"C:\\temp\\key.jks\",\"excluded\":\"alias1,alias2\",\"password\":\"testpass\"}"
 echo    -  %~nx0 delcert LABEL_OR_KEYSTORE
 echo    -  %~nx0 enableavl APP_SERVER SERVER_TYPE "{\"docker\":\"DOCKER_CONTAINER_NAME\",\"user\":\"USERNAME_FOR_APPLICATION_SERVER_ACCESS\",\"pass\":\"PASSWORD_FOR_APPLICATION_SERVER_ACCESS\"}"
-echo    -  %~nx0 enableavl WEBLOGIC_HOST weblogic "{\"conntype\":\"rest\",\"user\":\"USERNAME_FOR_WEBLOGIC_REST\",\"pass\":\"PASSWORD_FOR_WEBLOGIC_REST\",\"ssl\":\"yes\",\"mngmport\":\"9002\",\"appserver\":\"AdminServer\",\"appsrvid\":\"MIDLEO_SERVER_ID\"}"
+echo    -  %~nx0 enableavl WEBLOGIC_HOST weblogic "{\"conntype\":\"rest\",\"user\":\"USERNAME_FOR_WEBLOGIC_REST\",\"pass\":\"PASSWORD_FOR_WEBLOGIC_REST\",\"ssl\":\"yes\",\"sslverify\":\"yes^|no\",\"mngmport\":\"9002\",\"appserver\":\"AdminServer\",\"appsrvid\":\"MIDLEO_SERVER_ID\"}"
 echo    -  %~nx0 disableavl APP_SERVER SERVER_TYPE
 echo    -  %~nx0 stopavl APP_SERVER SERVER_TYPE comment
 echo    -  %~nx0 startavl APP_SERVER SERVER_TYPE
-echo    -  %~nx0 addappstat SRV_TYPE APPSRV "{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\"}"
+echo    -  %~nx0 addappstat SRV_TYPE APPSRV "{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\",\"sslverify\":\"yes^|no\"}"
 echo    -  %~nx0 delappstat SRV_TYPE APPSRV
-echo    -  %~nx0 addoptadvisor SRV_TYPE APPSRV "{\"appsrvid\":\"MIDLEO_SERVER_ID\",\"usr\":\"USER\",\"pass\":\"PASS\",\"mngmport\":\"7001\"}"
+echo    -  %~nx0 addoptadvisor SRV_TYPE APPSRV "{\"appsrvid\":\"MIDLEO_SERVER_ID\",\"usr\":\"USER\",\"pass\":\"PASS\",\"ssl\":\"yes\",\"sslverify\":\"yes^|no\",\"mngmport\":\"7001\"}"
 echo    -  %~nx0 deloptadvisor SRV_TYPE APPSRV
 echo    -  %~nx0 enableoptadvisor [days]
 echo    -  %~nx0 disableoptadvisor [reason]
