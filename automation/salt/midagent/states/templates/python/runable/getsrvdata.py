@@ -147,7 +147,7 @@ def _write_next_run(updint):
         log_file.write(str(int(timenow.timestamp())))
     os.replace(tmp_file, NEXTRUN_FILE)
     try:
-        os.chmod(NEXTRUN_FILE, 0o640)
+        os.chmod(NEXTRUN_FILE, 0o600)
     except Exception:
         pass
 

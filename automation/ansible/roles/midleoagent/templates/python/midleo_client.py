@@ -408,16 +408,33 @@ def _decompress_file(encoded_file):
     return content.decode("utf-8").replace("\r", "")
 
 
+def _is_private_runtime_path(path):
+    real_path = os.path.realpath(path)
+    for name in ("config", "logs"):
+        root = os.path.realpath(os.path.join(os.getcwd(), name))
+        try:
+            if os.path.commonpath([root, real_path]) == root:
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def _write_remote_file(filename, encoded_file, roots):
     safe_filename = _safe_path(filename, roots)
     content = _decompress_file(encoded_file)
     directory = os.path.dirname(safe_filename)
     os.makedirs(directory, exist_ok=True)
+    if _is_private_runtime_path(directory):
+        try:
+            os.chmod(directory, 0o700)
+        except Exception:
+            pass
     fd, tmp_path = tempfile.mkstemp(prefix=".mwagent_", dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(content)
-        os.chmod(tmp_path, 0o640)
+        os.chmod(tmp_path, 0o600 if _is_private_runtime_path(safe_filename) else 0o640)
         os.replace(tmp_path, safe_filename)
     finally:
         if os.path.exists(tmp_path):

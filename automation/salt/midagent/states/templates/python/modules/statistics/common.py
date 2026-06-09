@@ -275,7 +275,7 @@ def save_optadvisor_runtime_state(state):
             tmp_file.write("\n")
         os.replace(tmp_path, path)
         try:
-            os.chmod(path, 0o640)
+            os.chmod(path, 0o600)
         except Exception:
             pass
     finally:
@@ -367,7 +367,7 @@ def acquire_optadvisor_lock(name="runtime", stale_seconds=None):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     for _ in range(2):
         try:
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(
                     {

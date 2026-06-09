@@ -153,6 +153,9 @@ case "${1:-}" in
   optadvisorstatus )
       "$PYTHON" "runable/optadvisorctl.py" status
       ;;
+  health )
+      "$PYTHON" "runable/health.py"
+      ;;
   rmaction )
       if [ -z "${2:-}" ]; then
         "$0"
@@ -206,6 +209,7 @@ MQSC
       echo "   -  $0 enableoptadvisor [days]       # max 30 days, requires per-server optadvisor config"
       echo "   -  $0 disableoptadvisor [reason]"
       echo "   -  $0 optadvisorstatus"
+      echo "   -  $0 health"
       echo "   -  $0 addaction APP_SERVER_TYPE.ERROR_CODE '{\"script\":\"/opt/midleo/actions/restart.sh\",\"args\":[\"{appserver_type}\",\"{error_code}\"],\"monid\":\"monaction\",\"appsrvid\":\"none\",\"appsrv\":\"tomcat01\",\"message\":\"Action already started recently\"}'"
       echo "   -  $0 addaction '{\"action_key\":\"APP_SERVER_TYPE.ERROR_CODE\",\"script\":\"/opt/midleo/actions/restart.sh\"}'"
       echo "   -  $0 rmaction APP_SERVER_TYPE.ERROR_CODE"

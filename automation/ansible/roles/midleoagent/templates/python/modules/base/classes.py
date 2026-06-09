@@ -36,6 +36,10 @@ def _write_log(path, line):
         _rotate_log(path)
         with open(path, "a", encoding="utf-8") as logfile:
             logfile.write(line + "\n")
+        try:
+            os.chmod(path, 0o600)
+        except Exception:
+            pass
 
 
 def ClearLog():

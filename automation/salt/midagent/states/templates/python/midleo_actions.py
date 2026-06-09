@@ -59,7 +59,7 @@ def _write_json_atomic(path, data):
             json.dump(data, tmp_file, ensure_ascii=False, indent=2, sort_keys=True)
         os.replace(tmp_path, path)
         try:
-            os.chmod(path, 0o640)
+            os.chmod(path, 0o600)
         except Exception:
             pass
     finally:

@@ -52,6 +52,8 @@ def getLocalJobsBody():
 
     cron_state = _read_json(CRON_STATE_FILE)
     for script_name, item in cron_state.items():
+        if str(script_name).startswith("_"):
+            continue
         if not isinstance(item, dict):
             continue
 

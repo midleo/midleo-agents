@@ -3,6 +3,7 @@ import json
 import socket
 import time
 import uuid
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 import requests
@@ -60,6 +61,65 @@ def _base_url(webssl, website):
 
     scheme = "https" if str(webssl).strip().lower() in ("y", "yes", "true", "1") else "http"
     return scheme + "://" + website
+
+
+def _utc_now():
+    return datetime.now(timezone.utc).replace(microsecond=0)
+
+
+def _iso_now():
+    return _utc_now().isoformat().replace("+00:00", "Z")
+
+
+def _record_upload_result(path, status_code=None, error=""):
+    if not str(path or "").startswith("/pubapi/"):
+        return
+    try:
+        state = configs.getUploadState()
+        if not isinstance(state, dict):
+            state = {}
+        endpoints = state.get("endpoints")
+        if not isinstance(endpoints, dict):
+            endpoints = {}
+        endpoint = endpoints.get(path)
+        if not isinstance(endpoint, dict):
+            endpoint = {}
+
+        ok = status_code is not None and int(status_code) >= 200 and int(status_code) < 300
+        state["last_attempt_at"] = _iso_now()
+        state["last_attempt_ts"] = int(time.time())
+        state["last_path"] = str(path)
+        state["total_attempts"] = int(state.get("total_attempts", 0)) + 1
+
+        endpoint["last_attempt_at"] = state["last_attempt_at"]
+        endpoint["last_status_code"] = status_code
+        endpoint["attempts"] = int(endpoint.get("attempts", 0)) + 1
+
+        if ok:
+            state["last_success_at"] = state["last_attempt_at"]
+            state["last_success_ts"] = state["last_attempt_ts"]
+            state["last_success_path"] = str(path)
+            state["success_count"] = int(state.get("success_count", 0)) + 1
+            state["consecutive_failures"] = 0
+            endpoint["last_success_at"] = state["last_attempt_at"]
+            endpoint["success_count"] = int(endpoint.get("success_count", 0)) + 1
+        else:
+            state["last_failure_at"] = state["last_attempt_at"]
+            state["last_failure_ts"] = state["last_attempt_ts"]
+            state["last_failure_path"] = str(path)
+            state["last_failure_status_code"] = status_code
+            state["last_failure_error"] = str(error or "")[-512:]
+            state["failure_count"] = int(state.get("failure_count", 0)) + 1
+            state["consecutive_failures"] = int(state.get("consecutive_failures", 0)) + 1
+            endpoint["last_failure_at"] = state["last_attempt_at"]
+            endpoint["failure_count"] = int(endpoint.get("failure_count", 0)) + 1
+            endpoint["last_error"] = str(error or "")[-512:]
+
+        endpoints[path] = endpoint
+        state["endpoints"] = endpoints
+        configs.saveUploadState(state)
+    except Exception:
+        pass
 
 
 def _drop_legacy_auth_payload_field(value):
@@ -156,6 +216,7 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
     if path.startswith("/pubapi/") and not skip_agent_enrollment:
         if not _register_agent_identity(webssl, website):
             classes.Err("Agent identity is missing; request not sent for " + path)
+            _record_upload_result(path, None, "agent identity is missing")
             return None
         request_headers = _with_agent_headers(request_headers)
         data = _strip_legacy_auth_payload(data)
@@ -180,9 +241,11 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
                 "utf-8", errors="replace"
             )
         classes.Err(method.upper() + " " + path + " HTTPResponse:" + str(res.status_code) + " " + body)
+        _record_upload_result(path, res.status_code, body if res.status_code < 200 or res.status_code >= 300 else "")
         return res
     except requests.exceptions.RequestException as ex:
         classes.Err("Exception:" + str(ex))
+        _record_upload_result(path, None, str(ex))
         return None
 
 

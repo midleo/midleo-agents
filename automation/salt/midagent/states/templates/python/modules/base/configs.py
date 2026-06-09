@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 CONFIG_DIR = os.path.join(os.getcwd(), "config")
 CRONJOBS_FILE = os.path.join(CONFIG_DIR, "cronjobs.json")
 AGENT_IDENTITY_FILE = os.path.join(CONFIG_DIR, "agent.identity")
+UPLOAD_STATE_FILE = os.path.join(CONFIG_DIR, "upload_state.json")
 
 MON_FILE = os.path.join(CONFIG_DIR, "confapplstat.json")
 OPTADVISOR_FILE = os.path.join(CONFIG_DIR, "confoptadvisor.json")
@@ -74,7 +75,7 @@ def _write_json_atomic(path, data):
             json.dump(data, tmp_file, ensure_ascii=False, indent=2, sort_keys=True)
         os.replace(tmp_path, path)
         try:
-            os.chmod(path, 0o640)
+            os.chmod(path, 0o600)
         except Exception:
             pass
     finally:
@@ -173,6 +174,16 @@ def saveCronjobs(data):
     if not isinstance(data, dict):
         data = {}
     _write_json_atomic(CRONJOBS_FILE, data)
+
+
+def getUploadState():
+    return _read_json_file(UPLOAD_STATE_FILE, {})
+
+
+def saveUploadState(data):
+    if not isinstance(data, dict):
+        data = {}
+    _write_json_atomic(UPLOAD_STATE_FILE, data)
 
 
 def syncCronjobsForConfig(config_filename, config_data):

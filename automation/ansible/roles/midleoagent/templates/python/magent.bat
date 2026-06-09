@@ -52,6 +52,7 @@ if /I "%1"=="deloptadvisor" goto deloptadvisor
 if /I "%1"=="enableoptadvisor" goto enableoptadvisor
 if /I "%1"=="disableoptadvisor" goto disableoptadvisor
 if /I "%1"=="optadvisorstatus" goto optadvisorstatus
+if /I "%1"=="health" goto health
 if /I "%1"=="addaction" goto addaction
 if /I "%1"=="rmaction" goto rmaction
 if /I "%1"=="enabletrackqm" goto enabletrackqm
@@ -150,6 +151,10 @@ exit /b %ERRORLEVEL%
 "%PYTHON%" "runable\optadvisorctl.py" status
 exit /b %ERRORLEVEL%
 
+:health
+"%PYTHON%" "runable\health.py"
+exit /b %ERRORLEVEL%
+
 :addaction
 if "%~2"=="" (
   goto usage
@@ -220,6 +225,7 @@ echo    -  %~nx0 deloptadvisor SRV_TYPE APPSRV
 echo    -  %~nx0 enableoptadvisor [days]
 echo    -  %~nx0 disableoptadvisor [reason]
 echo    -  %~nx0 optadvisorstatus
+echo    -  %~nx0 health
 echo    -  %~nx0 addaction APP_SERVER_TYPE.ERROR_CODE "{\"script\":\"C:\\actions\\restart.cmd\",\"args\":[\"{appserver_type}\",\"{error_code}\"],\"monid\":\"monaction\",\"appsrvid\":\"none\",\"appsrv\":\"tomcat01\",\"message\":\"Action already started recently\"}"
 echo    -  %~nx0 addaction "{\"action_key\":\"APP_SERVER_TYPE.ERROR_CODE\",\"script\":\"C:\\actions\\restart.cmd\"}"
 echo    -  %~nx0 rmaction APP_SERVER_TYPE.ERROR_CODE

@@ -81,6 +81,22 @@ midagent_secure_crypto_secret:
     - makedirs: True
 {% endfor %}
 
+midagent_secure_private_logs_dir:
+  file.directory:
+    - name: {{agent_install_dir}}logs
+    - user: {{mwuser}}
+    - group: {{mwuser}}
+    - dir_mode: 700
+    - makedirs: True
+
+midagent_secure_private_config_dir:
+  file.directory:
+    - name: {{agent_install_dir}}config
+    - user: {{mwuser}}
+    - group: {{mwuser}}
+    - dir_mode: 700
+    - makedirs: True
+
 midagent_create_client:
   file.managed:
     - user: {{mwuser}}
@@ -118,7 +134,7 @@ midagent_secure_cronjobs_config:
     - name: {{agent_install_dir}}config/cronjobs.json
     - user: {{mwuser}}
     - group: {{mwuser}}
-    - mode: '0640'
+    - mode: '0600'
     - replace: False
 
 midagent_create_client_modules:
@@ -148,7 +164,7 @@ midagent_create_config:
   file.managed:
     - user: {{mwuser}}
     - group: {{mwuser}}
-    - mode: '0640'
+    - mode: '0600'
     - template: jinja
     - names:
       - {{agent_install_dir}}config/mwagent.config:
@@ -180,8 +196,21 @@ midagent_secure_config:
     - name: {{agent_install_dir}}config/mwagent.config
     - user: {{mwuser}}
     - group: {{mwuser}}
-    - mode: '0640'
+    - mode: '0600'
     - replace: False
+
+midagent_harden_private_runtime_permissions:
+  cmd.run:
+    - name: |
+        chown -R {{mwuser}}:{{mwuser}} {{agent_install_dir}}config {{agent_install_dir}}logs
+        find {{agent_install_dir}}config -type d -exec chmod 700 {} +
+        find {{agent_install_dir}}config -type f -exec chmod 600 {} +
+        find {{agent_install_dir}}logs -type d -exec chmod 700 {} +
+        find {{agent_install_dir}}logs -type f -exec chmod 600 {} +
+    - python_shell: True
+    - require:
+      - file: midagent_secure_config
+      - file: midagent_secure_cronjobs_config
 
 midagent_create_sudoer:
   file.managed:

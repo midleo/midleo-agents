@@ -55,6 +55,16 @@
     - "{{agent_install_dir}}logs"
     - "{{agent_install_dir}}config"
     - "{{agent_install_dir}}extchecks"
+- name: "Secure Midleo private runtime directories"
+  file:
+    path: "{{item}}"
+    state: directory
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
+    mode: '0700'
+  loop:
+    - "{{agent_install_dir}}logs"
+    - "{{agent_install_dir}}config"
 - name: "creage agent"
   template:
     src: templates/python/midleo_client.py
@@ -89,7 +99,7 @@
     dest: "{{agent_install_dir}}config/cronjobs.json"
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
-    mode: '0640'
+    mode: '0600'
 - name: "check exist agentconfig"
   stat: "path={{agent_install_dir}}config/mwagent.config"
   register: st_agcfg
@@ -99,14 +109,14 @@
     dest: "{{agent_install_dir}}config/mwagent.config"
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
-    mode: '0640'
+    mode: '0600'
   when: not st_agcfg.stat.exists
 - name: "secure agentconfig"
   file:
     path: "{{agent_install_dir}}config/mwagent.config"
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
-    mode: '0640'
+    mode: '0600'
 
 - name: "Install Midleo sudoers policy"
   template:
@@ -155,6 +165,24 @@
     force: yes
   with_filetree: templates/python/runable
   when: item.state == 'file'
+- name: "Own Midleo private runtime files"
+  file:
+    path: "{{item}}"
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
+    recurse: yes
+  loop:
+    - "{{agent_install_dir}}logs"
+    - "{{agent_install_dir}}config"
+- name: "Harden Midleo private runtime permissions"
+  shell: |
+    find "{{agent_install_dir}}config" -type d -exec chmod 700 {} +
+    find "{{agent_install_dir}}config" -type f -exec chmod 600 {} +
+    find "{{agent_install_dir}}logs" -type d -exec chmod 700 {} +
+    find "{{agent_install_dir}}logs" -type f -exec chmod 600 {} +
+  args:
+    executable: /bin/bash
+  changed_when: false
 - name: Update apt repo and cache on all Debian/Ubuntu boxes
   apt: 
     update_cache: yes 
@@ -179,7 +207,6 @@
       - pycryptodome
       - pywinrm
       - netifaces
-#      - pymqi
     state: present
     extra_args: --break-system-packages
 - name: Install optional IBM MQ Python package

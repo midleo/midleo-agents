@@ -31,6 +31,10 @@ def log(message):
     os.makedirs(CONFIG_DIR, exist_ok=True)
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(f"{now_str()} {message}\n")
+    try:
+        os.chmod(LOG_FILE, 0o600)
+    except Exception:
+        pass
 
 
 def read_json(path, default=None):
@@ -50,7 +54,7 @@ def write_json_atomic(path, data):
         json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
     os.replace(tmp, path)
     try:
-        os.chmod(path, 0o640)
+        os.chmod(path, 0o600)
     except Exception:
         pass
 
@@ -239,6 +243,8 @@ def main():
 
     now_dt = datetime.now()
     now_ts = int(time.time())
+    cron_started_ts = now_ts
+    cron_started_at = now_str()
     nextrun_ts = read_nextrun_ts()
 
     context = {
@@ -252,6 +258,8 @@ def main():
 
     failed = False
     ran_any = False
+    ran_jobs = 0
+    failed_jobs = 0
 
     for script_name, job in cron_config.items():
         if not should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
@@ -269,14 +277,28 @@ def main():
             log(f"{script_name} failed exit_code={result.get('exit_code')}")
 
         ran_any = True
+        ran_jobs += 1
 
         if result["exit_code"] != 0 and not job.get("ignore_error", False):
             failed = True
+            failed_jobs += 1
 
     if not ran_any:
         log("cronjobs no_jobs_ran")
 
-    return 1 if failed else 0
+    exit_code = 1 if failed else 0
+    state["_meta"] = {
+        "last_execution_started_ts": cron_started_ts,
+        "last_execution_started_at": cron_started_at,
+        "last_execution_finished_ts": int(time.time()),
+        "last_execution_finished_at": now_str(),
+        "last_execution_exit_code": exit_code,
+        "last_ran_jobs": ran_jobs,
+        "last_failed_jobs": failed_jobs,
+    }
+    write_json_atomic(STATE_FILE, state)
+
+    return exit_code
 
 
 if __name__ == "__main__":
