@@ -249,6 +249,19 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
         return None
 
 
+def _request_with_retry(method, webssl, website, path, data=None, headers=None, max_attempts=3, **kwargs):
+    delay = 1.0
+    last = None
+    for attempt in range(1, max_attempts + 1):
+        last = _request(method, webssl, website, path, data=data, headers=headers, **kwargs)
+        if last is not None and 200 <= int(last.status_code) < 300:
+            return last
+        if attempt < max_attempts:
+            time.sleep(delay)
+            delay = min(delay * 2, 8.0)
+    return last
+
+
 def postData(webssl, website, data):
     _request("post", webssl, website, "/pubapi/updatesrv", json.dumps(data))
 
@@ -334,11 +347,11 @@ def postAvlData(webssl, website, thisdata):
 
 
 def postMonAl(webssl, website, thisdata):
-    _request("post", webssl, website, "/pubapi/monalert", thisdata)
+    _request_with_retry("post", webssl, website, "/pubapi/monalert", thisdata)
 
 
 def postMonCheck(webssl, website, thisdata):
-    _request("post", webssl, website, "/pubapi/extmoncheck", thisdata)
+    _request_with_retry("post", webssl, website, "/pubapi/extmoncheck", thisdata)
 
 
 def postMaintenance(webssl, website, data):
