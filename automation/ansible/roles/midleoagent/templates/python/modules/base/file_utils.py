@@ -37,6 +37,10 @@ def _truncate_file(path):
         classes.Err("Error cleaning the file:" + str(err))
 
 
+def truncate_file(path):
+    _truncate_file(path)
+
+
 def csv_json(file,array,check=False,cleanit=True):
     in_arr={}
     if os.path.isfile(file):

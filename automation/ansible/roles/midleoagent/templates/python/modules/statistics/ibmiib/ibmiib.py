@@ -128,7 +128,6 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
         classes.Err("ibmiib optadvisor collector error:" + _java_result_error(java_result))
         return None
 
-    appcode = _safe_text(config.get("appcode"))
     server_id = _safe_text(_get_server_id(config, thisnode))
     if not server_id:
         classes.Err("ibmiib optadvisor disabled for missing server_id")
@@ -140,10 +139,9 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
         return None
 
     node_id = "".join(ch if ch.isalnum() or ch in ("_", "-", ".") else "-" for ch in str(thisnode))[:24]
-    return {
+    payload = {
         "schema_version": OPTADVISOR_SCHEMA_VERSION,
         "collected_at": _iso_utc(collected_at),
-        "appcode": appcode,
         "server_id": server_id,
         "technology": OPTADVISOR_TECHNOLOGY,
         "collector": {
@@ -156,6 +154,7 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
         "target": java_result.get("target", {}),
         "resources": resources,
     }
+    return payload
 
 
 def _execution_group_filter(thisnode, config, values):
@@ -317,7 +316,7 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata)
                 payload = json.loads(line)
                 payload.pop("_legacy_token", None)
                 res = makerequest.postOptAdvisorTelemetry(webssl, website, payload, common.optadvisor_post_token(optadvisor_config, _legacy_token))
-                if res is None or res.status_code < 200 or res.status_code >= 300:
+                if not makerequest._optadvisor_post_accepted(res):
                     status = "no-response" if res is None else str(res.status_code)
                     body = "" if res is None else str(res.text)[-common.MAX_LOG_BYTES:]
                     classes.Err("ibmiib optadvisor post failed status:" + status + " body:" + body)

@@ -107,7 +107,6 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
     if not isinstance(java_result, dict) or java_result.get("error") == "yes":
         return None
 
-    appcode = _safe_text(config.get("appcode"))
     server_id = _safe_text(_get_server_id(config, thisnode))
     if not server_id:
         classes.Err("jboss optadvisor disabled for missing server_id")
@@ -121,7 +120,6 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
     return {
         "schema_version": OPTADVISOR_SCHEMA_VERSION,
         "collected_at": _iso_utc(collected_at),
-        "appcode": appcode,
         "server_id": server_id,
         "technology": _technology(config),
         "collector": {

@@ -16,6 +16,7 @@ from modules.base import classes, decrypt, file_utils, makerequest, secrets, sta
 
 DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_STAT_TIMEOUT_SECONDS", "45"))
 MAX_LOG_BYTES = 4000
+MAX_STAT_PAYLOAD_BYTES = int(os.environ.get("MIDLEO_STAT_PAYLOAD_MAX_BYTES", str(4 * 1024 * 1024)))
 MAX_OPTADVISOR_RESOURCES = 250
 MAX_OPTADVISOR_ENABLE_DAYS = 30
 OPTADVISOR_SCHEMA_VERSION = "1.0"
@@ -436,7 +437,6 @@ def optadvisor_collection_enabled(config):
 
 
 def optadvisor_post_token(config, default_token):
-    # OptAdvisor telemetry now authenticates through the registered agent identity.
     return ""
 
 
@@ -504,7 +504,7 @@ def flush_optadvisor_telemetry(prefix, thisnode, website, webssl, _legacy_token,
                     payload,
                     optadvisor_post_token(optadvisor_config, _legacy_token),
                 )
-                if res is None or res.status_code < 200 or res.status_code >= 300:
+                if not makerequest._optadvisor_post_accepted(res):
                     status = "no-response" if res is None else str(res.status_code)
                     body = "" if res is None else str(res.text)[-MAX_LOG_BYTES:]
                     classes.Err(prefix + " optadvisor post failed status:" + status + " body:" + body)
@@ -536,10 +536,9 @@ def java_payload_line(stdout):
 def build_optadvisor_payload(prefix, technology, collector_name, thisnode, config, target, resources, collected_at=None):
     if not optadvisor_enabled(config):
         return None
-    appcode = safe_text(config.get("appcode"))
     server_id = safe_text(optadvisor_server_id(config, thisnode))
-    if not appcode or not server_id:
-        classes.Err(prefix + " optadvisor disabled for missing appcode or server_id")
+    if not server_id:
+        classes.Err(prefix + " optadvisor disabled for missing server_id")
         return None
     if not isinstance(resources, list) or len(resources) == 0:
         return None
@@ -547,10 +546,9 @@ def build_optadvisor_payload(prefix, technology, collector_name, thisnode, confi
         classes.Err(prefix + " optadvisor resource batch trimmed to " + str(MAX_OPTADVISOR_RESOURCES))
         resources = resources[:MAX_OPTADVISOR_RESOURCES]
 
-    return {
+    payload = {
         "schema_version": OPTADVISOR_SCHEMA_VERSION,
         "collected_at": iso_utc(collected_at),
-        "appcode": appcode,
         "server_id": server_id,
         "technology": technology,
         "collector": {
@@ -563,6 +561,7 @@ def build_optadvisor_payload(prefix, technology, collector_name, thisnode, confi
         "target": target if isinstance(target, dict) else {},
         "resources": resources,
     }
+    return payload
 
 
 def metric_number(key, value):
@@ -643,6 +642,100 @@ def tag_value(metric_key, tag):
     return metric_key.split(marker, 1)[1].split(";", 1)[0]
 
 
+def _stat_payload_json(stat_type, subtype, data):
+    return json.dumps(
+        {
+            "type": stat_type,
+            "subtype": subtype,
+            "data": data,
+        },
+        separators=(",", ":"),
+    )
+
+
+def _stat_payload_size(stat_type, subtype, data):
+    return len(_stat_payload_json(stat_type, subtype, data).encode("utf-8"))
+
+
+def _iter_stat_value_chunks(stat_type, subtype, key, value, max_bytes):
+    text = str(value or "")
+    points = [point for point in text.split(";") if point]
+    if not points:
+        yield text
+        return
+
+    chunk = ""
+    for point in points:
+        item = point + ";"
+        candidate = chunk + item
+        if chunk and _stat_payload_size(stat_type, subtype, {key: candidate}) > max_bytes:
+            yield chunk
+            chunk = item
+        else:
+            chunk = candidate
+
+        if _stat_payload_size(stat_type, subtype, {key: chunk}) > max_bytes:
+            classes.Err("stat payload single point exceeds byte limit for " + stat_type + ":" + str(subtype))
+            yield chunk
+            chunk = ""
+
+    if chunk:
+        yield chunk
+
+
+def iter_stat_payload_chunks(stat_type, subtype, data, max_bytes=MAX_STAT_PAYLOAD_BYTES):
+    if not isinstance(data, dict) or not data:
+        return
+    current = {}
+    for key, value in data.items():
+        candidate = dict(current)
+        candidate[key] = value
+        if _stat_payload_size(stat_type, subtype, candidate) <= max_bytes:
+            current = candidate
+            continue
+
+        if current:
+            yield current
+            current = {}
+
+        single = {key: value}
+        if _stat_payload_size(stat_type, subtype, single) <= max_bytes:
+            current = single
+            continue
+
+        for value_chunk in _iter_stat_value_chunks(stat_type, subtype, key, value, max_bytes):
+            yield {key: value_chunk}
+
+    if current:
+        yield current
+
+
+def post_stat_payloads(stat_type, subtype, website, webssl, data):
+    chunk_count = 0
+    for chunk in iter_stat_payload_chunks(stat_type, subtype, data):
+        chunk_count += 1
+        res = makerequest.postStatData(webssl, website, _stat_payload_json(stat_type, subtype, chunk))
+        if not makerequest._stat_post_accepted(res):
+            status = "no-response" if res is None else str(res.status_code)
+            body = "" if res is None else str(res.text)[-MAX_LOG_BYTES:]
+            classes.Err(
+                "stat payload post failed for "
+                + stat_type
+                + ":"
+                + str(subtype)
+                + " chunk:"
+                + str(chunk_count)
+                + " status:"
+                + status
+                + " body:"
+                + body
+            )
+            return False
+    if chunk_count > 1:
+        classes.Err("stat payload split for " + stat_type + ":" + str(subtype) + " chunks:" + str(chunk_count))
+    return chunk_count > 0
+
+
 def post_csv_stats(stat_type, func_name, website, webssl, _legacy_token, stat_data, pattern_fn):
     try:
         if not isinstance(stat_data, dict) or len(stat_data) == 0:
@@ -656,17 +749,16 @@ def post_csv_stats(stat_type, func_name, website, webssl, _legacy_token, stat_da
                 continue
 
             for file_path in glob.glob(pattern_fn(str(logdir), str(subtype))):
-                ret = file_utils.csv_json(file_path, func(), "", True)
+                ret = file_utils.csv_json(file_path, func(), "", False)
                 retarr = json.loads(ret)
                 if len(retarr) == 0:
+                    file_utils.truncate_file(file_path)
                     continue
 
-                payload = {
-                    "type": stat_type,
-                    "subtype": subtype,
-                    "data": retarr,
-                }
-                makerequest.postStatData(webssl, website, json.dumps(payload))
+                if post_stat_payloads(stat_type, subtype, website, webssl, retarr):
+                    file_utils.truncate_file(file_path)
+                else:
+                    classes.Err("stat upload failed, keeping file for retry:" + str(file_path))
 
     except OSError as err:
         classes.Err("Error opening the file statlist:" + str(err))

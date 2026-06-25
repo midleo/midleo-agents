@@ -86,6 +86,8 @@ def _record_upload_result(path, status_code=None, error=""):
             endpoint = {}
 
         ok = status_code is not None and int(status_code) >= 200 and int(status_code) < 300
+        if ok and str(path) == "/pubapi/updatestat":
+            ok = _stat_post_accepted_body(status_code, error)
         state["last_attempt_at"] = _iso_now()
         state["last_attempt_ts"] = int(time.time())
         state["last_path"] = str(path)
@@ -241,7 +243,8 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
                 "utf-8", errors="replace"
             )
         classes.Err(method.upper() + " " + path + " HTTPResponse:" + str(res.status_code) + " " + body)
-        _record_upload_result(path, res.status_code, body if res.status_code < 200 or res.status_code >= 300 else "")
+        upload_error = body if res.status_code < 200 or res.status_code >= 300 or str(path) == "/pubapi/updatestat" else ""
+        _record_upload_result(path, res.status_code, upload_error)
         return res
     except requests.exceptions.RequestException as ex:
         classes.Err("Exception:" + str(ex))
@@ -267,7 +270,7 @@ def postData(webssl, website, data):
 
 
 def postStatData(webssl, website, thisdata):
-    _request("post", webssl, website, "/pubapi/updatestat", thisdata)
+    return _request("post", webssl, website, "/pubapi/updatestat", thisdata)
 
 
 def postibmmqQData(webssl, website, qm, data):
@@ -288,6 +291,43 @@ def postibmmqCHData(webssl, website, qm, data):
         "/pubapi/updateibmmqchstat/" + quote(str(qm), safe=""),
         data,
     )
+
+
+def _stat_post_accepted_body(status_code, body=""):
+    if status_code is None or int(status_code) < 200 or int(status_code) >= 300:
+        return False
+    text = str(body or "").strip()
+    if text.startswith("saved:"):
+        return True
+    if text in ("invalid payload", "database error"):
+        return False
+    if not text:
+        return False
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        return True
+    if isinstance(parsed, dict) and parsed.get("error") is True:
+        return False
+    return True
+
+
+def _stat_post_accepted(res):
+    if res is None:
+        return False
+    return _stat_post_accepted_body(res.status_code, getattr(res, "text", ""))
+
+
+def _optadvisor_post_accepted(res):
+    if res is None or res.status_code < 200 or res.status_code >= 300:
+        return False
+    try:
+        body = res.json()
+    except Exception:
+        return True
+    if isinstance(body, dict) and body.get("error") is True:
+        return False
+    return True
 
 
 def postOptAdvisorTelemetry(webssl, website, data, _legacy_token=None):

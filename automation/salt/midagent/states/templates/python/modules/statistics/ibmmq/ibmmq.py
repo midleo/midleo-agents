@@ -879,7 +879,6 @@ def buildOptAdvisorPayload(
     if not _optadvisor_enabled(inpdata):
         return None
 
-    appcode = _safe_text(inpdata.get("appcode"))
     server_id = _safe_text(_get_server_id(inpdata, thisqm))
     if not server_id:
         classes.Err("ibmmq optadvisor disabled for missing server_id")
@@ -931,7 +930,6 @@ def buildOptAdvisorPayload(
     return {
         "schema_version": OPTADVISOR_SCHEMA_VERSION,
         "collected_at": _iso_utc(collected_at),
-        "appcode": appcode,
         "server_id": server_id,
         "technology": OPTADVISOR_TECHNOLOGY,
         "collector": {

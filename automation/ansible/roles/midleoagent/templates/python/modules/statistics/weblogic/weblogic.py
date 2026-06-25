@@ -1,7 +1,6 @@
 import json
 import os
 import socket
-import subprocess
 import urllib.parse
 import uuid
 from datetime import datetime, timezone
@@ -11,7 +10,7 @@ from modules.statistics import common
 
 
 OPTADVISOR_SCHEMA_VERSION = "1.0"
-OPTADVISOR_COLLECTOR_NAME = "weblogic-jmx-collector"
+OPTADVISOR_COLLECTOR_NAME = "weblogic-rest-collector"
 OPTADVISOR_COLLECTOR_VERSION = "1.0.0"
 OPTADVISOR_TECHNOLOGY = "weblogic"
 OPTADVISOR_CONFIG_KEYS = {
@@ -97,14 +96,6 @@ def _append_optadvisor_payload(thisnode, payload):
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
 
 
-def _java_payload_line(stdout):
-    lines = [line.strip() for line in str(stdout or "").splitlines() if line.strip()]
-    for line in reversed(lines):
-        if line.startswith("{") and line.endswith("}"):
-            return line
-    return ""
-
-
 def _normalize_status(value):
     text = _safe_text(value).lower().replace("-", "_").replace(" ", "_")
     if "running" in text:
@@ -118,8 +109,8 @@ def _normalize_status(value):
     return "unknown"
 
 
-def _normalize_target(thisnode, java_result, resources):
-    target = java_result.get("target", {})
+def _normalize_target(thisnode, collect_result, resources):
+    target = collect_result.get("target", {})
     if not isinstance(target, dict):
         target = {}
     target = dict(target)
@@ -169,35 +160,33 @@ def _normalize_resources(resources, target):
     return normalized_resources
 
 
-def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
+def buildOptAdvisorPayload(thisnode, config, collect_result, collected_at=None):
     if not _optadvisor_enabled(config):
         return None
-    if not isinstance(java_result, dict):
+    if not isinstance(collect_result, dict):
         classes.Err("weblogic optadvisor returned invalid collector result")
         return None
-    if java_result.get("error") == "yes":
-        errorlog = java_result.get("errorlog") or java_result.get("log") or java_result.get("err") or "unknown collector error"
+    if collect_result.get("error") == "yes":
+        errorlog = collect_result.get("errorlog") or collect_result.get("log") or collect_result.get("err") or "unknown collector error"
         classes.Err("weblogic optadvisor collector error:" + str(errorlog)[-common.MAX_LOG_BYTES:])
         return None
 
-    appcode = _safe_text(config.get("appcode"))
     server_id = _safe_text(_get_server_id(config, thisnode))
     if not server_id:
         classes.Err("weblogic optadvisor disabled for missing server_id")
         return None
 
-    resources = java_result.get("resources", [])
+    resources = collect_result.get("resources", [])
     if not isinstance(resources, list) or len(resources) == 0:
         classes.Err("weblogic optadvisor returned no resources")
         return None
 
-    target = _normalize_target(thisnode, java_result, resources)
+    target = _normalize_target(thisnode, collect_result, resources)
     resources = _normalize_resources(resources, target)
     node_id = "".join(ch if ch.isalnum() or ch in ("_", "-", ".") else "-" for ch in str(thisnode))[:24]
-    return {
+    payload = {
         "schema_version": OPTADVISOR_SCHEMA_VERSION,
         "collected_at": _iso_utc(collected_at),
-        "appcode": appcode,
         "server_id": server_id,
         "technology": OPTADVISOR_TECHNOLOGY,
         "collector": {
@@ -210,64 +199,293 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
         "target": target,
         "resources": resources,
     }
+    return payload
 
 
-def _collect_optadvisor(thisnode, config, values, jar_path):
-    classes.Err("weblogic optadvisor java start:" + str(thisnode))
-    java_arg = json.dumps(
-        {
-            "server": thisnode,
-            "appserver": _get_appserver(config, thisnode),
-            "function": "getoptadvisor",
-            "usr": values["usr"],
-            "pwd": values["pwd"],
-            "mngmport": values["mngmport"],
-            "ssl": values["ssl"],
-        }
+def _resource_key(appserver, name):
+    appserver = _safe_text(appserver)
+    name = _safe_text(name)
+    return appserver + "/" + name if appserver and name else name or appserver
+
+
+def _resource(resource_type, key, name, status, metrics, metadata=None):
+    item = {
+        "resource_type": resource_type,
+        "technical_key": key,
+        "name": name,
+        "status": _normalize_status(status),
+        "metadata": metadata if isinstance(metadata, dict) else {},
+        "metrics": [metric for metric in metrics if isinstance(metric, dict)],
+    }
+    return item if item["metrics"] else None
+
+
+def _add_number_metric(metrics, key, value):
+    common.add_metric(metrics, common.metric_number(key, value))
+
+
+def _add_string_metric(metrics, key, value):
+    common.add_metric(metrics, common.metric_string(key, value))
+
+
+def _payload_items(payload):
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    return _weblogic_rest_items(payload)
+
+
+def _rest_item_name(item):
+    return _safe_text(_case_value(item, ("name", "Name", "serverName", "ServerName")))
+
+
+def _rest_first(base_url, values, paths, label):
+    for path in paths:
+        try:
+            payload = common.rest_json_request(base_url, path, values)
+            if payload:
+                return payload
+        except Exception as err:
+            classes.Err("weblogic optadvisor REST " + label + " failed path:" + path + " error:" + str(err))
+    return {}
+
+
+def _server_runtime_paths(appserver):
+    encoded_server = urllib.parse.quote(_safe_text(appserver), safe="")
+    paths = []
+    if encoded_server:
+        paths.append("/management/weblogic/latest/domainRuntime/serverRuntimes/" + encoded_server)
+    paths.append("/management/weblogic/latest/serverRuntime")
+    paths.append("/management/weblogic/latest/domainRuntime/serverRuntimes")
+    return paths
+
+
+def _select_named_payload(payload, wanted_name):
+    wanted = _safe_text(wanted_name).lower()
+    if not wanted:
+        return payload if isinstance(payload, dict) else {}
+    if isinstance(payload, dict) and _rest_item_name(payload).lower() == wanted:
+        return payload
+    for item in _payload_items(payload):
+        if _rest_item_name(item).lower() == wanted:
+            return item
+    return payload if isinstance(payload, dict) and not _payload_items(payload) else {}
+
+
+def _local_and_domain_paths(appserver, suffix):
+    encoded_server = urllib.parse.quote(_safe_text(appserver), safe="")
+    paths = []
+    if encoded_server:
+        paths.append("/management/weblogic/latest/domainRuntime/serverRuntimes/" + encoded_server + suffix)
+    paths.append("/management/weblogic/latest/serverRuntime" + suffix)
+    return paths
+
+
+def _is_internal_application(item):
+    name = _safe_text(_case_value(item, ("applicationName", "ApplicationName", "name", "Name"))).lower()
+    internal = _case_value(item, ("internal", "Internal"))
+    if common.truthy(internal):
+        return True
+    return (
+        not name
+        or name.startswith("wls-")
+        or name.startswith("bea_")
+        or name == "weblogic"
+        or name == "consoleapp"
+        or name.startswith("consolehelp")
+        or name.startswith("bea_wls_internal")
+        or name.startswith("jms-internal")
     )
-    command = [
-        "java",
-        "--add-opens",
-        "java.base/java.io=ALL-UNNAMED",
-        "-cp",
-        "/midleolibs/libs/*:/midleolibs/vendor/*:" + jar_path,
-        "midleo_weblogic.weblogic_main",
-        java_arg,
-    ]
-    try:
-        result = subprocess.run(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-            timeout=common.DEFAULT_TIMEOUT_SECONDS,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        classes.Err("weblogic optadvisor timed out after " + str(common.DEFAULT_TIMEOUT_SECONDS) + " seconds")
-        return
-    except OSError as err:
-        classes.Err("weblogic optadvisor failed to start:" + str(err))
-        return
 
-    classes.Err("weblogic optadvisor java exit code:" + str(result.returncode))
-    if result.stderr:
-        classes.Err("weblogic optadvisor Error:" + result.stderr[-common.MAX_LOG_BYTES:])
-    if result.returncode != 0:
-        classes.Err("weblogic optadvisor failed with exit code " + str(result.returncode))
-        return
 
+def _deployment_counts(base_url, values, appserver):
+    payload = _rest_first(
+        base_url,
+        values,
+        _local_and_domain_paths(appserver, "/applicationRuntimes"),
+        "applicationRuntimes",
+    )
+    deployed = 0
+    active = 0
+    for item in _payload_items(payload):
+        if _is_internal_application(item):
+            continue
+        deployed += 1
+        runtime_state = _safe_text(_case_value(item, ("state", "State", "runtimeState"))).lower()
+        version_state = common.numeric_value(_case_value(item, ("activeVersionState", "ActiveVersionState")))
+        if (
+            "active" in runtime_state
+            or "running" in runtime_state
+            or "prepared" in runtime_state
+            or (version_state is not None and int(version_state) == 2)
+        ):
+            active += 1
+    return deployed, active
+
+
+def _server_resource(base_url, values, appserver, target):
+    server_name = _safe_text(target.get("server_name")) or _safe_text(appserver) or "weblogic-server"
+    status = _normalize_status(target.get("status"))
+    metrics = []
+    _add_string_metric(metrics, "server_status", status)
+    deployed, active = _deployment_counts(base_url, values, server_name)
+    _add_number_metric(metrics, "deployment_count", deployed)
+    _add_number_metric(metrics, "active_deployment_count", active)
+    return _resource("weblogic_server", _resource_key(server_name, "server"), server_name, status, metrics)
+
+
+def _collect_jvm_resource(base_url, values, appserver):
+    payload = _rest_first(
+        base_url,
+        values,
+        _local_and_domain_paths(appserver, "/JVMRuntime"),
+        "JVMRuntime",
+    )
+    if not isinstance(payload, dict):
+        return None
+    name = _rest_item_name(payload) or (_safe_text(appserver) + "/JVMRuntime")
+    heap_size = common.numeric_value(_case_value(payload, ("heapSizeCurrent", "HeapSizeCurrent")))
+    heap_free = common.numeric_value(_case_value(payload, ("heapFreeCurrent", "HeapFreeCurrent")))
+    heap_free_percent = common.numeric_value(_case_value(payload, ("heapFreePercent", "HeapFreePercent")))
+    metrics = []
+    if heap_size is not None and heap_free is not None:
+        _add_number_metric(metrics, "heap_used_bytes", max(0.0, heap_size - heap_free))
+    if heap_free_percent is not None:
+        _add_number_metric(metrics, "heap_free_percent", heap_free_percent)
+        _add_number_metric(metrics, "heap_used_percent", 100.0 - heap_free_percent)
+    elif heap_size is not None and heap_size > 0 and heap_free is not None:
+        used_percent = ((heap_size - heap_free) / heap_size) * 100.0
+        _add_number_metric(metrics, "heap_used_percent", used_percent)
+        _add_number_metric(metrics, "heap_free_percent", 100.0 - used_percent)
+    return _resource("weblogic_jvm", _resource_key(appserver, name), name, "running", metrics)
+
+
+def _collect_thread_pool_resource(base_url, values, appserver):
+    payload = _rest_first(
+        base_url,
+        values,
+        _local_and_domain_paths(appserver, "/threadPoolRuntime"),
+        "threadPoolRuntime",
+    )
+    if not isinstance(payload, dict):
+        return None
+    name = _rest_item_name(payload) or "ThreadPoolRuntime"
+    total = common.numeric_value(_case_value(payload, ("executeThreadTotalCount", "ExecuteThreadTotalCount")))
+    idle = common.numeric_value(_case_value(payload, ("executeThreadIdleCount", "ExecuteThreadIdleCount")))
+    metrics = []
+    _add_number_metric(metrics, "stuck_thread_count", _case_value(payload, ("stuckThreadCount", "StuckThreadCount")))
+    _add_number_metric(metrics, "hogging_thread_count", _case_value(payload, ("hoggingThreadCount", "HoggingThreadCount")))
+    _add_number_metric(metrics, "execute_thread_total_count", total)
+    _add_number_metric(metrics, "execute_thread_idle_count", idle)
+    if total is not None and idle is not None and total > 0 and idle <= total:
+        _add_number_metric(metrics, "execute_thread_busy_percent", max(0.0, total - idle) * 100.0 / total)
+    return _resource("weblogic_thread_pool", _resource_key(appserver, name), name, "running", metrics)
+
+
+def _collect_jdbc_resources(base_url, values, appserver):
+    payload = _rest_first(
+        base_url,
+        values,
+        _local_and_domain_paths(appserver, "/JDBCServiceRuntime/JDBCDataSourceRuntimeMBeans"),
+        "JDBCDataSourceRuntimeMBeans",
+    )
+    resources = []
+    for item in _payload_items(payload):
+        name = _rest_item_name(item) or "JDBCDataSourceRuntime"
+        state = _safe_text(_case_value(item, ("state", "State"))) or "unknown"
+        active = common.numeric_value(_case_value(item, ("activeConnectionsCurrentCount", "ActiveConnectionsCurrentCount")))
+        capacity = common.numeric_value(_case_value(item, ("currCapacity", "CurrCapacity")))
+        metrics = []
+        _add_number_metric(metrics, "active_connections_current_count", active)
+        _add_number_metric(metrics, "curr_capacity", capacity)
+        if active is not None and capacity is not None and capacity > 0:
+            _add_number_metric(metrics, "connection_usage_percent", active * 100.0 / capacity)
+        _add_number_metric(metrics, "waiting_for_connection_current_count", _case_value(item, ("waitingForConnectionCurrentCount", "WaitingForConnectionCurrentCount")))
+        _add_number_metric(metrics, "leaked_connection_count", _case_value(item, ("leakedConnectionCount", "LeakedConnectionCount")))
+        resource = _resource("weblogic_jdbc_datasource", _resource_key(appserver, name), name, state, metrics)
+        if resource:
+            resources.append(resource)
+    return resources
+
+
+def _collect_jms_resources(base_url, values, appserver):
+    server_payload = _rest_first(
+        base_url,
+        values,
+        _local_and_domain_paths(appserver, "/JMSRuntime/JMSServers"),
+        "JMSServers",
+    )
+    resources = []
+    for jms_server in _payload_items(server_payload):
+        jms_name = _rest_item_name(jms_server)
+        destinations = []
+        for key in ("destinations", "Destinations", "JMSDestinationRuntimes", "jmsDestinationRuntimes"):
+            value = jms_server.get(key)
+            if value:
+                destinations = _payload_items(value) or ([value] if isinstance(value, dict) else [])
+                break
+        if not destinations and jms_name:
+            destination_payload = _rest_first(
+                base_url,
+                values,
+                _local_and_domain_paths(
+                    appserver,
+                    "/JMSRuntime/JMSServers/" + urllib.parse.quote(jms_name, safe="") + "/destinations",
+                ),
+                "JMS destinations",
+            )
+            destinations = _payload_items(destination_payload)
+        for destination in destinations:
+            name = _rest_item_name(destination) or "JMSDestinationRuntime"
+            metrics = []
+            _add_number_metric(metrics, "messages_current_count", _case_value(destination, ("messagesCurrentCount", "MessagesCurrentCount")))
+            _add_number_metric(metrics, "messages_pending_count", _case_value(destination, ("messagesPendingCount", "MessagesPendingCount")))
+            _add_number_metric(metrics, "consumers_current_count", _case_value(destination, ("consumersCurrentCount", "ConsumersCurrentCount")))
+            resource = _resource("weblogic_jms_destination", _resource_key(appserver, name), name, "running", metrics)
+            if resource:
+                resources.append(resource)
+    return resources
+
+
+def _rest_collect_optadvisor(thisnode, config, values):
+    base_url, _ = common.rest_base_url(thisnode, values, values.get("mngmport") or "7001")
+    appserver = _safe_text(_get_appserver(config, thisnode))
+    root = _rest_first(base_url, values, _server_runtime_paths(appserver), "serverRuntime")
+    server_payload = _select_named_payload(root, appserver)
+    server_name = _rest_item_name(server_payload) or appserver or thisnode
+    status = _normalize_status(_case_value(server_payload, ("state", "State", "serverState")))
+    metadata = {}
+    cluster = _case_value(server_payload, ("cluster", "Cluster", "clusterName", "ClusterName"))
+    if cluster:
+        metadata["cluster_name"] = _safe_text(cluster)
+    target = {
+        "status": status,
+        "server_name": server_name,
+        "metadata": metadata,
+    }
+    resources = []
+    server_resource = _server_resource(base_url, values, server_name, target)
+    if server_resource:
+        resources.append(server_resource)
+    for resource in (
+        _collect_jvm_resource(base_url, values, server_name),
+        _collect_thread_pool_resource(base_url, values, server_name),
+    ):
+        if resource:
+            resources.append(resource)
+    resources.extend(_collect_jdbc_resources(base_url, values, server_name))
+    resources.extend(_collect_jms_resources(base_url, values, server_name))
+    return {"target": target, "resources": resources}
+
+
+def _collect_optadvisor(thisnode, config, values):
+    classes.Err("weblogic optadvisor REST start:" + str(thisnode))
     try:
-        payload_line = _java_payload_line(result.stdout)
-        if not payload_line:
-            classes.Err("weblogic optadvisor returned no JSON payload")
-            return
-        java_result = json.loads(payload_line)
-        payload = buildOptAdvisorPayload(thisnode, config, java_result, _utc_now())
+        collect_result = _rest_collect_optadvisor(thisnode, config, values)
+        payload = buildOptAdvisorPayload(thisnode, config, collect_result, _utc_now())
         if payload is not None:
             _append_optadvisor_payload(thisnode, payload)
-    except (json.JSONDecodeError, TypeError, ValueError) as err:
-        classes.Err("weblogic optadvisor payload parse error:" + str(err))
+    except Exception as err:
+        classes.Err("weblogic optadvisor REST error:" + str(err))
 
 
 def _weblogic_rest_path(subtype):
@@ -412,6 +630,8 @@ def _collect_rest_statistics(thisnode, values, metrics):
 
 
 def _weblogic_rest_items(payload):
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
     if not isinstance(payload, dict):
         return []
     for key in ("items", "Items", "result", "data"):
@@ -524,7 +744,7 @@ def getStat(thisqm, inpdata):
             )
 
         if common.optadvisor_collection_enabled(optadvisor_config):
-            _collect_optadvisor(thisqm, optadvisor_config, values, jar_path)
+            _collect_optadvisor(thisqm, optadvisor_config, values)
 
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in weblogic statistics:" + str(err))
