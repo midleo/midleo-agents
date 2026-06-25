@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import binascii
 import json
 import os
 import re
@@ -9,7 +10,7 @@ import tempfile
 import zlib
 from datetime import datetime
 
-from modules.base import classes, configs, decrypt, secrets
+from modules.base import banlist, classes, configs, decrypt, secrets
 
 PORT_NUMBER = 5550
 AGENT_VER = "1.26.06"
@@ -22,6 +23,7 @@ READ_TIMEOUT = 30
 CMD_TIMEOUT = 300
 
 CLIENT_SEMAPHORE = None
+INVALID_PROTOCOL_COUNTS = {}
 
 FORBIDDEN_PATTERNS = [
     r"\brm\s+-[rRfF]+\s+/",
@@ -102,6 +104,54 @@ def _decode_json_bytes(b: bytes):
     if isinstance(s, (bytes, bytearray)):
         s = s.decode("utf-8", errors="strict")
     return json.loads(s)
+
+
+def _decode_request_payload(raw, cfg):
+    datamess = _decode_json_bytes(raw)
+    if not isinstance(datamess, dict) or "data" not in datamess:
+        raise ValueError("invalid envelope")
+    try:
+        decrypted = decrypt.decryptit(datamess["data"], cfg["uid_key"])
+    except Exception as ex:
+        raise ValueError("invalid encrypted payload") from ex
+    data = json.loads(decrypted) if isinstance(decrypted, str) else decrypted
+    if not isinstance(data, dict):
+        raise ValueError("invalid payload")
+    return data
+
+
+def _invalid_payload_threshold(cfg):
+    try:
+        value = int(str(cfg.get("BAN_INVALID_PAYLOAD_THRESHOLD", "1")).strip() or "1")
+    except (TypeError, ValueError):
+        value = 1
+    return max(1, min(value, 10))
+
+
+def _is_malformed_protocol_error(ex):
+    if isinstance(ex, (UnicodeDecodeError, json.JSONDecodeError, binascii.Error, zlib.error)):
+        return True
+    if isinstance(ex, ValueError):
+        return str(ex) in ("empty", "invalid envelope", "invalid encrypted payload", "invalid payload")
+    return False
+
+
+def _ban_malformed_peer(peername, ex, cfg):
+    host = str(peername[0] if isinstance(peername, (tuple, list)) else peername)
+    threshold = _invalid_payload_threshold(cfg)
+    INVALID_PROTOCOL_COUNTS[host] = INVALID_PROTOCOL_COUNTS.get(host, 0) + 1
+    if INVALID_PROTOCOL_COUNTS[host] < threshold:
+        classes.Err(
+            "Info:Invalid protocol data from "
+            + str(peername)
+            + " count="
+            + str(INVALID_PROTOCOL_COUNTS[host])
+            + " threshold="
+            + str(threshold)
+        )
+        return
+    if banlist.add_banned(peername, "invalid protocol data: " + str(ex)):
+        classes.Err("Info:Added banned IP " + host + " reason=invalid protocol data")
 
 
 def _reply(now_str, parts, cfgkey):
@@ -454,12 +504,12 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
 
     try:
         raw = await _read_framed_or_legacy(reader)
-        datamess = _decode_json_bytes(raw)
-
-        decrypted = decrypt.decryptit(datamess["data"], cfg["uid_key"])
-        data = json.loads(decrypted) if isinstance(decrypted, str) else decrypted
-        if not isinstance(data, dict):
-            raise ValueError("invalid payload")
+        try:
+            data = _decode_request_payload(raw, cfg)
+        except Exception as ex:
+            if _is_malformed_protocol_error(ex):
+                _ban_malformed_peer(addr, ex, cfg)
+            raise
 
         if data.get("uid") != cfg["uid_key"]:
             raise ValueError("unauthorized")
@@ -482,6 +532,9 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     _write_remote_file(filename, f["file"], cfg["remote_roots"])
                     responses.append("File created:" + filename)
                 except Exception as ex:
+                    if _is_malformed_protocol_error(ex):
+                        _ban_malformed_peer(addr, ex, cfg)
+                        raise
                     responses.append("File write failed:" + str(filename) + " (" + str(ex) + ")")
 
             elif ftype == "delete" and filename:
@@ -492,7 +545,11 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     responses.append("File delete failed:" + str(filename) + " (" + str(ex) + ")")
 
         if "command" in data:
-            cmd_raw = base64.b64decode(data["command"]).decode("utf-8", errors="strict")
+            try:
+                cmd_raw = base64.b64decode(data["command"], validate=True).decode("utf-8", errors="strict")
+            except (binascii.Error, UnicodeDecodeError) as ex:
+                _ban_malformed_peer(addr, ex, cfg)
+                raise
             commands = _split_commands(cmd_raw)
 
             for cmd in commands:
@@ -533,6 +590,14 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
 
 
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    addr = writer.get_extra_info("peername")
+    if banlist.is_banned(addr):
+        classes.Err("Info:Rejected banned connection from " + str(addr))
+        try:
+            await _close_writer(writer)
+        except Exception:
+            pass
+        return
     async with CLIENT_SEMAPHORE:
         await _handle_client(reader, writer)
 

@@ -126,12 +126,22 @@ midagent_create_script:
         - source: salt://midagent/templates/python/cronjobs.bat
       - {{agent_install_dir}}config/cronjobs.json:
         - source: salt://midagent/templates/python/config/cronjobs.json
+      - {{agent_install_dir}}config/banned.json:
+        - source: salt://midagent/templates/python/config/banned.json
     - context:
         python_install_dir: "{{python_install_dir}}"
 
 midagent_secure_cronjobs_config:
   file.managed:
     - name: {{agent_install_dir}}config/cronjobs.json
+    - user: {{mwuser}}
+    - group: {{mwuser}}
+    - mode: '0600'
+    - replace: False
+
+midagent_secure_banned_config:
+  file.managed:
+    - name: {{agent_install_dir}}config/banned.json
     - user: {{mwuser}}
     - group: {{mwuser}}
     - mode: '0600'

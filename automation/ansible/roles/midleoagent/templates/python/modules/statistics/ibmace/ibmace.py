@@ -4,6 +4,7 @@ import json
 import os
 import socket
 import sys
+import time
 import uuid
 from urllib.parse import quote
 from datetime import datetime, timezone
@@ -89,6 +90,8 @@ APPLSTAT_SKIP_KEYS = OPTADVISOR_CONFIG_KEYS | {
     "sslverify",
     "ssl_verify",
 }
+APPLSTAT_MAX_FILES = int(os.environ.get("MIDLEO_OPTADVISOR_APPLSTAT_MAX_FILES", "100"))
+APPLSTAT_MAX_FILE_AGE_SECONDS = int(os.environ.get("MIDLEO_OPTADVISOR_APPLSTAT_MAX_AGE_SECONDS", "86400"))
 
 
 def _utc_now():
@@ -187,14 +190,28 @@ def _applstat_stats_file_paths(thisnode, stat_metrics=None):
     for logdir in logdirs:
         paths.extend(glob.glob(logdir + "*flowStats*.csv"))
         paths.extend(glob.glob(logdir + "*SnapShot*.csv"))
-    deduped = []
+    candidates = []
     seen = set()
+    now = time.time()
+    max_age_seconds = max(0, APPLSTAT_MAX_FILE_AGE_SECONDS)
     for path in paths:
         normalized = os.path.normpath(path)
-        if normalized not in seen and os.path.isfile(normalized):
-            seen.add(normalized)
-            deduped.append(normalized)
-    return deduped
+        if normalized in seen or not os.path.isfile(normalized):
+            continue
+        try:
+            mtime = os.path.getmtime(normalized)
+        except OSError as err:
+            classes.Err("ibmace optadvisor stats file skipped:" + str(err))
+            continue
+        if max_age_seconds and now - mtime > max_age_seconds:
+            continue
+        seen.add(normalized)
+        candidates.append((mtime, normalized))
+    candidates.sort(reverse=True)
+    if APPLSTAT_MAX_FILES > 0 and len(candidates) > APPLSTAT_MAX_FILES:
+        classes.Err("ibmace optadvisor stats file scan trimmed to " + str(APPLSTAT_MAX_FILES))
+        candidates = candidates[:APPLSTAT_MAX_FILES]
+    return [path for _, path in candidates]
 
 
 def _get_server_id(config, thisnode):
@@ -1349,7 +1366,6 @@ def _post_rest_statistics(website, webssl, stat_data):
         except (json.JSONDecodeError, TypeError, ValueError):
             retarr = {}
         if not retarr:
-            file_utils.truncate_file(file_path)
             continue
         if common.post_stat_payloads(
             "ibmace",

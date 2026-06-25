@@ -100,6 +100,14 @@
     owner: "{{midleo_mwuser}}"
     group: "{{midleo_mwuser}}"
     mode: '0600'
+- name: "copy banned ips json"
+  template:
+    src: templates/python/config/banned.json
+    dest: "{{agent_install_dir}}config/banned.json"
+    owner: "{{midleo_mwuser}}"
+    group: "{{midleo_mwuser}}"
+    mode: '0600'
+    force: no
 - name: "check exist agentconfig"
   stat: "path={{agent_install_dir}}config/mwagent.config"
   register: st_agcfg

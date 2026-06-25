@@ -42,6 +42,12 @@
     dest: "{{agent_install_dir}}config/cronjobs.json"
     force: no
 
+- name: "copy banned ips json"
+  win_copy:
+    src: templates/python/config/banned.json
+    dest: "{{agent_install_dir}}config/banned.json"
+    force: no
+
 - name: "check existing windows agent config"
   win_stat:
     path: "{{agent_install_dir}}config/mwagent.config"

@@ -752,7 +752,6 @@ def post_csv_stats(stat_type, func_name, website, webssl, _legacy_token, stat_da
                 ret = file_utils.csv_json(file_path, func(), "", False)
                 retarr = json.loads(ret)
                 if len(retarr) == 0:
-                    file_utils.truncate_file(file_path)
                     continue
 
                 if post_stat_payloads(stat_type, subtype, website, webssl, retarr):
