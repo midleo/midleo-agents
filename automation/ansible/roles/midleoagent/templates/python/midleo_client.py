@@ -42,6 +42,7 @@ FORBIDDEN_PATTERNS = [
 ]
 
 SHELL_META_CHARS = set("|&;<>\n`")
+SHELL_C_EXECUTABLES = {"sh", "bash", "dash", "ksh", "zsh"}
 AGENT_SCRIPT_COMMANDS = {"magent.sh", "magent.bat", "cronjobs.sh", "cronjobs.bat"}
 
 def _get_cfg():
@@ -307,10 +308,63 @@ def _magent_json_args(cmd_str):
     return args + [json_text]
 
 
+def _strip_wrapping_quotes(value):
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    return value
+
+
+def _normalize_escaped_quotes(value):
+    return value.replace('\\"', '"')
+
+
+def _token_exe_name(value):
+    exe = os.path.basename(str(value).strip("\"'")).lower()
+    return exe[:-4] if exe.endswith(".exe") else exe
+
+
+def _has_shell_meta_token(args):
+    for token in args:
+        if any(ch in token for ch in SHELL_META_CHARS):
+            return True
+        if "$(" in token or "${" in token:
+            return True
+    return False
+
+
+def _shell_c_args(cmd_str):
+    try:
+        args = shlex.split(_normalize_escaped_quotes(cmd_str), posix=os.name != "nt")
+    except ValueError as ex:
+        raise ValueError("invalid command syntax: " + str(ex))
+
+    for idx, arg in enumerate(args[:-2]):
+        if _token_exe_name(arg) not in SHELL_C_EXECUTABLES:
+            continue
+        if args[idx + 1] != "-c":
+            continue
+        if _has_shell_meta_token(args[:idx]):
+            return None
+        if len(args) != idx + 3:
+            return None
+
+        command_arg = _strip_wrapping_quotes(args[idx + 2])
+        if not command_arg:
+            raise ValueError("invalid command syntax: missing shell -c command")
+        return args[:idx + 2] + [command_arg]
+
+    return None
+
+
 def _command_args(cmd_str):
     magent_args = _magent_json_args(cmd_str)
     if magent_args is not None:
         return magent_args
+
+    shell_c_args = _shell_c_args(cmd_str)
+    if shell_c_args is not None:
+        return shell_c_args
 
     if _contains_unquoted_shell_syntax(cmd_str):
         raise ValueError("shell metacharacters are not allowed")
