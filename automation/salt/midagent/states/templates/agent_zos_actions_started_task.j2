@@ -1,0 +1,20 @@
+//* Sample z/OS started task PROC for the Midleo localhost action service.
+//* Copy to a site PROCLIB member such as MIDLEOAC after review.
+//MIDLEOAC PROC AGTDIR='{{ agent_install_dir | default("/u/midleoagent/") }}'
+//MIDLEOAC EXEC PGM=BPXBATCH,REGION=0M,TIME=NOLIMIT
+//STDPARM DD *
+SH &AGTDIR.midleoagent.zos.sh actions-foreground
+/*
+//STDENV DD *
+_BPXK_AUTOCVT=ON
+_CEE_RUNOPTS=FILETAG(AUTOCVT,AUTOTAG) POSIX(ON)
+_TAG_REDIR_ERR=txt
+_TAG_REDIR_OUT=txt
+/*
+//STDOUT DD PATH='&AGTDIR.logs/midleoactions.stc.out',
+// PATHOPTS=(OWRONLY,OCREAT,OAPPEND),
+// PATHMODE=(SIRUSR,SIWUSR,SIRGRP,SIWGRP)
+//STDERR DD PATH='&AGTDIR.logs/midleoactions.stc.err',
+// PATHOPTS=(OWRONLY,OCREAT,OAPPEND),
+// PATHMODE=(SIRUSR,SIWUSR,SIRGRP,SIWGRP)
+// PEND

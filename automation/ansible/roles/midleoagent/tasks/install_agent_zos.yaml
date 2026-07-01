@@ -1,0 +1,161 @@
+---
+- set_fact:
+    agent_unique_id: "{{ lookup('password', '/dev/null length=16 chars=hexdigits') }}"
+    agent_install_dir: "{{ midleo_zos_agent_install_dir | default('/u/midleoagent/') }}"
+    python_install_dir: "{{ midleo_zos_python | default('/usr/lpp/IBM/cyp/v3r12/pyz/bin/python3') }}"
+    midleo_agent_allowed_commands: "{{ allowed_commands | default(['magent.zos.sh', 'dspmq', 'dspmqver']) }}"
+
+- name: "Create z/OS USS Midleo directories"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0750'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+  loop:
+    - "{{ agent_install_dir }}"
+    - "{{ agent_install_dir }}modules"
+    - "{{ agent_install_dir }}runable"
+    - "{{ agent_install_dir }}logs"
+    - "{{ agent_install_dir }}run"
+    - "{{ agent_install_dir }}config"
+    - "{{ agent_install_dir }}extchecks"
+
+- name: "Secure z/OS USS private runtime directories"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0700'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+  loop:
+    - "{{ agent_install_dir }}logs"
+    - "{{ agent_install_dir }}run"
+    - "{{ agent_install_dir }}config"
+
+- name: "Create z/OS agent Python services"
+  template:
+    src: "templates/python/{{ item }}"
+    dest: "{{ agent_install_dir }}{{ item }}"
+    mode: '0750'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+  loop:
+    - midleo_client.py
+    - midleo_actions.py
+
+- name: "Create z/OS USS wrapper scripts"
+  template:
+    src: "templates/python/{{ item }}"
+    dest: "{{ agent_install_dir }}{{ item }}"
+    mode: '0755'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+  loop:
+    - magent.zos.sh
+    - cronjobs.zos.sh
+    - midleoagent.zos.sh
+    - zos_env.sh
+
+- name: "Copy z/OS cron and ban config"
+  template:
+    src: "templates/python/config/{{ item }}"
+    dest: "{{ agent_install_dir }}config/{{ item }}"
+    mode: '0600'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+    force: no
+  loop:
+    - cronjobs.json
+    - banned.json
+
+- name: "Check existing z/OS agent config"
+  stat:
+    path: "{{ agent_install_dir }}config/mwagent.config"
+  register: st_zos_agcfg
+
+- name: "Create z/OS agent config"
+  template:
+    src: templates/mwagent.config.j2
+    dest: "{{ agent_install_dir }}config/mwagent.config"
+    mode: '0600'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+  vars:
+    allowed_commands: "{{ midleo_agent_allowed_commands }}"
+    midleo_zos_python_home: "{{ midleo_zos_python_home | default('') }}"
+    midleo_zos_zpymqi_path: "{{ midleo_zos_zpymqi_path | default('') }}"
+    midleo_zos_steplib: "{{ midleo_zos_steplib | default('') }}"
+    midleo_zos_zoau_home: "{{ midleo_zos_zoau_home | default('') }}"
+  when: not st_zos_agcfg.stat.exists
+
+- name: "Create z/OS local crypto secret"
+  copy:
+    dest: "{{ agent_install_dir }}config/crypto.secret"
+    content: "{{ lookup('password', '/dev/null length=64 chars=ascii_letters,digits') }}\n"
+    mode: '0600'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+    force: no
+
+- name: "Create z/OS module directories"
+  file:
+    path: "{{ agent_install_dir }}modules/{{ item.path }}"
+    state: directory
+    mode: '0750'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+  with_filetree: templates/python/modules
+  when: item.state == 'directory'
+
+- name: "Create z/OS runable directories"
+  file:
+    path: "{{ agent_install_dir }}runable/{{ item.path }}"
+    state: directory
+    mode: '0750'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+  with_filetree: templates/python/runable
+  when: item.state == 'directory'
+
+- name: "Upload z/OS module files"
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ agent_install_dir }}modules/{{ item.path }}"
+    mode: '0640'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+    force: yes
+  with_filetree: templates/python/modules
+  when: item.state == 'file'
+
+- name: "Upload z/OS runable files"
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ agent_install_dir }}runable/{{ item.path }}"
+    mode: '0640'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+    force: yes
+  with_filetree: templates/python/runable
+  when: item.state == 'file'
+
+- name: "Create z/OS started task and crontab samples"
+  template:
+    src: "templates/{{ item.src }}"
+    dest: "{{ agent_install_dir }}{{ item.dest }}"
+    mode: '0640'
+    owner: "{{ midleo_zos_owner | default(omit) }}"
+    group: "{{ midleo_zos_group | default(omit) }}"
+  loop:
+    - { src: agent_zos_started_task.j2, dest: MIDLEOA.proc }
+    - { src: agent_zos_actions_started_task.j2, dest: MIDLEOAC.proc }
+    - { src: agent_zos_crontab.j2, dest: midleoagent.zos.crontab }
+
+- name: "Create z/OS USS cron entry"
+  cron:
+    name: midleo cronjobs
+    minute: "*"
+    job: "{{ agent_install_dir }}cronjobs.zos.sh >> {{ agent_install_dir }}logs/cronjobs.zos.out 2>&1"
+  when: midleo_zos_install_cron | default(false) | bool
+...

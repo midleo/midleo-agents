@@ -1,0 +1,4 @@
+# z/OS USS crontab entry for Midleo local jobs.
+# Install for the Midleo agent user after site cron access is approved:
+#   crontab {{ agent_install_dir | default("/u/midleoagent/") }}midleoagent.zos.crontab
+* * * * * {{ agent_install_dir | default("/u/midleoagent/") }}cronjobs.zos.sh >> {{ agent_install_dir | default("/u/midleoagent/") }}logs/cronjobs.zos.out 2>&1

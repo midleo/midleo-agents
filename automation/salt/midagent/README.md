@@ -1,6 +1,6 @@
 # Midleo Agent Salt Deployment
 
-This Salt formula installs the Linux Midleo agent service, action service, and cron runner.
+This Salt formula installs the Linux Midleo agent service, action service, and cron runner. It also includes a z/OS USS path that installs the Python runtime files, USS wrappers, cron sample, and BPXBATCH started-task samples.
 
 ## Quick Start
 
@@ -41,6 +41,20 @@ Static defaults are in `pillars/midagent_vars.sls`:
 - `python_install_dir`: default `/usr/bin/python3`
 - `mwuser`: default `mwadmin`
 
+For z/OS USS, override the static defaults before applying the state:
+
+- `agent_install_dir`: normally `/u/midleoagent/`
+- `python_install_dir`: for example `/usr/lpp/IBM/cyp/v3r12/pyz/bin/python3`
+- `mwuser`: the RACF user or started-task identity that owns the USS files
+
+Optional z/OS input pillars:
+
+- `INPUT:midleo_zos_python_home`
+- `INPUT:midleo_zos_zpymqi_path`
+- `INPUT:midleo_zos_steplib`
+- `INPUT:midleo_zos_zoau_home`
+- `INPUT:install_cron`, default `false`
+
 ## Installed Dependencies
 
 System packages:
@@ -65,6 +79,8 @@ Python packages:
 
 `shlex`, `subprocess`, `asyncio`, and the other base runtime imports are Python standard-library modules and are not installed separately.
 
+On z/OS, package installation is intentionally site managed. Install IBM Open Enterprise SDK for Python or an equivalent supported Python, then install required Python packages such as `pycryptodome` and `requests`. For IBM MQ local statistics, deploy a z/OS-capable PyMQI port such as `zpymqi`, then set `ZOS_ZPYMQI_PATH` and `ZOS_STEPLIB`.
+
 ## Services and Files
 
 The state creates:
@@ -76,6 +92,17 @@ The state creates:
 - `/etc/systemd/system/midleoagent.service`
 - `/etc/systemd/system/midleoactions.service`
 - a per-minute cron entry for the Midleo service user.
+
+On z/OS USS, the state creates:
+
+- `/u/midleoagent/` or the configured install root
+- `magent.zos.sh`, `cronjobs.zos.sh`, `midleoagent.zos.sh`, and `zos_env.sh`
+- `config/mwagent.config`
+- `config/crypto.secret`
+- `MIDLEOA.proc` and `MIDLEOAC.proc` BPXBATCH started-task samples
+- `midleoagent.zos.crontab`
+
+The state does not copy PROC members to PROCLIB, define RACF STARTED profiles, or start the tasks. Those are site-controlled z/OS system programming actions.
 
 Executable demo app-server registration states are not part of the production install. Register application servers through Midleo Core or explicit Salt states with customer-specific data.
 
@@ -153,3 +180,5 @@ salt-call state.apply midagent.installAgent test=True pillar="$pillar"
 ```
 
 Before customer rollout, verify TLS trust, firewall rules, `ALLOWED_COMMANDS`, `REMOTE_FILE_ROOTS`, `ACTION_SCRIPT_ROOTS`, and the Midleo Core endpoint. Avoid allowing raw `sudo`, `docker`, shells, or interpreters unless the customer explicitly accepts that operational risk.
+
+For z/OS rollout, also verify the OMVS segment/UID, STARTED class mapping, USS file tags or `_BPXK_AUTOCVT`, port 5550 access, cron authorization, and MQ authority for `RUNMQSC`. ZOAU can be added later for JES job operations; see https://www.ibm.com/docs/en/zoau/1.3.x?topic=apis-jobs.

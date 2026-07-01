@@ -1,13 +1,29 @@
 ---
+- name: "Detect z/OS target"
+  set_fact:
+    midleo_agent_is_zos: "{{ (midleo_agent_platform | default('') | lower) == 'zos' or (ansible_system | default('')) in ['OS/390', 'z/OS'] }}"
+
 - name: "Remove agent windows"
   include_tasks:
     file: remove_agent_windows.yaml
-  when: ansible_facts['os_family']=='Windows'
+  when: (ansible_facts.get('os_family', '')) == 'Windows'
+
+- name: "Remove agent z/OS USS"
+  include_tasks:
+    file: remove_agent_zos.yaml
+    apply:
+      become: false
+  when:
+    - (ansible_facts.get('os_family', '')) != 'Windows'
+    - midleo_agent_is_zos | bool
+
 - name: "Remove agent linux"
   include_tasks:
     file: remove_agent_linux.yaml
   args:
     apply:
       become: true
-  when: ansible_facts['os_family']!='Windows'
+  when:
+    - (ansible_facts.get('os_family', '')) != 'Windows'
+    - not (midleo_agent_is_zos | bool)
 ...

@@ -15,12 +15,13 @@ from midleo_client import AGENT_VER
 from getlocaljobs import getLocalJobsBody
 
 OS_TYPE = platform.system()
+ZOS_OS_TYPES = {"OS/390", "z/OS"}
 BASE_DIR = os.getcwd()
 CONFIG_DIR = os.path.join(BASE_DIR, "config")
 CERTS_FILE = os.path.join(CONFIG_DIR, "certs.json")
 NEXTRUN_FILE = os.path.join(CONFIG_DIR, "nextrun.txt")
 
-if OS_TYPE == "Linux":
+if OS_TYPE == "Linux" or OS_TYPE in ZOS_OS_TYPES:
     from modules.base import lin_utils, lin_packages
 elif OS_TYPE == "Windows":
     from modules.base import win_utils
@@ -164,7 +165,7 @@ def create():
 
         if OS_TYPE == "Windows":
             config = _build_windows_config(uid, groupid, updint, certs)
-        elif OS_TYPE == "Linux":
+        elif OS_TYPE == "Linux" or OS_TYPE in ZOS_OS_TYPES:
             config = _build_linux_config(uid, groupid, updint, certs)
         else:
             raise RuntimeError("Unsupported operating system: " + OS_TYPE)

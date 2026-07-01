@@ -3,7 +3,10 @@ windowshost1 group_id="middleware_team"
 
 
 [linux]
-linuxhost1 group_id="middleware_team" 
+linuxhost1 group_id="middleware_team"
+
+[zos]
+zoshost1 group_id="middleware_team"
 
 [windows:vars]
 ansible_port=5985
@@ -29,6 +32,24 @@ midleo_mwuser="mwadmin"
 agent_bootstrap_token=""
 allowed_commands=['magent.sh','dspmq','dspmqver','uptime']
 
+[zos:vars]
+ansible_connection='ssh'
+midleo_agent_platform='zos'
+midleo_website_base_url="MIDLEO_BASE_URL"
+midleo_website_base_url_ssl="n"
+update_interval_minutes="5"
+midleo_mwuser="MWADMIN"
+agent_bootstrap_token=""
+midleo_zos_agent_install_dir="/u/midleoagent/"
+midleo_zos_python="/usr/lpp/IBM/cyp/v3r12/pyz/bin/python3"
+midleo_zos_python_home="/usr/lpp/IBM/cyp/v3r12/pyz"
+midleo_zos_zpymqi_path=""
+midleo_zos_steplib=""
+midleo_zos_zoau_home=""
+midleo_zos_install_cron=false
+allowed_commands=['magent.zos.sh','dspmq','dspmqver']
+
 [middleware:children]
 linux
 windows
+zos

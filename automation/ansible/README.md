@@ -9,7 +9,7 @@ cd automation/ansible
 ansible-playbook install_midleo_agent.yaml -i inventories/hosts
 ```
 
-The playbook targets the `middleware` inventory group. Linux hosts are installed under `/var/midleoagent/`; Windows hosts are installed under `D:/apps/midleoagent/`.
+The playbook targets the `middleware` inventory group. Linux hosts are installed under `/var/midleoagent/`; Windows hosts are installed under `D:/apps/midleoagent/`; z/OS USS hosts default to `/u/midleoagent/`.
 
 ## Required Inventory Variables
 
@@ -28,6 +28,17 @@ Windows inventory also needs:
 - `win_user`
 - `win_pass`
 - WinRM connection settings appropriate for the customer environment.
+
+z/OS inventory should set:
+
+- `midleo_agent_platform=zos`
+- `midleo_zos_agent_install_dir`, default `/u/midleoagent/`
+- `midleo_zos_python`, default `/usr/lpp/IBM/cyp/v3r12/pyz/bin/python3`
+- `midleo_zos_python_home`, for example `/usr/lpp/IBM/cyp/v3r12/pyz`
+- optional `midleo_zos_zpymqi_path`, the parent directory containing the z/OS `pymqi` package
+- optional `midleo_zos_steplib`, the IBM MQ load libraries needed by `zpymqi`
+- optional `midleo_zos_zoau_home`, if later JES job integration uses ZOAU
+- optional `midleo_zos_install_cron=true`, only when USS cron access is approved
 
 ## Optional Variables
 
@@ -57,6 +68,8 @@ Python packages:
 
 `shlex` and `subprocess` are Python standard-library modules and are available in Python 3.6 and current Python releases.
 
+z/OS Python dependencies are site managed. Install IBM Open Enterprise SDK for Python or an equivalent supported Python first, then provide required Python packages such as `pycryptodome` and `requests`. `zpymqi` is not installed with `pip`; transfer and unpack it per the local z/OS MQ standard, then set `ZOS_ZPYMQI_PATH` and `ZOS_STEPLIB`.
+
 ## Services and Schedule
 
 Linux deployment creates:
@@ -66,6 +79,17 @@ Linux deployment creates:
 - `/etc/cron.d/midleoagent`
 
 The cron entry runs every minute and executes enabled jobs from `/var/midleoagent/config/cronjobs.json`. Jobs are bounded by `JOB_TIMEOUT_SECONDS`.
+
+z/OS deployment creates USS runtime files and samples:
+
+- `magent.zos.sh`
+- `cronjobs.zos.sh`
+- `midleoagent.zos.sh`
+- `MIDLEOA.proc`
+- `MIDLEOAC.proc`
+- `midleoagent.zos.crontab`
+
+There is no systemd on z/OS. For a service, review the BPXBATCH PROC samples, copy them to a site PROCLIB, define the RACF STARTED profiles, and start `MIDLEOA` and `MIDLEOAC`. For scheduling, install the sample crontab only after the site allows the agent user to use USS cron.
 
 Linux deployment also creates `/etc/midleo/crypto.secret` once and preserves it across reinstall. This secret is used for local application credential encryption and must not be rotated without re-encrypting stored agent credentials.
 
@@ -146,3 +170,11 @@ test -f /etc/midleo/crypto.secret
 ```
 
 Review `ALLOWED_COMMANDS`, `REMOTE_FILE_ROOTS`, `ACTION_SCRIPT_ROOTS`, `SSLVERIFY`, firewall rules, and the Midleo Core endpoint before exposing the service to enterprise networks. Avoid allowing raw `sudo`, `docker`, shells, or interpreters unless the customer explicitly accepts that operational risk.
+
+On z/OS, `magent.zos.sh enabletrackqm|disabletrackqm` runs `RUNMQSC` directly. The USS user or started-task identity must have the MQ/RACF permissions; the Linux `sudo -u mqm` model does not apply.
+
+Useful z/OS references:
+
+- `zpymqi`: https://colinpaicemq.github.io/zpymqi/
+- Python on z/OS setup notes: https://colinpaice.blog/2021/06/30/installing-python-on-z-os/
+- ZOAU Jobs API: https://www.ibm.com/docs/en/zoau/1.3.x?topic=apis-jobs

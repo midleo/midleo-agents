@@ -7,12 +7,14 @@ The Linux agent runs two services:
 - `midleoagent`: TCP agent service used by Midleo Core for approved remote operations.
 - `midleoactions`: localhost action service used for controlled remediation actions.
 
+On z/OS, the same Python services run under UNIX System Services (USS). The repository provides USS wrappers and BPXBATCH started-task samples instead of systemd units.
+
 The cron integration runs every minute and executes only the jobs enabled in `config/cronjobs.json`. The actual collection interval is controlled by the agent configuration and per-job schedules.
 
 ## Repository Layout
 
-- `automation/ansible`: Ansible playbooks and roles for Linux and Windows deployment.
-- `automation/salt/midagent`: Salt states, pillars, execution modules, and state modules for Linux deployment.
+- `automation/ansible`: Ansible playbooks and roles for Linux, Windows, and z/OS USS deployment.
+- `automation/salt/midagent`: Salt states, pillars, execution modules, and state modules for Linux and z/OS USS deployment.
 - `monitoring.beats`: Filebeat, Fluent Bit, Logstash, and rsyslog examples for forwarding middleware alerts to Midleo Core.
 
 The Ansible and Salt Python template trees are intentionally the same runtime code. Keep changes under both template trees synchronized:
@@ -26,9 +28,11 @@ diff -qr automation/ansible/roles/midleoagent/templates/python automation/salt/m
 - Python 3.6 or newer.
 - Linux deployment uses systemd and cron.
 - Windows deployment uses Windows Scheduled Tasks.
+- z/OS deployment uses USS shell scripts, optional USS cron, and optional BPXBATCH started tasks generated from `MIDLEOA.proc` and `MIDLEOAC.proc` samples.
 - Required Python packages are installed by the automation: `psutil`, `py-cpuinfo`, `dnspython`, `requests`, `pycryptodome`, `pywinrm`, and `netifaces`.
 - `shlex`, `subprocess`, `asyncio`, `json`, and the other base imports used by the agent are Python standard-library modules and do not require separate installation.
 - IBM MQ local queue statistics require `pymqi` and IBM MQ client development libraries. Enable this only on MQ hosts.
+- On z/OS, local IBM MQ statistics require a z/OS-capable PyMQI port such as `zpymqi`; set `ZOS_ZPYMQI_PATH` and `ZOS_STEPLIB` in `config/mwagent.config`.
 - MQ event collection requires `amqsevt` and `jq`.
 - Optimization Advisor telemetry requires two controls: the per-server
   `confapplstat.json` opt-in and a time-limited local runtime window. Enable the
@@ -87,6 +91,7 @@ diff -qr automation/ansible/roles/midleoagent/templates/python automation/salt/m
 - Application credential encryption uses `/etc/midleo/crypto.secret`, created by Linux automation with root ownership and service-user read access.
 - HTTPS certificate verification is enabled by default with `SSLVERIFY=y`.
 - systemd services run with additional hardening options where supported.
+- z/OS started tasks must be assigned a RACF STARTED profile, OMVS segment/UID, filesystem access, and only the MQ authorities needed by configured collectors.
 
 ## Deployment
 
@@ -128,5 +133,23 @@ systemctl list-timers --all
 crontab -u mwadmin -l
 tail -n 100 /var/midleoagent/logs/midleoagent.log
 ```
+
+Common z/OS USS paths:
+
+- Install root: `/u/midleoagent/`
+- Agent config: `/u/midleoagent/config/mwagent.config`
+- Cron sample: `/u/midleoagent/midleoagent.zos.crontab`
+- Started-task samples: `/u/midleoagent/MIDLEOA.proc`, `/u/midleoagent/MIDLEOAC.proc`
+- USS lifecycle wrapper: `/u/midleoagent/midleoagent.zos.sh`
+
+z/OS service operations:
+
+```sh
+/u/midleoagent/midleoagent.zos.sh start
+/u/midleoagent/midleoagent.zos.sh status
+/u/midleoagent/cronjobs.zos.sh
+```
+
+For a true z/OS service, copy the reviewed PROC samples to a site PROCLIB and start them as `S MIDLEOA` and `S MIDLEOAC`. USS cron can run `cronjobs.zos.sh` every minute when the site allows the agent user to use `cron`.
 
 For production, validate TLS, firewall rules, least-privilege command allowlists, and module-specific vendor libraries before onboarding customer hosts.

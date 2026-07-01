@@ -2,6 +2,16 @@
 
 {% set install_pymqi = salt['pillar.get']('INPUT:install_pymqi', False) %}
 {% set osfam = grains.get('os_family', '') %}
+{% set osname = grains.get('os', '') %}
+{% set kernel = grains.get('kernel', '') %}
+{% set is_zos = osname|lower in ['zos', 'z/os'] or kernel in ['OS/390', 'z/OS'] %}
+{% if is_zos %}
+
+midagent_zos_package_notice:
+  test.show_notification:
+    - text: "z/OS USS Python and packages are site managed. Install IBM Open Enterprise SDK for Python, pycryptodome, requests, and optional zpymqi before starting Midleo."
+
+{% else %}
 {% if osfam == 'RedHat' %}
 {% set python_dev_package = 'python3-devel' %}
 {% else %}
@@ -37,4 +47,5 @@ midagent_install_pymqi:
     - name: pymqi
     - require:
       - pkg: midagent_install_packages
+{% endif %}
 {% endif %}

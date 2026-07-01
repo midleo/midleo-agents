@@ -1,0 +1,16 @@
+---
+- set_fact:
+    agent_install_dir: "{{ midleo_zos_agent_install_dir | default('/u/midleoagent/') }}"
+
+- name: "Stop z/OS USS Midleo services"
+  shell: "{{ agent_install_dir }}midleoagent.zos.sh stop"
+  args:
+    executable: /bin/sh
+  failed_when: false
+  changed_when: false
+
+- name: "Remove z/OS USS Midleo runtime"
+  file:
+    path: "{{ agent_install_dir }}"
+    state: absent
+...

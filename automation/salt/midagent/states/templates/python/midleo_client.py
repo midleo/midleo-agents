@@ -43,7 +43,14 @@ FORBIDDEN_PATTERNS = [
 
 SHELL_META_CHARS = set("|&;<>\n`")
 SHELL_C_EXECUTABLES = {"sh", "bash", "dash", "ksh", "zsh"}
-AGENT_SCRIPT_COMMANDS = {"magent.sh", "magent.bat", "cronjobs.sh", "cronjobs.bat"}
+AGENT_SCRIPT_COMMANDS = {
+    "magent.sh",
+    "magent.bat",
+    "magent.zos.sh",
+    "cronjobs.sh",
+    "cronjobs.bat",
+    "cronjobs.zos.sh",
+}
 
 def _get_cfg():
     cfg = configs.getcfgData() or {}
@@ -299,7 +306,7 @@ def _magent_json_args(cmd_str):
         return None
 
     script = os.path.basename(args[0]).lower()
-    if script not in ("magent.sh", "magent.bat"):
+    if script not in ("magent.sh", "magent.bat", "magent.zos.sh"):
         return None
 
     if args[1] not in ("enableavl", "addcert", "addappstat", "addoptadvisor", "addaction"):

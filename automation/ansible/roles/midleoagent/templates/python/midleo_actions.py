@@ -107,6 +107,22 @@ def _normalize_key(payload):
     return appserver_type, error_code, appserver_type + "." + error_code
 
 
+def _posix_shell():
+    configured = os.environ.get("MIDLEO_SHELL", "").strip()
+    if configured:
+        return configured
+
+    try:
+        sysname = os.uname().sysname.upper()
+    except Exception:
+        sysname = ""
+
+    if sysname in ("OS/390", "Z/OS"):
+        return "/bin/sh"
+
+    return "/bin/bash"
+
+
 def _resolve_script_command(script_path, args):
     args = [str(arg) for arg in (args or [])]
 
@@ -119,7 +135,7 @@ def _resolve_script_command(script_path, args):
         return [script_path, *args]
 
     if script_path.endswith(".sh"):
-        return ["/bin/bash", script_path, *args]
+        return [_posix_shell(), script_path, *args]
 
     return [script_path, *args]
 
