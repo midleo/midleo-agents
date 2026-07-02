@@ -274,7 +274,7 @@ def postStatData(webssl, website, thisdata):
 
 
 def postibmmqQData(webssl, website, qm, data):
-    _request(
+    return _request_with_retry(
         "post",
         webssl,
         website,
@@ -284,7 +284,7 @@ def postibmmqQData(webssl, website, qm, data):
 
 
 def postibmmqCHData(webssl, website, qm, data):
-    _request(
+    return _request_with_retry(
         "post",
         webssl,
         website,

@@ -1160,11 +1160,14 @@ def resetStat(thisqm, website, webssl, _legacy_token, thisdata):
                         statlist[qname]["data"] += linearr[1] + ";"
                         statlist[qname]["jsondata"] = json.loads(linearr[2])
 
-                if len(statlist) > 1:
-                    makerequest.postibmmqQData(
+                if len(statlist) > 0:
+                    res = makerequest.postibmmqQData(
                         webssl, website, thisqm, json.dumps(statlist)
                     )
-                    open(file, "w", encoding="utf-8").close()
+                    if res is not None and 200 <= int(res.status_code) < 300:
+                        open(file, "w", encoding="utf-8").close()
+                    else:
+                        classes.Err("ibmmq queue status upload failed for " + str(thisqm))
     except OSError as err:
         classes.Err("Error opening queues file:" + str(err))
     except (json.JSONDecodeError, csv.Error, IndexError, TypeError, ValueError) as err:
@@ -1198,11 +1201,14 @@ def resetStat(thisqm, website, webssl, _legacy_token, thisdata):
                         statlist[chname]["data"] += linearr[1] + ";"
                         statlist[chname]["jsondata"] = json.loads(linearr[2])
 
-                if len(statlist) > 1:
-                    makerequest.postibmmqCHData(
+                if len(statlist) > 0:
+                    res = makerequest.postibmmqCHData(
                         webssl, website, thisqm, json.dumps(statlist)
                     )
-                    open(file, "w", encoding="utf-8").close()
+                    if res is not None and 200 <= int(res.status_code) < 300:
+                        open(file, "w", encoding="utf-8").close()
+                    else:
+                        classes.Err("ibmmq channel status upload failed for " + str(thisqm))
     except OSError as err:
         classes.Err("Error opening channels file:" + str(err))
     except (json.JSONDecodeError, csv.Error, IndexError, TypeError, ValueError) as err:
