@@ -7,11 +7,11 @@ StartLimitBurst=10
  
 [Service]
 Type=simple
-User={{mwuser}}
-Group={{mwuser}}
-WorkingDirectory={{agent_install_dir}}
+User={{ midleo_mwuser }}
+Group={{ midleo_mwuser }}
+WorkingDirectory={{ agent_install_dir }}
 Environment=PYTHONUNBUFFERED=1
-ExecStart={{python_install_dir}} -u {{agent_install_dir}}midleo_actions.py
+ExecStart={{python_install_dir}} -u {{ agent_install_dir }}midleo_actions.py
 Restart=on-failure
 RestartSec=10
 TimeoutStopSec=30

@@ -1,0 +1,146 @@
+---
+- name: "Set Linux update defaults"
+  set_fact:
+    agent_install_dir: "{{ (agent_install_dir | default('/var/midleoagent/')) | regex_replace('/+$', '') }}/"
+    python_install_dir: "{{ python_install_dir | default('/usr/bin/python3') }}"
+    midleo_mwuser: "{{ midleo_mwuser | default('mwadmin') }}"
+
+- name: "Stop Midleo agent service before update"
+  service:
+    name: midleoagent
+    state: stopped
+    enabled: yes
+
+- name: "Truncate midleoagent.log"
+  copy:
+    content: ""
+    dest: "{{ agent_install_dir }}logs/midleoagent.log"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0600"
+    force: yes
+
+- name: "Check existing Midleo config directory"
+  stat:
+    path: "{{ agent_install_dir }}config"
+  register: midleo_update_config_dir
+
+- name: "Require existing config directory for update-only deployment"
+  fail:
+    msg: "Existing {{ agent_install_dir }}config directory is required. Use install_midleo_agent.yaml for first install."
+  when: not midleo_update_config_dir.stat.isdir | default(false)
+
+- name: "Update Midleo agent Python services"
+  template:
+    src: "templates/python/{{ item.name }}"
+    dest: "{{ agent_install_dir }}{{ item.name }}"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { name: "midleo_client.py", mode: "0750" }
+    - { name: "midleo_actions.py", mode: "0750" }
+
+- name: "Update Midleo Linux wrapper scripts"
+  template:
+    src: "templates/python/{{ item }}"
+    dest: "{{ agent_install_dir }}{{ item }}"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0755"
+  loop:
+    - magent.sh
+    - magent_docker.sh
+    - cronjobs.sh
+
+- name: "Update Midleo systemd units"
+  template:
+    src: "templates/{{ item.src }}"
+    dest: "/etc/systemd/system/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - { src: "agent_linux_service.j2", dest: "midleoagent.service" }
+    - { src: "agent_linux_actions_service.j2", dest: "midleoactions.service" }
+
+- name: "Ensure Midleo code directories exist"
+  file:
+    path: "{{ agent_install_dir }}{{ item }}"
+    state: directory
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0750"
+  loop:
+    - modules
+    - runable
+    - extchecks
+
+- name: "Update module directories"
+  file:
+    path: "{{ agent_install_dir }}modules/{{ item.path }}"
+    state: directory
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0750"
+  with_filetree: templates/python/modules
+  when:
+    - item.state == 'directory'
+    - "'__pycache__' not in item.path"
+
+- name: "Update runable directories"
+  file:
+    path: "{{ agent_install_dir }}runable/{{ item.path }}"
+    state: directory
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0750"
+  with_filetree: templates/python/runable
+  when:
+    - item.state == 'directory'
+    - "'__pycache__' not in item.path"
+
+- name: "Update module files"
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ agent_install_dir }}modules/{{ item.path }}"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0640"
+    force: yes
+  with_filetree: templates/python/modules
+  when:
+    - item.state == 'file'
+    - "'__pycache__' not in item.path"
+    - not (item.path | regex_search('\\.pyc$'))
+
+- name: "Update runable files"
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ agent_install_dir }}runable/{{ item.path }}"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0755"
+    force: yes
+  with_filetree: templates/python/runable
+  when:
+    - item.state == 'file'
+    - "'__pycache__' not in item.path"
+    - not (item.path | regex_search('\\.pyc$'))
+
+- name: "Reload systemd after unit update"
+  systemd:
+    daemon_reload: yes
+
+- name: "Start Midleo agent service after update"
+  service:
+    name: midleoagent
+    state: restarted
+    enabled: yes
+
+- name: "Start Midleo action service after update"
+  service:
+    name: midleoactions
+    state: restarted
+    enabled: yes
+...

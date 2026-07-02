@@ -31,8 +31,22 @@
   file:
     path: "/etc/cron.d/midleoagent"
     state: absent
+- name: Remove Midleo sudoers policy
+  file:
+    path: "/etc/sudoers.d/{{ midleo_mwuser | default('mwadmin') }}.conf"
+    state: absent
 - name: Remove midleoagent
   file:
-    path: "{{agent_install_dir}}"
+    path: "{{ agent_install_dir }}"
     state: absent
+- name: Remove Midleo crypto secret when requested
+  file:
+    path: "/etc/midleo/crypto.secret"
+    state: absent
+  when: midleo_remove_secrets | default(false) | bool
+- name: Remove Midleo crypto directory when requested
+  file:
+    path: "/etc/midleo"
+    state: absent
+  when: midleo_remove_secrets | default(false) | bool
 ...

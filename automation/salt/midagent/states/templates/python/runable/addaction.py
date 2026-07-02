@@ -10,6 +10,38 @@ sys.path.insert(0, parentdir)
 from modules.base import configs
 
 
+def _action_roots():
+    cfg = configs.getcfgData() or {}
+    roots_raw = str(
+        cfg.get(
+            "ACTION_SCRIPT_ROOTS",
+            os.path.join(parentdir, "extchecks") + ",/opt/midleo/actions",
+        )
+    )
+    return [item.strip() for item in roots_raw.split(",") if item.strip()]
+
+
+def _path_under(root, path):
+    real_root = os.path.realpath(root)
+    real_path = os.path.realpath(path)
+    try:
+        return os.path.commonpath([real_root, real_path]) == real_root
+    except ValueError:
+        return False
+
+
+def _validate_action_script_path(script_path):
+    if not script_path or "\x00" in script_path:
+        raise ValueError("invalid action script")
+    candidate = (
+        script_path
+        if os.path.isabs(script_path)
+        else os.path.join(parentdir, script_path)
+    )
+    if not any(_path_under(root, candidate) for root in _action_roots()):
+        raise ValueError("action script outside allowed roots")
+
+
 def _load_input():
     if len(sys.argv) < 2:
         raise ValueError("Missing action definition")
@@ -43,6 +75,7 @@ def _validate_action(action_key, action_body):
     script_path = str(action_body.get("script", "")).strip()
     if not script_path:
         raise ValueError("script is required")
+    _validate_action_script_path(script_path)
 
     args = action_body.get("args", [])
     if "args" in action_body and not isinstance(args, list):

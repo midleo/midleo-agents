@@ -51,6 +51,31 @@ AGENT_SCRIPT_COMMANDS = {
     "cronjobs.bat",
     "cronjobs.zos.sh",
 }
+PROTECTED_REMOTE_ROOT_FILES = {
+    "midleo_client.py",
+    "midleo_actions.py",
+    "magent.sh",
+    "magent.bat",
+    "magent.zos.sh",
+    "magent_docker.sh",
+    "cronjobs.sh",
+    "cronjobs.bat",
+    "cronjobs.zos.sh",
+    "midleoagent.zos.sh",
+    "zos_env.sh",
+}
+PROTECTED_REMOTE_DIRS = {"modules", "runable", "logs", "run"}
+PROTECTED_REMOTE_CONFIG_FILES = {
+    "mwagent.config",
+    "mwagent.config.bat",
+    "agent.identity",
+    "crypto.secret",
+    "actions_state.json",
+    "cron_state.json",
+    "upload_state.json",
+    "nextrun.txt",
+}
+REMOTE_EXTCHECK_EXTENSIONS = {".mdl"}
 
 def _get_cfg():
     cfg = configs.getcfgData() or {}
@@ -69,6 +94,14 @@ def _get_cfg():
     if not remote_roots:
         remote_roots = [os.getcwd()]
 
+    action_roots_raw = str(
+        cfg.get(
+            "ACTION_SCRIPT_ROOTS",
+            os.path.join(os.getcwd(), "extchecks") + ",/opt/midleo/actions",
+        )
+    ).strip()
+    action_roots = [x.strip() for x in action_roots_raw.split(",") if x.strip()]
+
     allow_shell = str(cfg.get("ALLOW_SHELL_COMMANDS", "n")).strip().lower() in (
         "y",
         "yes",
@@ -83,6 +116,7 @@ def _get_cfg():
         "allowed_cmds": allowed_cmds,
         "allow_shell": allow_shell,
         "remote_roots": remote_roots,
+        "action_roots": action_roots,
         "bind_host": bind_host,
     }
 
@@ -419,6 +453,32 @@ def _normalize_exe(value):
     return exe[:-4] if exe.endswith(".exe") else exe
 
 
+def _allowed_entry_has_path(value):
+    cleaned = str(value).strip("\"'")
+    return os.path.isabs(cleaned) or "/" in cleaned or "\\" in cleaned
+
+
+def _command_candidate_path(value):
+    cleaned = str(value).strip("\"'")
+    return os.path.realpath(
+        cleaned if os.path.isabs(cleaned) else os.path.join(os.getcwd(), cleaned)
+    )
+
+
+def _command_is_allowed(args, cmd_index, exe, allowed):
+    for entry in allowed:
+        entry = str(entry).strip()
+        if not entry:
+            continue
+        if _allowed_entry_has_path(entry):
+            if _command_candidate_path(args[cmd_index]) == os.path.realpath(entry):
+                return True
+            continue
+        if exe == _normalize_exe(entry):
+            return True
+    return False
+
+
 def _validate_command(cmd_str, allowed):
     if not cmd_str or not cmd_str.strip():
         raise ValueError("empty command")
@@ -437,10 +497,9 @@ def _validate_command(cmd_str, allowed):
     args = _command_args(cmd_str)
     cmd_index = _command_index(args)
     exe = _command_exe(args)
-    allowed_set = {_normalize_exe(a) for a in allowed if a}
-    if not allowed_set:
+    if not [a for a in allowed if str(a).strip()]:
         raise ValueError("command allowlist is empty")
-    if exe not in allowed_set:
+    if not _command_is_allowed(args, cmd_index, exe, allowed):
         raise ValueError("command not allowed")
 
     if exe in AGENT_SCRIPT_COMMANDS:
@@ -509,6 +568,55 @@ def _safe_path(filename, roots):
     raise ValueError("file path outside allowed roots")
 
 
+def _path_under(root, path):
+    real_root = os.path.realpath(root)
+    real_path = os.path.realpath(path)
+    try:
+        return os.path.commonpath([real_root, real_path]) == real_root
+    except ValueError:
+        return False
+
+
+def _install_relative_parts(path):
+    real_base = os.path.realpath(os.getcwd())
+    real_path = os.path.realpath(path)
+    if not _path_under(real_base, real_path):
+        return []
+    rel = os.path.relpath(real_path, real_base)
+    if rel in (".", ""):
+        return []
+    return [part.lower() for part in rel.split(os.sep) if part and part != "."]
+
+
+def _is_allowed_extcheck_upload(path):
+    if not _path_under(os.path.join(os.getcwd(), "extchecks"), path):
+        return False
+    return os.path.splitext(path)[1].lower() in REMOTE_EXTCHECK_EXTENSIONS
+
+
+def _is_action_root_path(path, action_roots):
+    return any(_path_under(root, path) for root in action_roots)
+
+
+def _validate_remote_file_target(path, cfg):
+    if _is_action_root_path(path, cfg.get("action_roots", [])) and not _is_allowed_extcheck_upload(path):
+        raise ValueError("remote writes to action script roots are not allowed")
+
+    parts = _install_relative_parts(path)
+    if not parts:
+        return
+
+    top = parts[0]
+    if len(parts) == 1 and top in PROTECTED_REMOTE_ROOT_FILES:
+        raise ValueError("remote writes to agent control files are not allowed")
+    if top in PROTECTED_REMOTE_DIRS:
+        raise ValueError("remote writes to private runtime directories are not allowed")
+    if top == "config" and len(parts) > 1 and parts[1] in PROTECTED_REMOTE_CONFIG_FILES:
+        raise ValueError("remote writes to private config files are not allowed")
+    if top == "extchecks" and not _is_allowed_extcheck_upload(path):
+        raise ValueError("remote extcheck uploads must use .mdl files")
+
+
 def _decompress_file(encoded_file):
     raw = base64.b64decode(encoded_file)
     decompressor = zlib.decompressobj()
@@ -531,8 +639,9 @@ def _is_private_runtime_path(path):
     return False
 
 
-def _write_remote_file(filename, encoded_file, roots):
-    safe_filename = _safe_path(filename, roots)
+def _write_remote_file(filename, encoded_file, cfg):
+    safe_filename = _safe_path(filename, cfg["remote_roots"])
+    _validate_remote_file_target(safe_filename, cfg)
     content = _decompress_file(encoded_file)
     directory = os.path.dirname(safe_filename)
     os.makedirs(directory, exist_ok=True)
@@ -552,8 +661,9 @@ def _write_remote_file(filename, encoded_file, roots):
             os.unlink(tmp_path)
 
 
-def _delete_remote_file(filename, roots):
-    safe_filename = _safe_path(filename, roots)
+def _delete_remote_file(filename, cfg):
+    safe_filename = _safe_path(filename, cfg["remote_roots"])
+    _validate_remote_file_target(safe_filename, cfg)
     os.remove(safe_filename)
 
 
@@ -590,19 +700,37 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
 
             if ftype == "create" and filename and f.get("file"):
                 try:
-                    _write_remote_file(filename, f["file"], cfg["remote_roots"])
+                    _write_remote_file(filename, f["file"], cfg)
+                    classes.Err("Remote file created:" + _sanitize(filename) + " from " + str(addr))
                     responses.append("File created:" + filename)
                 except Exception as ex:
                     if _is_malformed_protocol_error(ex):
                         _ban_malformed_peer(addr, ex, cfg)
                         raise
+                    classes.Err(
+                        "Remote file write failed:"
+                        + _sanitize(filename)
+                        + " from "
+                        + str(addr)
+                        + " reason="
+                        + _sanitize(str(ex))
+                    )
                     responses.append("File write failed:" + str(filename) + " (" + str(ex) + ")")
 
             elif ftype == "delete" and filename:
                 try:
-                    _delete_remote_file(filename, cfg["remote_roots"])
+                    _delete_remote_file(filename, cfg)
+                    classes.Err("Remote file deleted:" + _sanitize(filename) + " from " + str(addr))
                     responses.append("File deleted:" + filename)
                 except Exception as ex:
+                    classes.Err(
+                        "Remote file delete failed:"
+                        + _sanitize(filename)
+                        + " from "
+                        + str(addr)
+                        + " reason="
+                        + _sanitize(str(ex))
+                    )
                     responses.append("File delete failed:" + str(filename) + " (" + str(ex) + ")")
 
         if "command" in data:
@@ -614,9 +742,20 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             commands = _split_commands(cmd_raw)
 
             for cmd in commands:
-                rc, out = await _run_command(
-                    cmd, cfg["allowed_cmds"], cfg["allow_shell"]
-                )
+                try:
+                    rc, out = await _run_command(
+                        cmd, cfg["allowed_cmds"], cfg["allow_shell"]
+                    )
+                except Exception as ex:
+                    classes.Err(
+                        "Command rejected:"
+                        + _sanitize(cmd)
+                        + " from "
+                        + str(addr)
+                        + " reason="
+                        + _sanitize(str(ex))
+                    )
+                    raise
                 sanitized = _sanitize(cmd)
                 classes.Err("Command:" + sanitized + " from " + str(addr))
                 responses.extend(

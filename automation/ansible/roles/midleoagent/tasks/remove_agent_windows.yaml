@@ -11,8 +11,12 @@
     name: midleoactions
     description: Run the midleoactions on boot
     state: absent
+- name: delete scheduled task to run cronjobs every minute
+  win_scheduled_task:
+    name: midleocron
+    state: absent
 - name: Remove midleoagent
   win_file:
-    path: "{{agent_install_dir}}"
+    path: "{{ agent_install_dir }}"
     state: absent
 ...

@@ -9,70 +9,70 @@
     path: "{{item}}"
     state: directory
   loop:
-    - "{{agent_install_dir}}"
-    - "{{agent_install_dir}}modules"
-    - "{{agent_install_dir}}runable"
-    - "{{agent_install_dir}}logs"
-    - "{{agent_install_dir}}config"
-    - "{{agent_install_dir}}extchecks"
+    - "{{ agent_install_dir }}"
+    - "{{ agent_install_dir }}modules"
+    - "{{ agent_install_dir }}runable"
+    - "{{ agent_install_dir }}logs"
+    - "{{ agent_install_dir }}config"
+    - "{{ agent_install_dir }}extchecks"
 
 - name: "create agent"
   win_copy:
     src: templates/python/midleo_client.py
-    dest: "{{agent_install_dir}}midleo_client.py"
+    dest: "{{ agent_install_dir }}midleo_client.py"
 
 - name: "create actions agent"
   win_copy:
     src: templates/python/midleo_actions.py
-    dest: "{{agent_install_dir}}midleo_actions.py"
+    dest: "{{ agent_install_dir }}midleo_actions.py"
 
 - name: "create agent script"
   win_copy:
     src: templates/python/magent.bat
-    dest: "{{agent_install_dir}}magent.bat"
+    dest: "{{ agent_install_dir }}magent.bat"
 
 - name: "create agent cronjob"
   win_copy:
     src: templates/python/cronjobs.bat
-    dest: "{{agent_install_dir}}cronjobs.bat"
+    dest: "{{ agent_install_dir }}cronjobs.bat"
 
 - name: "copy cronjobs json"
   win_copy:
     src: templates/python/config/cronjobs.json
-    dest: "{{agent_install_dir}}config/cronjobs.json"
+    dest: "{{ agent_install_dir }}config/cronjobs.json"
     force: no
 
 - name: "copy banned ips json"
   win_copy:
     src: templates/python/config/banned.json
-    dest: "{{agent_install_dir}}config/banned.json"
+    dest: "{{ agent_install_dir }}config/banned.json"
     force: no
 
 - name: "check existing windows agent config"
   win_stat:
-    path: "{{agent_install_dir}}config/mwagent.config"
+    path: "{{ agent_install_dir }}config/mwagent.config"
   register: st_win_agcfg
 
 - name: "create windows agent config"
   win_template:
     src: templates/mwagent.config.win.j2
-    dest: "{{agent_install_dir}}config/mwagent.config"
+    dest: "{{ agent_install_dir }}config/mwagent.config"
   when: not st_win_agcfg.stat.exists
 
 - name: "check existing windows batch config"
   win_stat:
-    path: "{{agent_install_dir}}config/mwagent.config.bat"
+    path: "{{ agent_install_dir }}config/mwagent.config.bat"
   register: st_win_batcfg
 
 - name: "create windows batch config"
   win_template:
     src: templates/mwagent.config.bat.j2
-    dest: "{{agent_install_dir}}config/mwagent.config.bat"
+    dest: "{{ agent_install_dir }}config/mwagent.config.bat"
   when: not st_win_batcfg.stat.exists
 
 - name: "create windows crypto secret"
   win_copy:
-    dest: "{{agent_install_dir}}config/crypto.secret"
+    dest: "{{ agent_install_dir }}config/crypto.secret"
     content: "{{ lookup('password', '/dev/null length=64 chars=ascii_letters,digits') }}\n"
     force: no
 
@@ -93,14 +93,14 @@
 - name: "Upload module files"
   win_copy:
     src: "{{ item.src }}"
-    dest: "{{agent_install_dir}}modules/{{ item.path }}"
+    dest: "{{ agent_install_dir }}modules/{{ item.path }}"
   with_filetree: templates/python/modules
   when: item.state == 'file'
 
 - name: "Upload runable files"
   win_copy:
     src: "{{ item.src }}"
-    dest: "{{agent_install_dir}}runable/{{ item.path }}"
+    dest: "{{ agent_install_dir }}runable/{{ item.path }}"
   with_filetree: templates/python/runable
   when: item.state == 'file'
 
@@ -121,8 +121,8 @@
     description: Run the midleoagent on boot
     actions:
     - path: "{{python_install_dir}}/python.exe"
-      arguments: "{{agent_install_dir}}midleo_client.py"
-      working_directory: "{{agent_install_dir}}"
+      arguments: "{{ agent_install_dir }}midleo_client.py"
+      working_directory: "{{ agent_install_dir }}"
     triggers:
     - type: boot
     username: SYSTEM
@@ -135,8 +135,8 @@
     description: Run the midleoactions on boot
     actions:
     - path: "{{python_install_dir}}/python.exe"
-      arguments: "{{agent_install_dir}}midleo_actions.py"
-      working_directory: "{{agent_install_dir}}"
+      arguments: "{{ agent_install_dir }}midleo_actions.py"
+      working_directory: "{{ agent_install_dir }}"
     triggers:
     - type: boot
     username: SYSTEM
@@ -146,6 +146,6 @@
 - name: create scheduled task to run cronjobs every minute
   win_shell: >
     schtasks /Create /TN midleocron /SC MINUTE /MO 1
-    /TR "\"{{agent_install_dir}}cronjobs.bat\""
+    /TR "\"{{ agent_install_dir }}cronjobs.bat\""
     /RU SYSTEM /RL HIGHEST /F
 ...

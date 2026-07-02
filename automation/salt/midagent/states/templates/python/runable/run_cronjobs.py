@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -19,6 +20,25 @@ MAINTENANCE_FILE = os.path.join(CONFIG_DIR, "maintenance.flag")
 LOG_FILE = os.path.join(CONFIG_DIR, "cronjobs.log")
 DEFAULT_JOB_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_JOB_TIMEOUT_SECONDS", "55"))
 MAX_CAPTURE_BYTES = 4000
+SCRIPT_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+\.py$")
+BLOCKED_CRON_SCRIPTS = {
+    "addaction.py",
+    "rmaction.py",
+    "addcert.py",
+    "delcert.py",
+    "addappstat.py",
+    "delappstat.py",
+    "addoptadvisor.py",
+    "deloptadvisor.py",
+    "enableavl.py",
+    "disableavl.py",
+    "enabletrackqm.py",
+    "disabletrackqm.py",
+    "optadvisorctl.py",
+    "setmaintenance.py",
+    "startavl.py",
+    "stopavl.py",
+}
 
 
 def now_str():
@@ -128,6 +148,24 @@ def resolve_args(args, context):
     return [str(item).format(**context) for item in (args or [])]
 
 
+def safe_script_path(script_name):
+    script_name = str(script_name or "")
+    if (
+        not SCRIPT_NAME_RE.fullmatch(script_name)
+        or script_name != os.path.basename(script_name)
+        or script_name in BLOCKED_CRON_SCRIPTS
+    ):
+        raise ValueError("invalid cron script name")
+    script_path = os.path.realpath(os.path.join(RUNABLE_DIR, script_name))
+    real_runable = os.path.realpath(RUNABLE_DIR)
+    try:
+        if os.path.commonpath([real_runable, script_path]) != real_runable:
+            raise ValueError("cron script outside runable directory")
+    except ValueError:
+        raise ValueError("cron script outside runable directory")
+    return script_path
+
+
 def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
     if not isinstance(job, dict):
         log(f"{script_name} skipped invalid_job_definition")
@@ -135,6 +173,12 @@ def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
 
     if not job.get("enabled", False):
         log(f"{script_name} skipped disabled")
+        return False
+
+    try:
+        safe_script_path(script_name)
+    except ValueError as err:
+        log(f"{script_name} skipped {err}")
         return False
 
     if not has_config_data(job.get("config_file")):
@@ -169,7 +213,18 @@ def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
 
 def run_job(script_name, args, job=None):
     python_bin = os.environ.get("PYTHON") or sys.executable
-    script_path = os.path.join(RUNABLE_DIR, script_name)
+    try:
+        script_path = safe_script_path(script_name)
+    except ValueError as err:
+        return {
+            "last_run_ts": int(time.time()),
+            "last_run": now_str(),
+            "finished_ts": int(time.time()),
+            "finished_at": now_str(),
+            "exit_code": 998,
+            "args": args,
+            "error": str(err),
+        }
 
     if not os.path.isfile(script_path):
         return {

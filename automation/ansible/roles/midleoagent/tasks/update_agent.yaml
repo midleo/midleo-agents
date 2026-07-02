@@ -1,0 +1,27 @@
+---
+- name: "Detect z/OS target"
+  set_fact:
+    midleo_agent_is_zos: "{{ (midleo_agent_platform | default('') | lower) == 'zos' or (ansible_system | default('')) in ['OS/390', 'z/OS'] }}"
+
+- name: "Fail Windows update-only path"
+  fail:
+    msg: "update_midleo_agent.yaml currently supports Linux and z/OS USS targets. Use the install playbook for Windows updates."
+  when: (ansible_facts.get('os_family', '')) == 'Windows'
+
+- name: "Update agent z/OS USS"
+  include_tasks:
+    file: update_agent_zos.yaml
+  when:
+    - (ansible_facts.get('os_family', '')) != 'Windows'
+    - midleo_agent_is_zos | bool
+
+- name: "Update agent linux"
+  include_tasks:
+    file: update_agent_linux.yaml
+  args:
+    apply:
+      become: true
+  when:
+    - (ansible_facts.get('os_family', '')) != 'Windows'
+    - not (midleo_agent_is_zos | bool)
+...

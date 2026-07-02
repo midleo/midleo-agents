@@ -9,6 +9,11 @@
   failed_when: false
   changed_when: false
 
+- name: "Remove z/OS USS cron entry"
+  cron:
+    name: midleo cronjobs
+    state: absent
+
 - name: "Remove z/OS USS Midleo runtime"
   file:
     path: "{{ agent_install_dir }}"

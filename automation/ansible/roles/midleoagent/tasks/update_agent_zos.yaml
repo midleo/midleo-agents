@@ -1,0 +1,109 @@
+---
+- name: "Set z/OS update defaults"
+  set_fact:
+    agent_install_dir: "{{ (midleo_zos_agent_install_dir | default(agent_install_dir | default('/u/midleoagent/'))) | regex_replace('/+$', '') }}/"
+    midleo_mwuser: "{{ midleo_zos_user | default(midleo_mwuser | default('MWADMIN')) }}"
+
+- name: "Check existing z/OS Midleo config directory"
+  stat:
+    path: "{{ agent_install_dir }}config"
+  register: midleo_update_zos_config_dir
+
+- name: "Require existing z/OS config directory for update-only deployment"
+  fail:
+    msg: "Existing {{ agent_install_dir }}config directory is required. Use install_midleo_agent.yaml for first install."
+  when: not midleo_update_zos_config_dir.stat.isdir | default(false)
+
+- name: "Update z/OS Midleo agent Python services"
+  template:
+    src: "templates/python/{{ item.name }}"
+    dest: "{{ agent_install_dir }}{{ item.name }}"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { name: "midleo_client.py", mode: "0750" }
+    - { name: "midleo_actions.py", mode: "0750" }
+
+- name: "Update z/OS Midleo wrapper scripts"
+  template:
+    src: "templates/python/{{ item }}"
+    dest: "{{ agent_install_dir }}{{ item }}"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0755"
+  loop:
+    - magent.zos.sh
+    - cronjobs.zos.sh
+    - midleoagent.zos.sh
+    - zos_env.sh
+
+- name: "Ensure z/OS Midleo code directories exist"
+  file:
+    path: "{{ agent_install_dir }}{{ item }}"
+    state: directory
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0750"
+  loop:
+    - modules
+    - runable
+    - extchecks
+
+- name: "Update z/OS module directories"
+  file:
+    path: "{{ agent_install_dir }}modules/{{ item.path }}"
+    state: directory
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0750"
+  with_filetree: templates/python/modules
+  when:
+    - item.state == 'directory'
+    - "'__pycache__' not in item.path"
+
+- name: "Update z/OS runable directories"
+  file:
+    path: "{{ agent_install_dir }}runable/{{ item.path }}"
+    state: directory
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0750"
+  with_filetree: templates/python/runable
+  when:
+    - item.state == 'directory'
+    - "'__pycache__' not in item.path"
+
+- name: "Update z/OS module files"
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ agent_install_dir }}modules/{{ item.path }}"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0640"
+    force: yes
+  with_filetree: templates/python/modules
+  when:
+    - item.state == 'file'
+    - "'__pycache__' not in item.path"
+    - not (item.path | regex_search('\\.pyc$'))
+
+- name: "Update z/OS runable files"
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ agent_install_dir }}runable/{{ item.path }}"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0755"
+    force: yes
+  with_filetree: templates/python/runable
+  when:
+    - item.state == 'file'
+    - "'__pycache__' not in item.path"
+    - not (item.path | regex_search('\\.pyc$'))
+
+- name: "Restart z/OS USS Midleo wrapper after update"
+  shell: "{{ agent_install_dir }}midleoagent.zos.sh restart"
+  args:
+    executable: /bin/sh
+...

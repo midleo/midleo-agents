@@ -24,6 +24,14 @@ Apply the state:
 salt-call -c saltconfig state.apply midagent.installAgent pillar="$pillar"
 ```
 
+To update an existing Linux or z/OS USS agent without changing runtime configuration or logs:
+
+```bash
+salt-call -c saltconfig state.apply midagent.updateAgent
+```
+
+The update state requires an existing `config/` directory and does not manage `config/`, `logs/`, `cronjobs.json`, `banned.json`, `mwagent.config`, `agent.identity`, or `crypto.secret`. It updates agent code, wrappers, modules, and runable scripts, then restarts the existing service or z/OS USS wrapper when files changed.
+
 ## Pillar Variables
 
 Runtime input:
@@ -39,13 +47,13 @@ Static defaults are in `pillars/midagent_vars.sls`:
 
 - `agent_install_dir`: default `/var/midleoagent/`
 - `python_install_dir`: default `/usr/bin/python3`
-- `mwuser`: default `mwadmin`
+- `midleo_mwuser`: default `mwadmin`
 
 For z/OS USS, override the static defaults before applying the state:
 
 - `agent_install_dir`: normally `/u/midleoagent/`
 - `python_install_dir`: for example `/usr/lpp/IBM/cyp/v3r12/pyz/bin/python3`
-- `mwuser`: the RACF user or started-task identity that owns the USS files
+- `midleo_mwuser`: the RACF user or started-task identity that owns the USS files
 
 Optional z/OS input pillars:
 

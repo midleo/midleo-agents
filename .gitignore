@@ -20,3 +20,6 @@ automation/salt/midagent/states/templates/python/modules/statistics/__pycache__/
 automation/salt/midagent/states/templates/python/modules/statistics/ibmmq/__pycache__/
 automation/salt/midagent/states/templates/python/modules/statistics/ibmace/__pycache__/
 automation/ansible/roles/midleoagent/templates/python/modules/base/__pycache__/
+
+# local inventories for customer/server-specific deployment data
+automation/ansible/inventories/local-*

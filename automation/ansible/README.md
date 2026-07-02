@@ -11,6 +11,14 @@ ansible-playbook install_midleo_agent.yaml -i inventories/hosts
 
 The playbook targets the `middleware` inventory group. Linux hosts are installed under `/var/midleoagent/`; Windows hosts are installed under `D:/apps/midleoagent/`; z/OS USS hosts default to `/u/midleoagent/`.
 
+To update an existing Linux or z/OS USS agent without changing runtime configuration or logs:
+
+```bash
+ansible-playbook update_midleo_agent.yaml -i inventories/local-midleo.ini
+```
+
+The update playbook requires an existing `config/` directory and does not manage `config/`, `logs/`, `cronjobs.json`, `banned.json`, `mwagent.config`, `agent.identity`, or `crypto.secret`. It updates agent code, wrappers, modules, and runable scripts, then restarts the existing agent services or z/OS USS wrapper.
+
 ## Required Inventory Variables
 
 Set these per host or group:
@@ -22,6 +30,8 @@ Set these per host or group:
 - `midleo_mwuser`: Linux service account, normally `mwadmin`.
 - `agent_bootstrap_token`: bootstrap token used only for first agent registration. Runtime requests use the per-agent identity saved during registration.
 - `allowed_commands`: command allowlist for remote operations.
+
+Keep server-specific inventories in files matching `automation/ansible/inventories/local-*`; these are ignored by git.
 
 Windows inventory also needs:
 

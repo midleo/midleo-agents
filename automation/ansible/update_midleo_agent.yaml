@@ -1,0 +1,9 @@
+---
+- name: 'Update Midleo Agent'
+  hosts: middleware
+  tasks:
+    - name: 'Update Midleo Agent'
+      import_role:
+        name: midleoagent
+        tasks_from: update_agent
+...
