@@ -190,3 +190,12 @@ salt-call state.apply midagent.installAgent test=True pillar="$pillar"
 Before customer rollout, verify TLS trust, firewall rules, `ALLOWED_COMMANDS`, `REMOTE_FILE_ROOTS`, `ACTION_SCRIPT_ROOTS`, and the Midleo Core endpoint. Avoid allowing raw `sudo`, `docker`, shells, or interpreters unless the customer explicitly accepts that operational risk.
 
 For z/OS rollout, also verify the OMVS segment/UID, STARTED class mapping, USS file tags or `_BPXK_AUTOCVT`, port 5550 access, cron authorization, and MQ authority for `RUNMQSC`. ZOAU can be added later for JES job operations; see https://www.ibm.com/docs/en/zoau/1.3.x?topic=apis-jobs.
+
+
+## License
+
+This repository is source-available proprietary software.
+
+It may be used only in authorized internal enterprise environments with Midleo services, Midleo products, or midleo.core.
+
+See [LICENSE](LICENSE).
