@@ -182,9 +182,3 @@ test -f /etc/midleo/crypto.secret
 Review `ALLOWED_COMMANDS`, `REMOTE_FILE_ROOTS`, `ACTION_SCRIPT_ROOTS`, `SSLVERIFY`, firewall rules, and the Midleo Core endpoint before exposing the service to enterprise networks. Avoid allowing raw `sudo`, `docker`, shells, or interpreters unless the customer explicitly accepts that operational risk.
 
 On z/OS, `magent.zos.sh enabletrackqm|disabletrackqm` runs `RUNMQSC` directly. The USS user or started-task identity must have the MQ/RACF permissions; the Linux `sudo -u mqm` model does not apply.
-
-Useful z/OS references:
-
-- `zpymqi`: https://colinpaicemq.github.io/zpymqi/
-- Python on z/OS setup notes: https://colinpaice.blog/2021/06/30/installing-python-on-z-os/
-- ZOAU Jobs API: https://www.ibm.com/docs/en/zoau/1.3.x?topic=apis-jobs
