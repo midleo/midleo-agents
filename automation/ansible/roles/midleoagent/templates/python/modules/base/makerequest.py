@@ -379,8 +379,7 @@ def getQRestStat(webssl, website, webport, qmgr, queue, usr, passwd):
 
 
 def postTrackData(webssl, website, thisdata):
-    _request("post", webssl, website, "/pubapi/updateibmqtrack", thisdata)
-
+    return _request("post", webssl, website, "/pubapi/updateibmqtrack", thisdata)
 
 def postAvlData(webssl, website, thisdata):
     _request("post", webssl, website, "/pubapi/updateappsrvavl", thisdata)
