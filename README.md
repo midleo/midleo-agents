@@ -153,3 +153,11 @@ z/OS service operations:
 For a true z/OS service, copy the reviewed PROC samples to a site PROCLIB and start them as `S MIDLEOA` and `S MIDLEOAC`. USS cron can run `cronjobs.zos.sh` every minute when the site allows the agent user to use `cron`.
 
 For production, validate TLS, firewall rules, least-privilege command allowlists, and module-specific vendor libraries before onboarding customer hosts.
+
+## License
+
+This repository is source-available proprietary software.
+
+It may be used only in authorized internal enterprise environments with Midleo services, Midleo products, or midleo.core.
+
+See [LICENSE](LICENSE).
