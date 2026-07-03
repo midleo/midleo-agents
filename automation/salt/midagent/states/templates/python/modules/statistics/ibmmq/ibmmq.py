@@ -31,10 +31,50 @@ OPTADVISOR_DEFAULTS = {
     "depth_percent_threshold": 70,
     "oldest_age_threshold_seconds": 1800,
     "include_patterns": [],
-    "exclude_patterns": ["SYSTEM.*", "AMQ.*", "MQAI.*"],
+    "exclude_patterns": ["SYSTEM.*", "AMQ.*", "MQAI.*", "PYMQPCF.*"],
     "deep_scan_interval_hours": 24,
     "collect_system_queues": False,
 }
+QSTAT_DATA_KEYS = [
+    "now",
+    "curdepth",
+    "maxdepth",
+    "percfull",
+    "qtype",
+    "usage",
+    "backthres",
+    "trdepth",
+    "maxmsgl",
+    "depthhlim",
+    "depthllim",
+    "inhibit_get",
+    "inhibit_put",
+    "opincount",
+    "opoutcount",
+    "uncmess",
+    "oldmessage",
+    "lastget",
+    "lastput",
+    "highqdepth",
+    "deqcount",
+    "enqcount",
+    "timereset",
+]
+CHSTAT_DATA_KEYS = [
+    "now",
+    "conname",
+    "status",
+    "msgs",
+    "current_msgs",
+    "bytes_sent",
+    "bytes_received",
+    "buff_sent",
+    "buff_received",
+    "indoubt_status",
+    "substate",
+    "startdate",
+    "starttime",
+]
 
 
 def qmConn(thisqm):
@@ -157,6 +197,10 @@ def _safe_text(value):
     return str(value).strip().replace("\u0000", "")
 
 
+def _is_internal_temp_queue(qname):
+    return _safe_text(qname).upper().startswith("PYMQPCF.")
+
+
 def _pcf_get(row, parameter, default=None):
     if parameter is None:
         return default
@@ -164,6 +208,15 @@ def _pcf_get(row, parameter, default=None):
         return row[parameter]
     except Exception:
         return default
+
+
+def _put_if(target, key, value):
+    if value is not None and value != "":
+        target[key] = value
+
+
+def _pcf_text(row, parameter):
+    return _safe_text(_pcf_get(row, parameter))
 
 
 def _number_metric(key, value):
@@ -307,7 +360,7 @@ def qStat(thisqm, q, queues):
         for queue_info in response:
             now = datetime.now().replace(microsecond=0)
             qname = queue_info[pymqi.CMQC.MQCA_Q_NAME].decode("utf-8").strip()
-            if qname:
+            if qname and not _is_internal_temp_queue(qname):
                 queues[qname] = {}
                 queues[qname]["name"] = qname
                 queues[qname]["now"] = now.timestamp()
@@ -337,6 +390,25 @@ def qStat(thisqm, q, queues):
                     queues[qname]["inhibit_get"] = inhibit_get
                 if inhibit_put is not None:
                     queues[qname]["inhibit_put"] = inhibit_put
+                _put_if(queues[qname], "boqname", _pcf_text(queue_info, getattr(pymqi.CMQC, "MQCA_BACKOUT_REQ_Q_NAME", None)))
+                _put_if(queues[qname], "trigger", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_TRIGGER_CONTROL", None)))
+                _put_if(queues[qname], "trigtype", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_TRIGGER_TYPE", None)))
+                _put_if(queues[qname], "trigmpri", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_TRIGGER_MSG_PRIORITY", None)))
+                _put_if(queues[qname], "trigdata", _pcf_text(queue_info, getattr(pymqi.CMQC, "MQCA_TRIGGER_DATA", None)))
+                _put_if(queues[qname], "process", _pcf_text(queue_info, getattr(pymqi.CMQC, "MQCA_PROCESS_NAME", None)))
+                _put_if(queues[qname], "initq", _pcf_text(queue_info, getattr(pymqi.CMQC, "MQCA_INITIATION_Q_NAME", None)))
+                _put_if(queues[qname], "defpsist", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_DEF_PERSISTENCE", None)))
+                _put_if(queues[qname], "defprty", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_DEF_PRIORITY", None)))
+                _put_if(queues[qname], "statq", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_STATISTICS_Q", None)))
+                _put_if(queues[qname], "monq", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_MONITORING_Q", None)))
+                _put_if(queues[qname], "propctl", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_PROPERTY_CONTROL", None)))
+                _put_if(queues[qname], "cluster", _pcf_text(queue_info, getattr(pymqi.CMQC, "MQCA_CLUSTER_NAME", None)))
+                _put_if(queues[qname], "clusnl", _pcf_text(queue_info, getattr(pymqi.CMQC, "MQCA_CLUSTER_NAMELIST", None)))
+                _put_if(queues[qname], "clwlrank", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_CLWL_Q_RANK", None)))
+                _put_if(queues[qname], "clwlprty", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_CLWL_Q_PRIORITY", None)))
+                _put_if(queues[qname], "clwluseq", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_CLWL_USEQ", None)))
+                _put_if(queues[qname], "streamq", _pcf_text(queue_info, getattr(pymqi.CMQC, "MQCA_STREAM_QUEUE_NAME", None)))
+                _put_if(queues[qname], "strmqos", _pcf_get(queue_info, getattr(pymqi.CMQC, "MQIA_STREAM_QUEUE_QOS", None)))
     except MQ_ERROR as ex:
         classes.Err("Exception:" + str(ex))
     return queues
@@ -372,29 +444,30 @@ def qStatInfo(thisqm, q, queues, include_empty=False):
         for queue_info in response:
 
             qname = queue_info[pymqi.CMQC.MQCA_Q_NAME].decode("utf-8").strip()
+            if not qname or _is_internal_temp_queue(qname):
+                continue
             if qname not in queues:
                 queues[qname] = {}
-            if qname:
-                op_in = _pcf_get(queue_info, pymqi.CMQC.MQIA_OPEN_INPUT_COUNT)
-                op_out = _pcf_get(queue_info, pymqi.CMQC.MQIA_OPEN_OUTPUT_COUNT)
-                uncommitted = _pcf_get(queue_info, pymqi.CMQCFC.MQIACF_UNCOMMITTED_MSGS)
-                oldest = _pcf_get(queue_info, pymqi.CMQCFC.MQIACF_OLDEST_MSG_AGE)
-                if op_in is not None:
-                    queues[qname]["opincount"] = op_in
-                if op_out is not None:
-                    queues[qname]["opoutcount"] = op_out
-                if uncommitted is not None:
-                    queues[qname]["uncmess"] = uncommitted
-                if oldest is not None:
-                    queues[qname]["oldmessage"] = oldest
-                last_get_date = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_GET_DATE))
-                last_get_time = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_GET_TIME))
-                last_put_date = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_PUT_DATE))
-                last_put_time = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_PUT_TIME))
-                if last_get_date or last_get_time:
-                    queues[qname]["lastget"] = (last_get_date + " " + last_get_time).strip()
-                if last_put_date or last_put_time:
-                    queues[qname]["lastput"] = (last_put_date + " " + last_put_time).strip()
+            op_in = _pcf_get(queue_info, pymqi.CMQC.MQIA_OPEN_INPUT_COUNT)
+            op_out = _pcf_get(queue_info, pymqi.CMQC.MQIA_OPEN_OUTPUT_COUNT)
+            uncommitted = _pcf_get(queue_info, pymqi.CMQCFC.MQIACF_UNCOMMITTED_MSGS)
+            oldest = _pcf_get(queue_info, pymqi.CMQCFC.MQIACF_OLDEST_MSG_AGE)
+            if op_in is not None:
+                queues[qname]["opincount"] = op_in
+            if op_out is not None:
+                queues[qname]["opoutcount"] = op_out
+            if uncommitted is not None:
+                queues[qname]["uncmess"] = uncommitted
+            if oldest is not None:
+                queues[qname]["oldmessage"] = oldest
+            last_get_date = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_GET_DATE))
+            last_get_time = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_GET_TIME))
+            last_put_date = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_PUT_DATE))
+            last_put_time = _safe_text(_pcf_get(queue_info, pymqi.CMQCFC.MQCACF_LAST_PUT_TIME))
+            if last_get_date or last_get_time:
+                queues[qname]["lastget"] = (last_get_date + " " + last_get_time).strip()
+            if last_put_date or last_put_time:
+                queues[qname]["lastput"] = (last_put_date + " " + last_put_time).strip()
     except MQ_ERROR as ex:
         classes.Err("Exception:" + str(ex))
     except Exception as ex:
@@ -413,6 +486,8 @@ def qResStat(thisqm, q, queues):
         response = pcf.MQCMD_RESET_Q_STATS(args, filters)
         for queue_info in response:
             qname = queue_info[pymqi.CMQC.MQCA_Q_NAME].decode("utf-8").strip()
+            if not qname or _is_internal_temp_queue(qname):
+                continue
             if qname and qname not in queues:
                 queues[qname] = {}
             if qname:
@@ -472,9 +547,8 @@ def chStat(thisqm, ch, chls):
                     .strip()
                     .replace("\u0000", "")
                 )
-                chls[chlname]["status"] = chl_st()[
-                    chl_info[pymqi.CMQCFC.MQIACH_CHANNEL_STATUS]
-                ]
+                channel_status = chl_info[pymqi.CMQCFC.MQIACH_CHANNEL_STATUS]
+                chls[chlname]["status"] = chl_st().get(channel_status, str(channel_status))
                 chls[chlname]["msgs"] = chl_info[pymqi.CMQCFC.MQIACH_MSGS]
                 chls[chlname]["current_msgs"] = chl_info[
                     pymqi.CMQCFC.MQIACH_CURRENT_MSGS
@@ -490,6 +564,9 @@ def chStat(thisqm, ch, chls):
                     chl_info,
                     pymqi.CMQCFC.MQIACH_INDOUBT_STATUS,
                 )
+                _put_if(chls[chlname], "substate", _pcf_get(chl_info, getattr(pymqi.CMQCFC, "MQIACH_CHANNEL_SUBSTATE", None)))
+                _put_if(chls[chlname], "startdate", _pcf_text(chl_info, getattr(pymqi.CMQCFC, "MQCACH_CHANNEL_START_DATE", None)))
+                _put_if(chls[chlname], "starttime", _pcf_text(chl_info, getattr(pymqi.CMQCFC, "MQCACH_CHANNEL_START_TIME", None)))
     except MQ_ERROR as ex:
         classes.Err("Exception:" + str(ex))
     except Exception as ex:
@@ -556,7 +633,12 @@ def listenerStat(thisqm, listener_name, listeners):
 
 def _is_system_queue(qname):
     upper = _safe_text(qname).upper()
-    return upper.startswith("SYSTEM.") or upper.startswith("AMQ.") or upper.startswith("MQAI.")
+    return (
+        upper.startswith("SYSTEM.")
+        or upper.startswith("AMQ.")
+        or upper.startswith("MQAI.")
+        or _is_internal_temp_queue(upper)
+    )
 
 
 def _matches_any(name, patterns):
@@ -635,6 +717,8 @@ def _select_detail_queues(thisqm, queues, qmgr_info, cfg):
     for qname, qdata in sorted((queues or {}).items()):
         qname = _safe_text(qname)
         if not qname:
+            continue
+        if _is_internal_temp_queue(qname):
             continue
         system_object = _is_system_queue(qname)
         if system_object and not cfg.get("collect_system_queues"):
@@ -987,7 +1071,7 @@ def getStat(thisqm, inpdata):
             if queues:
                 opt_queues.update(queues)
                 for k, v in queues.items():
-                    strin = "#".join(str(vin) for kin, vin in v.items() if kin != "name")
+                    strin = "#".join(str(v.get(kin, "")) for kin in QSTAT_DATA_KEYS)
 
                     rowkey = (k, strin)
                     if rowkey not in qseen:
@@ -1007,7 +1091,7 @@ def getStat(thisqm, inpdata):
             if chls:
                 opt_channels.update(chls)
                 for k, v in chls.items():
-                    strin = "#".join(str(vin) for kin, vin in v.items() if kin != "name")
+                    strin = "#".join(str(v.get(kin, "")) for kin in CHSTAT_DATA_KEYS)
 
                     rowkey = (k, strin)
                     if rowkey not in chseen:
@@ -1139,6 +1223,7 @@ def resetStat(thisqm, website, webssl, _legacy_token, thisdata):
         for file in files:
             if os.path.isfile(file):
                 statlist = {}
+                skipped_internal_queues = 0
                 with open(file, newline="", encoding="utf-8") as f:
                     reader_obj = csv.reader(f, delimiter=",")
                     for linearr in reader_obj:
@@ -1154,6 +1239,9 @@ def resetStat(thisqm, website, webssl, _legacy_token, thisdata):
                             continue
 
                         qname = linearr[0]
+                        if _is_internal_temp_queue(qname):
+                            skipped_internal_queues += 1
+                            continue
                         if qname not in statlist:
                             statlist[qname] = {"data": "", "jsondata": {}}
 
@@ -1168,6 +1256,8 @@ def resetStat(thisqm, website, webssl, _legacy_token, thisdata):
                         open(file, "w", encoding="utf-8").close()
                     else:
                         classes.Err("ibmmq queue status upload failed for " + str(thisqm))
+                elif skipped_internal_queues > 0:
+                    open(file, "w", encoding="utf-8").close()
     except OSError as err:
         classes.Err("Error opening queues file:" + str(err))
     except (json.JSONDecodeError, csv.Error, IndexError, TypeError, ValueError) as err:
