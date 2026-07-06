@@ -31,6 +31,8 @@ usage() {
   echo "   -  $0 health"
   echo "   -  $0 addaction APP_SERVER_TYPE.ERROR_CODE '{\"script\":\"/u/midleo/actions/restart.sh\"}'"
   echo "   -  $0 rmaction APP_SERVER_TYPE.ERROR_CODE"
+  echo "   -  $0 addmessagebackup JOB_NAME '{\"transport\":\"ibmmq\",\"middleware_instance\":\"QM1\",\"source\":\"ORDER.REQUEST.Q\",\"body_mode\":\"none\"}'"
+  echo "   -  $0 rmmessbackup JOB_NAME"
   echo "   -  $0 enabletrackqm QMGR"
   echo "   -  $0 disabletrackqm QMGR"
   echo "   -  $0 maintenance on|off [comment]"
@@ -73,6 +75,7 @@ for path in (
     os.path.join(cfgdir, "confapplstat.json"),
     os.path.join(cfgdir, "confoptadvisor.json"),
     os.path.join(cfgdir, "confactions.json"),
+    os.path.join(cfgdir, "confmessagebackup.json"),
 ):
     if not os.path.isfile(path):
         with open(path, "w", encoding="utf-8") as f:
@@ -82,6 +85,7 @@ configs.syncCronjobsForConfig("conftrack.json", configs.gettrackData())
 configs.syncCronjobsForConfig("confavl.json", configs.getAvlData())
 configs.syncCronjobsForConfig("confapplstat.json", configs.getmonData())
 configs.syncCronjobsForConfig("confoptadvisor.json", configs.getOptAdvisorData())
+configs.syncCronjobsForConfig("confmessagebackup.json", configs.getMessageBackupData())
 PY
 
 case "${1:-}" in
@@ -137,6 +141,15 @@ case "${1:-}" in
     else
       "$PYTHON" "runable/addaction.py" "$2"
     fi
+    ;;
+  addmessagebackup)
+    require_arg "${2:-}"
+    require_arg "${3:-}"
+    "$PYTHON" "runable/addmessagebackup.py" "$2" "$3"
+    ;;
+  rmmessbackup)
+    require_arg "${2:-}"
+    "$PYTHON" "runable/rmmessbackup.py" "$2"
     ;;
   delappstat)
     require_arg "${2:-}"

@@ -89,6 +89,99 @@ def qmConn(thisqm):
     return qmgr
 
 
+def _client_connect_ready(broker_cfg, qmgr_name=""):
+    broker_cfg = broker_cfg or {}
+    channel = _safe_text(broker_cfg.get("channel") or broker_cfg.get("qmchannel"))
+    host = ""
+    for key in ("host", "serverdns", "serverip"):
+        host = _safe_text(broker_cfg.get(key))
+        if host:
+            break
+    if not host:
+        appsrv = _safe_text(broker_cfg.get("appsrv"))
+        if appsrv and (not qmgr_name or appsrv.upper() != qmgr_name.upper()):
+            host = appsrv
+    port = broker_cfg.get("port")
+    if not channel or not host or port in (None, ""):
+        return None
+    try:
+        port_int = int(port)
+    except (TypeError, ValueError):
+        return None
+    if port_int < 1 or port_int > 65535:
+        return None
+    return channel, host, port_int
+
+
+def _ssl_key_repository(broker_cfg):
+    for key in ("sslkey", "keyrepo", "ssl_key_repository"):
+        value = _safe_text((broker_cfg or {}).get(key))
+        if value:
+            return value
+    return _safe_text(os.environ.get("MQSSLKEYR") or os.environ.get("MQSCOUT_SSL_KEY_REPOSITORY") or "")
+
+
+def connect_qmgr(broker_cfg, qmgr_name=None):
+    """Connect to a queue manager using client or bindings mode from broker config."""
+    if pymqi is None:
+        classes.Err("Exception:pymqi is not available:" + str(PYMQI_IMPORT_ERROR))
+        return None
+
+    broker_cfg = dict(broker_cfg or {})
+    qmgr_name = _safe_text(
+        qmgr_name or broker_cfg.get("qmgr") or broker_cfg.get("appsrv") or ""
+    )
+    if not qmgr_name:
+        classes.Err("ibmmq connect_qmgr: missing queue manager name")
+        return None
+
+    client = _client_connect_ready(broker_cfg, qmgr_name)
+    try:
+        if client:
+            channel, host, port = client
+            conn_info = "%s(%s)" % (host, port)
+            user = _safe_text(
+                broker_cfg.get("usr")
+                or broker_cfg.get("srvuser")
+                or broker_cfg.get("username")
+            )
+            password = common.decrypt_password(
+                broker_cfg.get("pwd")
+                or broker_cfg.get("srvpass")
+                or broker_cfg.get("password")
+                or ""
+            )
+            connect_kwargs = {}
+            if user:
+                connect_kwargs["user"] = user
+                connect_kwargs["password"] = password
+
+            sslcipher = _safe_text(broker_cfg.get("sslcipher"))
+            ssl_enabled = _truthy(broker_cfg.get("sslenabled") or broker_cfg.get("ssl"))
+            if sslcipher or ssl_enabled:
+                cd = pymqi.CD()
+                if sslcipher:
+                    cd.SSLCipherSpec = sslcipher
+                key_repo = _ssl_key_repository(broker_cfg)
+                sco = pymqi.SCO()
+                if key_repo:
+                    sco.KeyRepository = key_repo
+                connect_kwargs["cd"] = cd
+                connect_kwargs["sco"] = sco
+
+            return pymqi.connect(
+                qmgr_name,
+                channel,
+                conn_info,
+                **connect_kwargs,
+            )
+
+        return pymqi.connect(qmgr_name)
+    except MQ_ERROR as ex:
+        classes.Err("Exception:" + str(ex))
+        return None
+
+
 def qmDisc(thisqm):
     if thisqm is not None:
         thisqm.disconnect()

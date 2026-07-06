@@ -51,6 +51,11 @@ AGENT_SCRIPT_COMMANDS = {
     "cronjobs.bat",
     "cronjobs.zos.sh",
 }
+INTERNAL_ALLOWED_COMMANDS = {
+    "magent.sh",
+    "magent.bat",
+    "magent.zos.sh",
+}
 PROTECTED_REMOTE_ROOT_FILES = {
     "midleo_client.py",
     "midleo_actions.py",
@@ -88,6 +93,7 @@ def _get_cfg():
     if isinstance(allowed_cmds, str):
         allowed_cmds = [c.strip() for c in allowed_cmds.split(",") if c.strip()]
     allowed_cmds = [str(c) for c in allowed_cmds]
+    allowed_cmds = sorted(set(allowed_cmds).union(INTERNAL_ALLOWED_COMMANDS))
 
     roots_raw = str(cfg.get("REMOTE_FILE_ROOTS", "")).strip()
     remote_roots = [x.strip() for x in roots_raw.split(",") if x.strip()]

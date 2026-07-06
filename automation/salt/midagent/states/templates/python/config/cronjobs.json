@@ -71,6 +71,36 @@
             ]
         }
     },
+    "getmessagebackup.py": {
+        "enabled": false,
+        "config_file": "confmessagebackup.json",
+        "timeout_seconds": 300,
+        "run": {
+            "minute_in": [
+                "02",
+                "12",
+                "22",
+                "32",
+                "42",
+                "52"
+            ]
+        }
+    },
+    "resetmessagebackup.py": {
+        "enabled": false,
+        "config_file": "confmessagebackup.json",
+        "timeout_seconds": 300,
+        "run": {
+            "minute_in": [
+                "07",
+                "17",
+                "27",
+                "37",
+                "47",
+                "57"
+            ]
+        }
+    },
     "runappavllin.py": {
         "enabled": false,
         "config_file": "confavl.json",

@@ -34,6 +34,8 @@ diff -qr automation/ansible/roles/midleoagent/templates/python automation/salt/m
 - IBM MQ local queue statistics require `pymqi` and IBM MQ client development libraries. Enable this only on MQ hosts.
 - On z/OS, local IBM MQ statistics require a z/OS-capable PyMQI port such as `zpymqi`; set `ZOS_ZPYMQI_PATH` and `ZOS_STEPLIB` in `config/mwagent.config`.
 - MQ event collection requires `amqsevt` and `jq`.
+- **Message backup/download** runs on the agent via cron-scheduled `getmessagebackup.py` / `resetmessagebackup.py` with `config/confmessagebackup.json` (see `confmessagebackup.json.example`). Jobs reference broker connection blocks in `confmessagebackup.json` `brokers` and/or reuse matching `confapplstat.json` entries via `middleware_instance`. Add jobs with `./magent.sh addmessagebackup JOB_NAME '{...}'` and remove them with `./magent.sh rmmessbackup JOB_NAME`. Broker passwords belong in local encrypted config, not committed JSON. Bodies are never logged; use `body_mode` `none|hash|full`. Backend ingest: `/pubapi/submitmessagebackup`.
+- IBM MQ message backup supports **client** connections when `channel`, `host` (or `serverip` / `serverdns` / `appsrv`), and `port` are configured, and **bindings** fallback to the local queue manager when no client channel is available (same host as `getStat`). Optional `sslenabled` / `sslcipher` / `sslkey` enable TLS client connections. JMS/MQ message properties are read via pymqi property handles; legacy RFH2/JMS folders (`mcd`, `jms`, `usr`) are parsed with pymqi `RFH2` and exposed in envelope `headers` and `properties` (for example `JMSCorrelationID`, `JMSType`). MQ descriptor fields such as `MsgId`, `CorrelId`, `PutDate`, `ReplyToQ`, and `GroupId` are included in the envelope `raw` block.
 - Optimization Advisor telemetry requires two controls: the per-server
   `confapplstat.json` opt-in and a time-limited local runtime window. Enable the
   runtime window manually on the agent with `./magent.sh enableoptadvisor [days]`
@@ -84,7 +86,7 @@ diff -qr automation/ansible/roles/midleoagent/templates/python automation/salt/m
 
 - Agent configuration files are deployed with mode `0640`.
 - Runtime directories are owned by the Midleo service user and are not world-readable.
-- Command execution is allowlist-based through `ALLOWED_COMMANDS`.
+- External command execution is allowlist-based through `ALLOWED_COMMANDS`; Midleo wrappers (`magent.sh`, `magent.bat`, `magent.zos.sh`) are internally allowed and path-pinned to the agent runtime directory.
 - Shell execution is disabled by default with `ALLOW_SHELL_COMMANDS=n`.
 - Remote file writes are restricted by `REMOTE_FILE_ROOTS`.
 - Action scripts are restricted by `ACTION_SCRIPT_ROOTS`.

@@ -11,6 +11,7 @@ UPLOAD_STATE_FILE = os.path.join(CONFIG_DIR, "upload_state.json")
 
 MON_FILE = os.path.join(CONFIG_DIR, "confapplstat.json")
 OPTADVISOR_FILE = os.path.join(CONFIG_DIR, "confoptadvisor.json")
+MESSAGE_BACKUP_FILE = os.path.join(CONFIG_DIR, "confmessagebackup.json")
 CERT_FILE = os.path.join(CONFIG_DIR, "certs.json")
 TRACK_FILE = os.path.join(CONFIG_DIR, "conftrack.json")
 AVL_FILE = os.path.join(CONFIG_DIR, "confavl.json")
@@ -21,6 +22,7 @@ FILE_TO_CRONJOBS = {
     "confavl.json": ["runappavllin.py", "resetappavl.py", "runmqevents.py"],
     "confapplstat.json": ["getapplstat.py", "resetapplstat.py"],
     "confoptadvisor.json": ["getoptadvisor.py", "resetoptadvisor.py"],
+    "confmessagebackup.json": ["getmessagebackup.py", "resetmessagebackup.py"],
 }
 
 DEFAULT_CRONJOB_DEFS = {
@@ -38,6 +40,20 @@ DEFAULT_CRONJOB_DEFS = {
             "minute_in": ["05", "15", "25", "35", "45", "55"],
         },
     },
+    "getmessagebackup.py": {
+        "config_file": "confmessagebackup.json",
+        "timeout_seconds": 300,
+        "run": {
+            "minute_in": ["02", "12", "22", "32", "42", "52"],
+        },
+    },
+    "resetmessagebackup.py": {
+        "config_file": "confmessagebackup.json",
+        "timeout_seconds": 300,
+        "run": {
+            "minute_in": ["07", "17", "27", "37", "47", "57"],
+        },
+    },
 }
 
 SECTION_FILE_MAP = {
@@ -46,6 +62,7 @@ SECTION_FILE_MAP = {
     "confavl": AVL_FILE,
     "confapplstat": MON_FILE,
     "confoptadvisor": OPTADVISOR_FILE,
+    "confmessagebackup": MESSAGE_BACKUP_FILE,
     "confactions": ACTIONS_FILE,
 }
 
@@ -150,6 +167,31 @@ def _has_items(data):
     return isinstance(data, dict) and len(data) > 0
 
 
+def _as_bool_value(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
+
+
+def _messageBackupActive(config_data):
+    if not isinstance(config_data, dict):
+        return False
+    root = config_data.get("message_backup")
+    if not isinstance(root, dict):
+        return len(config_data) > 0
+    if not _as_bool_value(root.get("enabled"), False):
+        return False
+    jobs = root.get("jobs")
+    if not isinstance(jobs, list) or not jobs:
+        return False
+    return any(
+        isinstance(job, dict) and _as_bool_value(job.get("enabled"), True)
+        for job in jobs
+    )
+
+
 def _section_to_file(section_name):
     return SECTION_FILE_MAP.get(section_name)
 
@@ -197,7 +239,10 @@ def syncCronjobsForConfig(config_filename, config_data):
         return
 
     cronjobs = getCronjobs()
-    enabled = _has_items(config_data)
+    if config_filename == "confmessagebackup.json":
+        enabled = _messageBackupActive(config_data)
+    else:
+        enabled = _has_items(config_data)
 
     for job_name in jobs:
         job_def = cronjobs.get(job_name, {})
@@ -271,6 +316,14 @@ def getOptAdvisorData():
 
 def saveOptAdvisorData(data):
     _save_config(OPTADVISOR_FILE, data, "confoptadvisor.json")
+
+
+def getMessageBackupData():
+    return _get_config(MESSAGE_BACKUP_FILE)
+
+
+def saveMessageBackupData(data):
+    _save_config(MESSAGE_BACKUP_FILE, data, "confmessagebackup.json")
 
 
 def getcertData():

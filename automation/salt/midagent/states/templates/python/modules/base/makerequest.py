@@ -381,6 +381,18 @@ def getQRestStat(webssl, website, webport, qmgr, queue, usr, passwd):
 def postTrackData(webssl, website, thisdata):
     return _request("post", webssl, website, "/pubapi/updateibmqtrack", thisdata)
 
+
+def postMessageBackup(webssl, website, thisdata):
+    return _request_with_retry(
+        "post",
+        webssl,
+        website,
+        "/pubapi/submitmessagebackup",
+        thisdata,
+        max_attempts=1,
+    )
+
+
 def postAvlData(webssl, website, thisdata):
     _request("post", webssl, website, "/pubapi/updateappsrvavl", thisdata)
 

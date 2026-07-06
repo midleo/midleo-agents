@@ -187,14 +187,12 @@ midagent_create_config:
         agent_bootstrap_token: "{{agent_bootstrap_token}}"
         agent_install_dir: "{{ agent_install_dir }}"
         allowed_commands: 
-          - magent.sh
           - dspmq
           - dspmqver
           {% if osfam == "Linux" %}
           - uptime
           {% endif %}
           {% if osfam == "Windows" %}
-          - magent.bat
           - net
           {% endif %}
         update_interval_minutes: "{{update_interval_minutes}}"

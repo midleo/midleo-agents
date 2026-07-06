@@ -35,8 +35,9 @@ if not exist "%HOMEDIR%\confavl.json" echo {}>"%HOMEDIR%\confavl.json"
 if not exist "%HOMEDIR%\confapplstat.json" echo {}>"%HOMEDIR%\confapplstat.json"
 if not exist "%HOMEDIR%\confoptadvisor.json" echo {}>"%HOMEDIR%\confoptadvisor.json"
 if not exist "%HOMEDIR%\confactions.json" echo {}>"%HOMEDIR%\confactions.json"
+if not exist "%HOMEDIR%\confmessagebackup.json" echo {}>"%HOMEDIR%\confmessagebackup.json"
 
-"%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; configs.syncCronjobsForConfig('conftrack.json', configs.gettrackData()); configs.syncCronjobsForConfig('confavl.json', configs.getAvlData()); configs.syncCronjobsForConfig('confapplstat.json', configs.getmonData()); configs.syncCronjobsForConfig('confoptadvisor.json', configs.getOptAdvisorData())"
+"%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; configs.syncCronjobsForConfig('conftrack.json', configs.gettrackData()); configs.syncCronjobsForConfig('confavl.json', configs.getAvlData()); configs.syncCronjobsForConfig('confapplstat.json', configs.getmonData()); configs.syncCronjobsForConfig('confoptadvisor.json', configs.getOptAdvisorData()); configs.syncCronjobsForConfig('confmessagebackup.json', configs.getMessageBackupData())"
 if errorlevel 1 exit /b 1
 
 if /I "%1"=="addcert" goto addcert
@@ -54,6 +55,8 @@ if /I "%1"=="disableoptadvisor" goto disableoptadvisor
 if /I "%1"=="optadvisorstatus" goto optadvisorstatus
 if /I "%1"=="health" goto health
 if /I "%1"=="addaction" goto addaction
+if /I "%1"=="addmessagebackup" goto addmessagebackup
+if /I "%1"=="rmmessbackup" goto rmmessbackup
 if /I "%1"=="rmaction" goto rmaction
 if /I "%1"=="enabletrackqm" goto enabletrackqm
 if /I "%1"=="disabletrackqm" goto disabletrackqm
@@ -175,6 +178,20 @@ if "%~2"=="" (
 "%PYTHON%" "runable\rmaction.py" "%~2"
 exit /b %ERRORLEVEL%
 
+:addmessagebackup
+if "%~3"=="" (
+  goto usage
+)
+"%PYTHON%" "runable\addmessagebackup.py" "%~2" "%~3"
+exit /b %ERRORLEVEL%
+
+:rmmessbackup
+if "%~2"=="" (
+  goto usage
+)
+"%PYTHON%" "runable\rmmessbackup.py" "%~2"
+exit /b %ERRORLEVEL%
+
 :enabletrackqm
 if "%~2"=="" (
   echo Empty Qmanager
@@ -229,6 +246,8 @@ echo    -  %~nx0 health
 echo    -  %~nx0 addaction APP_SERVER_TYPE.ERROR_CODE "{\"script\":\"C:\\actions\\restart.cmd\",\"args\":[\"{appserver_type}\",\"{error_code}\"],\"monid\":\"monaction\",\"appsrvid\":\"none\",\"appsrv\":\"tomcat01\",\"message\":\"Action already started recently\"}"
 echo    -  %~nx0 addaction "{\"action_key\":\"APP_SERVER_TYPE.ERROR_CODE\",\"script\":\"C:\\actions\\restart.cmd\"}"
 echo    -  %~nx0 rmaction APP_SERVER_TYPE.ERROR_CODE
+echo    -  %~nx0 addmessagebackup JOB_NAME "{\"transport\":\"ibmmq\",\"middleware_instance\":\"QM1\",\"source\":\"ORDER.REQUEST.Q\",\"body_mode\":\"none\"}"
+echo    -  %~nx0 rmmessbackup JOB_NAME
 echo    -  %~nx0 enabletrackqm QMGR
 echo    -  %~nx0 disabletrackqm QMGR
 echo    -  %~nx0 maintenance on^|off [comment]

@@ -21,7 +21,7 @@ update_interval_minutes="5"
 midleo_mwuser="mwadmin"
 # Bootstrap only. Runtime requests use the registered agent identity.
 agent_bootstrap_token=""
-allowed_commands=['magent.bat','net']
+allowed_commands=['net']
 
 [linux:vars]
 midleo_website_base_url="MIDLEO_BASE_URL"
@@ -30,7 +30,7 @@ update_interval_minutes="5"
 midleo_mwuser="mwadmin"
 # Bootstrap only. Runtime requests use the registered agent identity.
 agent_bootstrap_token=""
-allowed_commands=['magent.sh','dspmq','dspmqver','uptime']
+allowed_commands=['dspmq','dspmqver','uptime']
 
 [zos:vars]
 ansible_connection='ssh'
@@ -47,7 +47,7 @@ midleo_zos_zpymqi_path=""
 midleo_zos_steplib=""
 midleo_zos_zoau_home=""
 midleo_zos_install_cron=false
-allowed_commands=['magent.zos.sh','dspmq','dspmqver']
+allowed_commands=['dspmq','dspmqver']
 
 [middleware:children]
 linux

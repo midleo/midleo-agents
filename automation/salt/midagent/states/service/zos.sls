@@ -107,7 +107,6 @@ midagent_zos_create_config:
         agent_bootstrap_token: "{{agent_bootstrap_token}}"
         agent_install_dir: "{{ agent_install_dir }}"
         allowed_commands:
-          - magent.zos.sh
           - dspmq
           - dspmqver
         update_interval_minutes: "{{update_interval_minutes}}"

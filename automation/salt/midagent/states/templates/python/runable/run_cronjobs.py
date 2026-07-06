@@ -30,6 +30,8 @@ BLOCKED_CRON_SCRIPTS = {
     "delappstat.py",
     "addoptadvisor.py",
     "deloptadvisor.py",
+    "addmessagebackup.py",
+    "rmmessbackup.py",
     "enableavl.py",
     "disableavl.py",
     "enabletrackqm.py",

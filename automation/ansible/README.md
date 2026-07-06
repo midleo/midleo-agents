@@ -31,6 +31,8 @@ Set these per host or group:
 - `agent_bootstrap_token`: bootstrap token used only for first agent registration. Runtime requests use the per-agent identity saved during registration.
 - `allowed_commands`: command allowlist for remote operations.
 
+Midleo-owned wrappers (`magent.sh`, `magent.bat`, `magent.zos.sh`) are allowed internally by the agent and do not need to be listed in `allowed_commands`.
+
 Keep server-specific inventories in files matching `automation/ansible/inventories/local-*`; these are ignored by git.
 
 Windows inventory also needs:
