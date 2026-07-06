@@ -14,6 +14,8 @@ KAFKA_CONFIG_KEYS = {
     "username",
     "pwd",
     "sasl_mechanism",
+    "kafka_provider",
+    "bootstrap_servers",
 }
 
 
@@ -74,6 +76,10 @@ def _java_command(thisnode, values, jar_path, function):
         payload["pwd"] = values.get("pwd")
     if values.get("sasl_mechanism"):
         payload["sasl_mechanism"] = values.get("sasl_mechanism")
+    if values.get("kafka_provider"):
+        payload["provider"] = values.get("kafka_provider")
+    if values.get("bootstrap_servers"):
+        payload["bootstrap_servers"] = values.get("bootstrap_servers")
     return [
         "java",
         "-cp",
@@ -186,6 +192,8 @@ def getStat(thisqm, inpdata):
                 "username": "",
                 "pwd": "",
                 "sasl_mechanism": "",
+                "kafka_provider": "",
+                "bootstrap_servers": "",
             },
         )
         optadvisor_config, metrics = common.split_optadvisor_config(metrics, KAFKA_CONFIG_KEYS)
@@ -211,6 +219,10 @@ def getStat(thisqm, inpdata):
                 java_arg_payload["pwd"] = values.get("pwd")
             if values.get("sasl_mechanism"):
                 java_arg_payload["sasl_mechanism"] = values.get("sasl_mechanism")
+            if values.get("kafka_provider"):
+                java_arg_payload["provider"] = values.get("kafka_provider")
+            if values.get("bootstrap_servers"):
+                java_arg_payload["bootstrap_servers"] = values.get("bootstrap_servers")
 
             common.run_command(
                 [
