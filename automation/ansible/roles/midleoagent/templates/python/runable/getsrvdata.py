@@ -10,11 +10,12 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
-from modules.base import makerequest, classes, certcheck, configs
+from modules.base import makerequest, classes, certcheck, configs, appsrv_discover
 from midleo_client import AGENT_VER
 from getlocaljobs import getLocalJobsBody
 
 OS_TYPE = platform.system()
+OS_RELEASE = platform.release()
 ZOS_OS_TYPES = {"OS/390", "z/OS"}
 BASE_DIR = os.getcwd()
 CONFIG_DIR = os.path.join(BASE_DIR, "config")
@@ -53,22 +54,22 @@ def _safe_cert_check(uid):
         return []
 
 
-def _safe_software_windows():
+def _safe_application_evidence_windows():
     try:
-        data = win_utils.getSoftware()
-        return data if data is not None else []
+        data = win_utils.getApplicationServerEvidence()
+        return data if isinstance(data, list) else None
     except Exception as ex:
-        classes.Err("Exception in win_utils.getSoftware(): " + str(ex))
-        return []
+        classes.Err("Exception in win_utils.getApplicationServerEvidence(): " + str(ex))
+        return None
 
 
-def _safe_software_linux():
+def _safe_application_evidence_linux():
     try:
-        data = lin_packages.getSoftware()
-        return data if data is not None else []
+        data = lin_packages.getApplicationServerEvidence()
+        return data if isinstance(data, list) else None
     except Exception as ex:
-        classes.Err("Exception in lin_packages.getSoftware(): " + str(ex))
-        return []
+        classes.Err("Exception in lin_packages.getApplicationServerEvidence(): " + str(ex))
+        return None
 
 
 def _safe_jobsdata():
@@ -79,6 +80,19 @@ def _safe_jobsdata():
     except Exception as ex:
         classes.Err("Exception in getLocalJobsBody(): " + str(ex))
     return {"jobs": []}
+
+
+def _attach_application_servers(config, evidence):
+    if evidence is None:
+        return
+    try:
+        config.application_servers = appsrv_discover.discover_application_servers(
+            evidence,
+            os_type=OS_TYPE,
+            os_release=OS_RELEASE,
+        )
+    except Exception as ex:
+        classes.Err("Exception in application server discovery: " + str(ex))
 
 
 def _build_windows_config(uid, groupid, updint, certs):
@@ -94,18 +108,19 @@ def _build_windows_config(uid, groupid, updint, certs):
         win_utils.getLBTS()
     )
     net_config = classes.NetConfig(win_utils.getIP())
-    software = _safe_software_windows()
+    evidence = _safe_application_evidence_windows()
 
-    return classes.Config(
+    config = classes.Config(
         uid,
         groupid,
         AGENT_VER,
         updint,
         hw_config.__dict__,
         net_config.__dict__,
-        software,
         certs
     )
+    _attach_application_servers(config, evidence)
+    return config
 
 
 def _build_linux_config(uid, groupid, updint, certs):
@@ -121,18 +136,19 @@ def _build_linux_config(uid, groupid, updint, certs):
         lin_utils.getLBTS()
     )
     net_config = classes.NetConfig(lin_utils.getIP())
-    software = _safe_software_linux()
+    evidence = _safe_application_evidence_linux()
 
-    return classes.Config(
+    config = classes.Config(
         uid,
         groupid,
         AGENT_VER,
         updint,
         hw_config.__dict__,
         net_config.__dict__,
-        software,
         certs
     )
+    _attach_application_servers(config, evidence)
+    return config
 
 
 def _sanitize_output(output):

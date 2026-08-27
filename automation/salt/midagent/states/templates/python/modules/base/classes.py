@@ -76,14 +76,13 @@ class NetConfig:
         self.dns = dns
         
 class Config:
-    def __init__(self, uid, groupid, agtver, updint, hw, net, geo, certs):
+    def __init__(self, uid, groupid, agtver, updint, hw, net, certs):
         self.uid = uid
         self.groupid = groupid
         self.agtver = agtver
         self.updint = updint
         self.hw_info = hw
         self.net_info = net
-        self.installed_software = geo
         self.certs = certs
 
 def WriteData(logdata,logfile):

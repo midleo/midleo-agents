@@ -1,37 +1,114 @@
 import platform, sys, psutil, socket, datetime, winreg
-from modules.base import classes
+from modules.base import appsrv_catalog, classes
+
+
+def _registry_value(key, name):
+    try:
+        value, _value_type = winreg.QueryValueEx(key, name)
+        return str(value or "").strip()
+    except Exception:
+        return ""
+
 
 def getInstalledSW(hive, flag):
-    aReg = winreg.ConnectRegistry(None, hive)
-    aKey = winreg.OpenKey(
-        aReg,
-        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-        0,
-        winreg.KEY_READ | flag
-    )
-
-    count_subkey = winreg.QueryInfoKey(aKey)[0]
     software_list = []
+    registry = None
+    uninstall_key = None
+    try:
+        registry = winreg.ConnectRegistry(None, hive)
+        uninstall_key = winreg.OpenKey(
+            registry,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+            0,
+            winreg.KEY_READ | flag,
+        )
+        count_subkey = winreg.QueryInfoKey(uninstall_key)[0]
 
-    for i in range(count_subkey):
-        try:
-            asubkey_name = winreg.EnumKey(aKey, i)
-            asubkey = winreg.OpenKey(aKey, asubkey_name)
-
-            software = {
-                "name": winreg.QueryValueEx(asubkey, "DisplayName")[0],
-                "version": winreg.QueryValueEx(asubkey, "DisplayVersion")[0]
-                    if winreg.QueryValueEx(asubkey, "DisplayVersion") else "undefined",
-                "publisher": winreg.QueryValueEx(asubkey, "Publisher")[0]
-                    if winreg.QueryValueEx(asubkey, "Publisher") else "undefined",
-                "description": ""
-            }
-
-            software_list.append(software)
-        except Exception:
-            continue
+        for index in range(count_subkey):
+            subkey = None
+            try:
+                subkey_name = winreg.EnumKey(uninstall_key, index)
+                subkey = winreg.OpenKey(uninstall_key, subkey_name)
+                name = _registry_value(subkey, "DisplayName")
+                if not name:
+                    continue
+                publisher = _registry_value(subkey, "Publisher")
+                if (
+                    not appsrv_catalog.match_package_name(name)
+                    and not appsrv_catalog.match_windows_display_name(name, publisher)
+                ):
+                    continue
+                software_list.append(
+                    {
+                        "name": name,
+                        "version": _registry_value(subkey, "DisplayVersion"),
+                        "publisher": publisher,
+                        "description": "",
+                    }
+                )
+            except Exception:
+                continue
+            finally:
+                if subkey is not None:
+                    try:
+                        winreg.CloseKey(subkey)
+                    except Exception:
+                        pass
+    except Exception:
+        return None
+    finally:
+        if uninstall_key is not None:
+            try:
+                winreg.CloseKey(uninstall_key)
+            except Exception:
+                pass
+        if registry is not None:
+            try:
+                winreg.CloseKey(registry)
+            except Exception:
+                pass
 
     return software_list
+
+
+def getIISSoftware():
+    registry = None
+    iis_key = None
+    try:
+        registry = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
+        access = winreg.KEY_READ | getattr(winreg, "KEY_WOW64_64KEY", 0)
+        iis_key = winreg.OpenKey(
+            registry,
+            r"SOFTWARE\Microsoft\InetStp",
+            0,
+            access,
+        )
+        version = _registry_value(iis_key, "VersionString")
+        if not version:
+            major = _registry_value(iis_key, "MajorVersion")
+            minor = _registry_value(iis_key, "MinorVersion")
+            version = ".".join(value for value in (major, minor) if value)
+        return [
+            {
+                "name": "Microsoft Internet Information Services",
+                "version": version,
+                "publisher": "Microsoft",
+                "description": "",
+            }
+        ]
+    except Exception:
+        return []
+    finally:
+        if iis_key is not None:
+            try:
+                winreg.CloseKey(iis_key)
+            except Exception:
+                pass
+        if registry is not None:
+            try:
+                winreg.CloseKey(registry)
+            except Exception:
+                pass
 
 def getName():
     try:
@@ -186,6 +263,22 @@ def getIFAddresses():
         classes.Err("Exception:"+str(err)+" at getIFAddresses()")
         return []
 
-def getSoftware():
-    software_list = getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY) + getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY)
+def getApplicationServerEvidence():
+    view_32 = getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY)
+    view_64 = getInstalledSW(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_64KEY)
+    if view_32 is None and view_64 is None:
+        return None
+    observations = (view_32 or []) + (view_64 or []) + (getIISSoftware() or [])
+    software_list = []
+    seen = set()
+    for item in observations:
+        key = (
+            str(item.get("name") or "").strip().lower(),
+            str(item.get("version") or "").strip(),
+            str(item.get("publisher") or "").strip().lower(),
+        )
+        if not key[0] or key in seen:
+            continue
+        seen.add(key)
+        software_list.append(item)
     return software_list
