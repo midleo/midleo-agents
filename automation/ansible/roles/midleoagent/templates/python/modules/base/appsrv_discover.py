@@ -9,24 +9,24 @@ import threading
 from modules.base import appsrv_catalog, classes
 
 
-DEFAULT_CMD_TIMEOUT = int(
-    os.environ.get("MIDLEO_APPSRV_CMD_TIMEOUT_SECONDS", "3")
-)
+try:
+    DEFAULT_CMD_TIMEOUT = max(1, min(30, int(
+        os.environ.get("MIDLEO_APPSRV_CMD_TIMEOUT_SECONDS", "3")
+    )))
+except (TypeError, ValueError):
+    DEFAULT_CMD_TIMEOUT = 3
 MAX_COMMAND_OUTPUT_BYTES = 64 * 1024
 ZOS_OS_TYPES = frozenset(("os/390", "z/os"))
 
 _INVALID_VERSIONS = frozenset(("", "undefined", "none", "null", "n/a", "unknown"))
 _EPOCH_RE = re.compile(r"^\d+:")
-_VERSION_RE = re.compile(
-    r"(?<![a-z0-9])v?(\d+(?:\.\d+){1,7}"
-    r"(?:(?:[._-](?:final|ga|cr\d+|sp\d+|alpha\d+|beta\d+|rc\d+)))?)",
-    re.IGNORECASE,
+_VERSION_PATTERN = (
+    r"\d+(?:\.\d+){1,7}"
+    r"(?:[._-](?:final|ga|cr|sp|alpha|beta|rc)(?:\.?\d+)*)?"
+    r"(?:\+[0-9a-z-]+(?:\.[0-9a-z-]+)*)?"
 )
-_PURE_VERSION_RE = re.compile(
-    r"^\s*v?\d+(?:\.\d+){1,7}"
-    r"(?:(?:[._-](?:final|ga|cr\d+|sp\d+|alpha\d+|beta\d+|rc\d+)))?\s*$",
-    re.IGNORECASE,
-)
+_VERSION_RE = re.compile(r"(?<![a-z0-9])v?(" + _VERSION_PATTERN + r")", re.IGNORECASE)
+_PURE_VERSION_RE = re.compile(r"^\s*v?" + _VERSION_PATTERN + r"\s*$", re.IGNORECASE)
 _VERSION_LABEL_RE = re.compile(r"\b(?:product\s+)?version\b", re.IGNORECASE)
 _IBM_MQ_RPM_VERSION_RE = re.compile(
     r"^(\d+\.\d+\.\d+)-(\d+)(?:\.[a-z0-9_.-]+)?$", re.IGNORECASE
@@ -209,6 +209,11 @@ def _collect_package_hits(software_list, os_type):
             keys = match_software_item(item, os_type=os_type)
             for key in keys:
                 version = normalize_version(item.get("version"), key)
+                if key == "aap":
+                    name = _safe_lower(item.get("name")).split(":", 1)[0]
+                    if name != "ansible-automation-platform" and "ansible automation platform" not in name:
+                        # Controller/hub/Tower versions are not AAP platform versions.
+                        version = ""
                 bucket = hits.setdefault(
                     key, {"versions": set(), "preferred_versions": set()}
                 )
@@ -309,7 +314,9 @@ def discover_application_servers(
                     spec, which_fn, run_command_fn
                 )
                 if detected:
-                    usable = [detected] if prefer_detected else sorted(
+                    # One default-path executable cannot invalidate evidence of
+                    # several installed product versions.
+                    usable = [detected] if prefer_detected and len(usable) <= 1 else sorted(
                         set(usable + [detected])
                     )
 

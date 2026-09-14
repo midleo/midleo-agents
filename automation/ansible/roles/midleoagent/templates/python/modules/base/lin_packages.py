@@ -5,19 +5,16 @@ import threading
 
 from modules.base import appsrv_catalog
 
-DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_PACKAGE_SCAN_TIMEOUT_SECONDS", "30"))
-MAX_SOFTWARE_ITEMS = int(os.environ.get("MIDLEO_MAX_SOFTWARE_ITEMS", "20000"))
-MAX_PACKAGE_OUTPUT_BYTES = max(
-    1024 * 1024,
-    min(
-        int(
-            os.environ.get(
-                "MIDLEO_MAX_PACKAGE_OUTPUT_BYTES", str(16 * 1024 * 1024)
-            )
-        ),
-        64 * 1024 * 1024,
-    ),
-)
+def _bounded_env_int(name, default, minimum, maximum):
+    try:
+        return max(minimum, min(maximum, int(os.environ.get(name, str(default)))))
+    except (TypeError, ValueError):
+        return default
+
+
+DEFAULT_TIMEOUT_SECONDS = _bounded_env_int("MIDLEO_PACKAGE_SCAN_TIMEOUT_SECONDS", 30, 1, 120)
+MAX_SOFTWARE_ITEMS = _bounded_env_int("MIDLEO_MAX_SOFTWARE_ITEMS", 20000, 1, 20000)
+MAX_PACKAGE_OUTPUT_BYTES = _bounded_env_int("MIDLEO_MAX_PACKAGE_OUTPUT_BYTES", 16 * 1024 * 1024, 1024 * 1024, 64 * 1024 * 1024)
 
 
 def _which(*names):
@@ -116,7 +113,7 @@ def get_apt(package_tool=None):
         else _which("dpkg-query")
     )
     if dpkg_query:
-        return run([dpkg_query, "-W", "-f=${Package}\t${Version}\n"])
+        return run([dpkg_query, "-W", "-f=${db:Status-Abbrev}\t${Package}\t${Version}\n"])
     dpkg = (
         package_tool
         if package_tool and os.path.basename(package_tool).startswith("dpkg")
@@ -152,17 +149,18 @@ def _collect_debian(software_list, package_tool=None):
     for line in get_apt(package_tool):
         if "\t" in line:
             parts = line.split("\t", 2)
-            if len(parts) >= 2:
+            # dpkg keeps removed packages with residual configuration. Only the
+            # installed state counts; held-but-installed packages count too.
+            if len(parts) == 3 and len(parts[0]) >= 2 and parts[0][1] == "i":
                 _append(
                     software_list,
-                    parts[0],
                     parts[1],
+                    parts[2],
                     "debian",
-                    parts[2] if len(parts) > 2 else "",
                 )
             continue
 
-        if line.startswith("ii"):
+        if len(line) >= 2 and line[1] == "i":
             parts = line.split(None, 4)
             if len(parts) >= 5:
                 _append(software_list, parts[1], parts[2], "debian", parts[4])
