@@ -9,7 +9,7 @@ from urllib.parse import quote
 import requests
 import urllib3
 from midleo_client import AGENT_VER
-from modules.base import classes, configs
+from modules.base import classes, configs, secrets
 
 DEFAULT_TIMEOUT_SECONDS = 20
 MAX_LOG_BODY_BYTES = 2048
@@ -71,7 +71,7 @@ def _iso_now():
     return _utc_now().isoformat().replace("+00:00", "Z")
 
 
-def _record_upload_result(path, status_code=None, error=""):
+def _record_upload_result(path, status_code=None, error="", accepted=None):
     if not str(path or "").startswith("/pubapi/"):
         return
     try:
@@ -88,6 +88,9 @@ def _record_upload_result(path, status_code=None, error=""):
         ok = status_code is not None and int(status_code) >= 200 and int(status_code) < 300
         if ok and str(path) == "/pubapi/updatestat":
             ok = _stat_post_accepted_body(status_code, error)
+        if accepted is False:
+            ok = False
+        safe_error = secrets.redact_text(str(error or "")[:MAX_LOG_BODY_BYTES])[-512:]
         state["last_attempt_at"] = _iso_now()
         state["last_attempt_ts"] = int(time.time())
         state["last_path"] = str(path)
@@ -110,12 +113,12 @@ def _record_upload_result(path, status_code=None, error=""):
             state["last_failure_ts"] = state["last_attempt_ts"]
             state["last_failure_path"] = str(path)
             state["last_failure_status_code"] = status_code
-            state["last_failure_error"] = str(error or "")[-512:]
+            state["last_failure_error"] = safe_error
             state["failure_count"] = int(state.get("failure_count", 0)) + 1
             state["consecutive_failures"] = int(state.get("consecutive_failures", 0)) + 1
             endpoint["last_failure_at"] = state["last_attempt_at"]
             endpoint["failure_count"] = int(endpoint.get("failure_count", 0)) + 1
-            endpoint["last_error"] = str(error or "")[-512:]
+            endpoint["last_error"] = safe_error
 
         endpoints[path] = endpoint
         state["endpoints"] = endpoints
@@ -203,7 +206,7 @@ def _register_agent_identity(webssl, website):
                 "status": body.get("status", "active"),
             },
         )
-        classes.Err("Agent identity saved for " + str(agent_id))
+        classes.Log("Agent identity saved for " + str(agent_id), component="http")
         return True
     return False
 
@@ -226,6 +229,7 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
     if not verify:
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+    started = time.monotonic()
     try:
         res = requests.request(
             method,
@@ -236,18 +240,34 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
             timeout=options["timeout"],
             **kwargs,
         )
-        if sensitive_response:
-            body = "[redacted]"
-        else:
-            body = (res.content or b"")[:MAX_LOG_BODY_BYTES].decode(
-                "utf-8", errors="replace"
-            )
-        classes.Err(method.upper() + " " + path + " HTTPResponse:" + str(res.status_code) + " " + body)
-        upload_error = body if res.status_code < 200 or res.status_code >= 300 or str(path) == "/pubapi/updatestat" else ""
-        _record_upload_result(path, res.status_code, upload_error)
+        response_body = (res.content or b"")[:MAX_LOG_BODY_BYTES].decode(
+            "utf-8", errors="replace"
+        )
+        body = "[redacted]" if sensitive_response else response_body
+        accepted = 200 <= res.status_code < 300
+        if accepted:
+            if path == "/pubapi/updatestat":
+                accepted = _stat_post_accepted_body(res.status_code, response_body)
+            elif response_body.lstrip().startswith("{"):
+                try:
+                    decoded = json.loads(response_body)
+                    accepted = decoded.get("error") is not True and decoded.get("success") is not False
+                except (ValueError, AttributeError):
+                    pass
+        message = method.upper() + " " + path.split("?", 1)[0] + " status=" + str(res.status_code)
+        message += " duration_ms=" + str(int((time.monotonic() - started) * 1000))
+        if not accepted:
+            message += " response=" + body
+        classes.Log(message, "INFO" if accepted else "ERROR", "http")
+        if accepted and classes.log_enabled("DEBUG"):
+            classes.Log("response=" + body, "DEBUG", "http")
+        upload_error = body if not accepted or path == "/pubapi/updatestat" else ""
+        _record_upload_result(path, res.status_code, upload_error, accepted=accepted)
         return res
     except requests.exceptions.RequestException as ex:
-        classes.Err("Exception:" + str(ex))
+        classes.Log(method.upper() + " " + path.split("?", 1)[0]
+                    + " failed duration_ms=" + str(int((time.monotonic() - started) * 1000))
+                    + " error=" + str(ex), "ERROR", "http")
         _record_upload_result(path, None, str(ex))
         return None
 
@@ -390,6 +410,7 @@ def postMessageBackup(webssl, website, thisdata):
         "/pubapi/submitmessagebackup",
         thisdata,
         max_attempts=1,
+        sensitive_response=True,
     )
 
 

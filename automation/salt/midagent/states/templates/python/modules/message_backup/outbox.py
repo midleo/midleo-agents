@@ -33,43 +33,30 @@ class MessageBackupOutbox:
         self.enabled = bool(config.get("enabled", True))
         self.path = str(config.get("path") or DEFAULT_OUTBOX_DIR)
         self.max_size_mb = int(config.get("max_size_mb", 1024) or 1024)
+        self._used_bytes = None
+        self._directory_ready = False
 
     def size(self):
         if not os.path.isdir(self.path):
             return 0
-        return len([name for name in os.listdir(self.path) if name.endswith(".json")])
+        with os.scandir(self.path) as entries:
+            return sum(1 for entry in entries if entry.name.endswith(".json") and entry.is_file(follow_symlinks=False))
 
-    def _trim_if_needed(self):
+    def _has_capacity(self, incoming_bytes):
         if self.max_size_mb <= 0:
-            return
-        total = 0
-        files = []
-        for name in os.listdir(self.path):
-            if not name.endswith(".json"):
-                continue
-            full = os.path.join(self.path, name)
-            try:
-                size = os.path.getsize(full)
-            except OSError:
-                continue
-            total += size
-            files.append((os.path.getmtime(full), full))
-        limit = self.max_size_mb * 1024 * 1024
-        if total <= limit:
-            return
-        for _, full in sorted(files):
-            try:
-                os.remove(full)
-            except OSError:
-                pass
-            total -= os.path.getsize(full) if os.path.exists(full) else 0
-            if total <= limit:
-                break
+            return True
+        if self._used_bytes is None:
+            with os.scandir(self.path) as entries:
+                self._used_bytes = sum(entry.stat(follow_symlinks=False).st_size for entry in entries
+                                       if entry.name.endswith(".json") and entry.is_file(follow_symlinks=False))
+        return self._used_bytes + incoming_bytes <= self.max_size_mb * 1024 * 1024
 
     def enqueue(self, envelope, retry_count=0, next_retry_at=None, last_error=""):
         if not self.enabled:
             return False
-        _ensure_dir(self.path)
+        if not self._directory_ready:
+            _ensure_dir(self.path)
+            self._directory_ready = True
         entry_id = uuid.uuid4().hex
         payload = _payload_for_outbox(envelope)
         record = {
@@ -83,15 +70,28 @@ class MessageBackupOutbox:
         }
         tmp = _entry_path(self.path, entry_id) + ".tmp"
         final = _entry_path(self.path, entry_id)
-        with open(tmp, "w", encoding="utf-8") as handle:
-            json.dump(record, handle, ensure_ascii=False, separators=(",", ":"))
-        os.replace(tmp, final)
         try:
-            os.chmod(final, 0o600)
-        except OSError:
-            pass
-        self._trim_if_needed()
-        return True
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(record, handle, ensure_ascii=False, separators=(",", ":"))
+            size = os.path.getsize(tmp)
+            if not self._has_capacity(size):
+                classes.Log("Outbox is full; pending messages retained and new handoff refused", "WARNING", "message_backup")
+                return False
+            os.replace(tmp, final)
+            if self._used_bytes is not None:
+                self._used_bytes += size
+            return True
+        except (OSError, TypeError, ValueError) as err:
+            classes.Err("message_backup outbox enqueue failed:" + str(err))
+            return False
+        finally:
+            try:
+                os.remove(tmp)
+            except FileNotFoundError:
+                pass
+            except OSError as err:
+                classes.Err("message_backup temporary file cleanup failed:" + str(err))
 
     def list_due(self, now_ts=None):
         if not self.enabled or not os.path.isdir(self.path):
@@ -105,10 +105,14 @@ class MessageBackupOutbox:
             try:
                 with open(path, "r", encoding="utf-8") as handle:
                     record = json.load(handle)
-            except (OSError, json.JSONDecodeError) as err:
+                if not isinstance(record, dict) or not isinstance(record.get("envelope"), dict):
+                    raise ValueError("invalid outbox record")
+                record["retry_count"] = max(0, int(record.get("retry_count", 0)))
+                is_due = int(record.get("next_retry_at", 0)) <= now_ts
+            except (OSError, TypeError, ValueError) as err:
                 classes.Err("message_backup outbox read failed:" + str(err))
                 continue
-            if int(record.get("next_retry_at", 0)) <= now_ts:
+            if is_due:
                 record["_path"] = path
                 due.append(record)
         return due
@@ -119,7 +123,10 @@ class MessageBackupOutbox:
             path = _entry_path(self.path, str(record["id"]))
         if path and os.path.exists(path):
             try:
+                size = os.path.getsize(path) if self._used_bytes is not None else 0
                 os.remove(path)
+                if self._used_bytes is not None:
+                    self._used_bytes = max(0, self._used_bytes - size)
             except OSError as err:
                 classes.Err("message_backup outbox remove failed:" + str(err))
 
@@ -127,6 +134,7 @@ class MessageBackupOutbox:
         path = record.get("_path")
         if not path or not os.path.exists(path):
             return
+        old_size = os.path.getsize(path) if self._used_bytes is not None else 0
         record["retry_count"] = int(record.get("retry_count", 0)) + 1
         record["next_retry_at"] = int(time.time()) + max(1, int(delay_seconds))
         record["last_error"] = str(error or "")[:512]
@@ -136,3 +144,5 @@ class MessageBackupOutbox:
         with open(tmp, "w", encoding="utf-8") as handle:
             json.dump(record, handle, ensure_ascii=False, separators=(",", ":"))
         os.replace(tmp, path)
+        if self._used_bytes is not None:
+            self._used_bytes += os.path.getsize(path) - old_size

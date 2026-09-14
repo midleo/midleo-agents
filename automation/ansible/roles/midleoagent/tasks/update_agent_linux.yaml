@@ -11,15 +11,6 @@
     state: stopped
     enabled: yes
 
-- name: "Truncate midleoagent.log"
-  copy:
-    content: ""
-    dest: "{{ agent_install_dir }}logs/midleoagent.log"
-    owner: "{{ midleo_mwuser }}"
-    group: "{{ midleo_mwuser }}"
-    mode: "0600"
-    force: yes
-
 - name: "Check existing Midleo config directory"
   stat:
     path: "{{ agent_install_dir }}config"

@@ -328,10 +328,10 @@ def _handle_action(payload):
                 state[action_key] = state_entry
                 _save_state(state)
                 _send_alert(runtime_cfg, action_key, action_cfg, state_entry, payload)
-                classes.Err("midleo_actions alerted repeat for " + action_key)
+                classes.Log("Alerted repeat for " + action_key, component="actions")
             else:
                 _save_state(state)
-                classes.Err("midleo_actions suppressed repeat for " + action_key)
+                classes.Log("Suppressed repeat for " + action_key, component="actions")
 
             return repeated
 
@@ -354,7 +354,7 @@ def _handle_action(payload):
         }
         _save_state(state)
 
-    classes.Err("midleo_actions started action " + action_key)
+    classes.Log("Started action " + action_key, component="actions")
     return {
         "status": "started",
         "uid": runtime_cfg["uid"],
@@ -371,7 +371,13 @@ class ActionHandler(BaseHTTPRequestHandler):
     server_version = "MidleoActions/1.0"
 
     def log_message(self, format_string, *args):
-        classes.Err("midleo_actions http " + (format_string % args))
+        classes.Log(format_string % args, "WARNING", "actions.http")
+
+    def log_request(self, code="-", size="-"):
+        level = "ERROR" if str(code).isdigit() and int(code) >= 400 else "INFO"
+        method = str(getattr(self, "command", None) or "-")
+        path = str(getattr(self, "path", None) or "-").split("?", 1)[0]
+        classes.Log(method + " " + path + " status=" + str(code), level, "actions.http")
 
     def _send_json(self, status_code, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -421,7 +427,7 @@ def main():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     server = ThreadingHTTPServer((HOST, PORT_NUMBER), ActionHandler)
     server.daemon_threads = True
-    classes.Err("midleo_actions listening on " + HOST + ":" + str(PORT_NUMBER))
+    classes.Log("Listening on " + HOST + ":" + str(PORT_NUMBER), component="actions")
     server.serve_forever()
 
 

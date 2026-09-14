@@ -14,16 +14,6 @@ midagent_stop_agent_service:
   service.dead:
     - name: midleoagent
 
-midagent_truncate_agent_log:
-  file.managed:
-    - name: {{ agent_install_dir }}logs/midleoagent.log
-    - contents: ''
-    - user: {{ midleo_mwuser }}
-    - group: {{ midleo_mwuser }}
-    - mode: '0600'
-    - require:
-      - service: midagent_stop_agent_service
-
 {% if is_zos %}
 midagent_zos_update_client:
   file.managed:

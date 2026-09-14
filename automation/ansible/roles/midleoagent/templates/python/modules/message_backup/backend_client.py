@@ -32,26 +32,32 @@ def _parse_batch_response(res, count):
 
     code = int(res.status_code)
     text = (res.text or "").strip()
-    if code >= 500:
+    if code >= 500 or code in (408, 429):
         return [("temporary_failure", text[:512])] * count, True
     if code >= 400:
         return [("rejected", text[:512])] * count, False
+    if code < 200 or code >= 300:
+        return [("temporary_failure", "unexpected HTTP status")] * count, True
 
     try:
         body = res.json()
     except Exception:
-        body = {}
+        return [("temporary_failure", "invalid backend JSON")] * count, True
     if not isinstance(body, dict):
-        return [("rejected", text[:512])] * count, False
+        return [("temporary_failure", "invalid backend response")] * count, True
+    if body.get("error") is True or body.get("success") is False:
+        return [("temporary_failure", "backend reported an application error")] * count, True
 
     results = body.get("results") if isinstance(body.get("results"), list) else None
-    if results and len(results) == count:
+    if "results" in body:
+        if results is None or len(results) != count:
+            return [("temporary_failure", "incomplete batch acknowledgement")] * count, True
         parsed = []
         for item in results:
             item = item if isinstance(item, dict) else {}
             status = str(item.get("status") or "").lower()
             if status not in VALID_RESULTS:
-                status = "rejected"
+                status = "temporary_failure"
             parsed.append((status, str(item.get("error") or "")[:512]))
         return parsed, False
 
@@ -59,7 +65,7 @@ def _parse_batch_response(res, count):
     # (older backend, or a batch of one) that returns a flat status.
     status = str(body.get("status") or "").lower()
     if status not in VALID_RESULTS:
-        status = "rejected" if body.get("error") else "persisted"
+        return [("temporary_failure", "missing backend acknowledgement")] * count, True
     is_retryable = status == "temporary_failure"
     return [(status, str(body.get("error") or "")[:512])] * count, is_retryable
 

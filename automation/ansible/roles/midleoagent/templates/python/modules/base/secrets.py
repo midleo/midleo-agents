@@ -43,10 +43,12 @@ _SECRET_TEXT_RE = re.compile(
     r'("?(?:pwd|pass|password|srvpass|cpass|chlpass|tibcopass|truststorepass|'
     r'keystorepass|storepass|keypass|sslpass|inttoken|token|agent_token|'
     r'collector_token|optadvisor_token|optadvisor_token_uid|'
-    r'optadvisor_token_expires_at|secret|api_key|apikey|authorization)"?'
-    r'\s*[:=]\s*)(".*?"|\'.*?\'|[^,\}\s]+)',
+    r'optadvisor_token_expires_at|secret|api_key|apikey|authorization|x-midleo-agent-token)"?'
+    r'\s*[:=]\s*)("(?:\\.|[^"\\])*(?:"|\\?$)|\'(?:\\.|[^\'\\])*(?:\'|\\?$)|[^,\}\s]+)',
     re.IGNORECASE,
 )
+_AUTH_HEADER_RE = re.compile(r'(\b(?:authorization|proxy-authorization)\s*[:=]\s*)(?:Bearer|Basic)\s+[^\s,;}]+', re.IGNORECASE)
+_URL_AUTH_RE = re.compile(r'(\b[a-z][a-z0-9+.-]*://)[^\s/@]+:[^\s/@]*@', re.IGNORECASE)
 
 
 def normalize_key(key):
@@ -69,7 +71,9 @@ def is_secret_key(key):
 
 
 def redact_text(value):
-    return _SECRET_TEXT_RE.sub(r'\1"..."', str(value))
+    text = _URL_AUTH_RE.sub(r'\1...@', str(value))
+    text = _AUTH_HEADER_RE.sub(r'\1"..."', text)
+    return _SECRET_TEXT_RE.sub(r'\1"..."', text)
 
 
 def redact_data(value, drop_keys=None):

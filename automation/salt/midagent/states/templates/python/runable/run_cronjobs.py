@@ -3,12 +3,18 @@
 import json
 import os
 import re
+import shutil
+import signal
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime
 
-LOG_ENABLED = False
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from modules.base import classes, secrets
+
+LOG_ENABLED = os.environ.get("MIDLEO_CRON_LOG", "").lower() in ("1", "true", "yes")
 BASE_DIR = os.environ.get("MWAGTDIR", os.getcwd())
 CONFIG_DIR = os.path.join(BASE_DIR, "config")
 RUNABLE_DIR = os.path.join(BASE_DIR, "runable")
@@ -17,8 +23,10 @@ CRON_CONFIG_FILE = os.path.join(CONFIG_DIR, "cronjobs.json")
 STATE_FILE = os.path.join(CONFIG_DIR, "cron_state.json")
 NEXT_RUN_FILE = os.path.join(CONFIG_DIR, "nextrun.txt")
 MAINTENANCE_FILE = os.path.join(CONFIG_DIR, "maintenance.flag")
-LOG_FILE = os.path.join(CONFIG_DIR, "cronjobs.log")
-DEFAULT_JOB_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_JOB_TIMEOUT_SECONDS", "55"))
+try:
+    DEFAULT_JOB_TIMEOUT_SECONDS = max(5, min(3600, int(os.environ.get("MIDLEO_JOB_TIMEOUT_SECONDS", "55"))))
+except (TypeError, ValueError):
+    DEFAULT_JOB_TIMEOUT_SECONDS = 55
 MAX_CAPTURE_BYTES = 4000
 SCRIPT_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+\.py$")
 BLOCKED_CRON_SCRIPTS = {
@@ -47,16 +55,10 @@ def now_str():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def log(message):
-    if not LOG_ENABLED:
-        return
-    os.makedirs(CONFIG_DIR, exist_ok=True)
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"{now_str()} {message}\n")
-    try:
-        os.chmod(LOG_FILE, 0o600)
-    except Exception:
-        pass
+def log(message, level="DEBUG"):
+    if LOG_ENABLED and level == "DEBUG":
+        level = "INFO"
+    classes.Log(message, level, "cron")
 
 
 def read_json(path, default=None):
@@ -183,6 +185,10 @@ def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
         log(f"{script_name} skipped {err}")
         return False
 
+    if not rule_matches(job.get("run", {}), now_dt):
+        log(f"{script_name} skipped schedule_no_match")
+        return False
+
     if not has_config_data(job.get("config_file")):
         log(f"{script_name} skipped empty_config_file={job.get('config_file', '')}")
         return False
@@ -206,11 +212,69 @@ def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
             log(f"{script_name} skipped invalid_env_exec={env_name}")
             return False
 
-    if not rule_matches(job.get("run", {}), now_dt):
-        log(f"{script_name} skipped schedule_no_match")
-        return False
-
     return True
+
+
+def _terminate_job_tree(process):
+    try:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGKILL)
+        elif os.name == "nt":
+            taskkill = shutil.which("taskkill.exe")
+            if taskkill:
+                subprocess.run([taskkill, "/PID", str(process.pid), "/T", "/F"],
+                               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, shell=False, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=1)
+    except (OSError, subprocess.SubprocessError):
+        log("Unable to confirm timeout cleanup for job pid=" + str(process.pid), "WARNING")
+
+
+def _capture_job(command, timeout_seconds):
+    tails = [bytearray(), bytearray()]
+    process = subprocess.Popen(command, cwd=BASE_DIR, env=os.environ.copy(),
+                               stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, shell=False,
+                               start_new_session=(os.name == "posix"))
+
+    def drain(stream, tail):
+        try:
+            while True:
+                chunk = os.read(stream.fileno(), 8192)
+                if not chunk:
+                    break
+                tail.extend(chunk)
+                if len(tail) > MAX_CAPTURE_BYTES:
+                    del tail[:-MAX_CAPTURE_BYTES]
+        except (OSError, ValueError):
+            pass
+
+    streams = (process.stdout, process.stderr)
+    readers = [threading.Thread(target=drain, args=(stream, tail), daemon=True)
+               for stream, tail in zip(streams, tails)]
+    for reader in readers:
+        reader.start()
+    timed_out = False
+    try:
+        code = process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        _terminate_job_tree(process)
+        code = 124
+    finally:
+        for reader in readers:
+            reader.join(timeout=1)
+        for stream in streams:
+            stream.close()
+    stdout, stderr = [secrets.redact_text(bytes(tail).decode("utf-8", errors="replace")) for tail in tails]
+    if timed_out:
+        stderr = "job timed out after " + str(timeout_seconds) + " seconds"
+    return code, stdout, stderr
 
 
 def run_job(script_name, args, job=None):
@@ -255,23 +319,9 @@ def run_job(script_name, args, job=None):
     timeout_seconds = max(5, min(timeout_seconds, 3600))
 
     try:
-        completed = subprocess.run(
-            [python_bin, script_path] + list(args),
-            cwd=BASE_DIR,
-            env=os.environ.copy(),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-            check=False,
-            timeout=timeout_seconds,
-        )
-        exit_code = completed.returncode
-        stdout = completed.stdout[-MAX_CAPTURE_BYTES:] if completed.stdout else ""
-        stderr = completed.stderr[-MAX_CAPTURE_BYTES:] if completed.stderr else ""
-    except subprocess.TimeoutExpired as err:
-        exit_code = 124
-        stdout = (err.stdout or "")[-MAX_CAPTURE_BYTES:] if isinstance(err.stdout, str) else ""
-        stderr = "job timed out after " + str(timeout_seconds) + " seconds"
+        exit_code, stdout, stderr = _capture_job([python_bin, script_path] + list(args), timeout_seconds)
+    except OSError as err:
+        exit_code, stdout, stderr = 127, "", secrets.redact_text(str(err))
 
     ended_ts = int(time.time())
     ended_at = now_str()
@@ -331,7 +381,7 @@ def main():
         if result.get("exit_code", 1) == 0:
             log(f"{script_name} ok")
         else:
-            log(f"{script_name} failed exit_code={result.get('exit_code')}")
+            log(f"{script_name} failed exit_code={result.get('exit_code')} error={result.get('stderr', result.get('error', ''))}", "ERROR")
 
         ran_any = True
         ran_jobs += 1

@@ -54,11 +54,11 @@ def _load_provider(transport, job_cfg, broker_cfg):
 
 
 def _log_envelope(envelope_data, operation, result, error_code=""):
+    level = "DEBUG" if result in ("persisted", "duplicate") else "WARNING"
+    if not classes.log_enabled(level):
+        return
     fields = envelope.log_fields(envelope_data, operation, result, error_code)
-    classes.Err(
-        "message_backup "
-        + json_safe(fields)
-    )
+    classes.Log(json_safe(fields), level, "message_backup")
 
 
 def json_safe(data):
@@ -247,7 +247,9 @@ def _submit_batch(items, provider, outbox, backend_cfg, ack_after, requeue):
     if len(statuses) != len(items):
         statuses = [("temporary_failure", "")] * len(items)
 
+    counts = {"persisted": 0, "duplicate": 0, "temporary_failure": 0, "rejected": 0}
     for item, (status, _error) in zip(items, statuses):
+        counts[status if status in counts else "rejected"] += 1
         raw_handle = item.get("_raw_handle") or item
         if status in ("persisted", "duplicate"):
             provider.ack(item)
@@ -270,6 +272,13 @@ def _submit_batch(items, provider, outbox, backend_cfg, ack_after, requeue):
         provider.nack(raw_handle, requeue=False)
         metrics.increment("message_backup_nacked")
         _log_envelope(item, "nack", "rejected", "schema_or_auth")
+
+    first = items[0]
+    summary = {"operation": "submit_batch", "transport": first.get("transport", ""),
+               "middleware_instance": first.get("middleware_instance", ""), "source": first.get("source", ""),
+               "messages": len(items)}
+    summary.update(counts)
+    classes.Log(json_safe(summary), "WARNING" if counts["temporary_failure"] or counts["rejected"] else "INFO", "message_backup")
 
 
 def _resolve_broker_config(transport, job, root=None):
@@ -317,7 +326,7 @@ def flush_outbox(global_cfg, outbox):
             if status in ("persisted", "duplicate"):
                 outbox.mark_sent(record)
                 continue
-            delay = min(initial_delay * (2 ** int(record.get("retry_count", 0))), int(retry.get("max_delay_ms", 60000) / 1000))
+            delay = min(initial_delay * (2 ** min(30, max(0, int(record.get("retry_count", 0))))), int(retry.get("max_delay_ms", 60000) / 1000))
             outbox.mark_retry(record, status, delay)
             metrics.increment("message_backup_outbox_retry_count")
 
@@ -339,6 +348,5 @@ def run_once(config_data=None):
     jobs = root.get("jobs") if isinstance(root.get("jobs"), list) else []
     for job in jobs:
         _process_job(job, root, outbox)
-    flush_outbox(root, outbox)
     metrics.set_gauge("message_backup_outbox_size", outbox.size())
     metrics.flush()

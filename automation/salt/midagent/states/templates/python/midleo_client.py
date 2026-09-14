@@ -13,7 +13,7 @@ from datetime import datetime
 from modules.base import banlist, classes, configs, decrypt, secrets
 
 PORT_NUMBER = 5550
-AGENT_VER = "1.26.08"
+AGENT_VER = "1.26.09"
 
 MAX_FRAME_BYTES = 2 * 1024 * 1024
 MAX_FILE_BYTES = 5 * 1024 * 1024
@@ -707,7 +707,7 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             if ftype == "create" and filename and f.get("file"):
                 try:
                     _write_remote_file(filename, f["file"], cfg)
-                    classes.Err("Remote file created:" + _sanitize(filename) + " from " + str(addr))
+                    classes.Log("Remote file created:" + _sanitize(filename) + " from " + str(addr))
                     responses.append("File created:" + filename)
                 except Exception as ex:
                     if _is_malformed_protocol_error(ex):
@@ -726,7 +726,7 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             elif ftype == "delete" and filename:
                 try:
                     _delete_remote_file(filename, cfg)
-                    classes.Err("Remote file deleted:" + _sanitize(filename) + " from " + str(addr))
+                    classes.Log("Remote file deleted:" + _sanitize(filename) + " from " + str(addr))
                     responses.append("File deleted:" + filename)
                 except Exception as ex:
                     classes.Err(
@@ -763,7 +763,7 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
                     )
                     raise
                 sanitized = _sanitize(cmd)
-                classes.Err("Command:" + sanitized + " from " + str(addr))
+                classes.Log("Command:" + sanitized + " from " + str(addr))
                 responses.extend(
                     ["Command:" + sanitized, "RC:" + str(rc), "Output:" + out]
                 )
