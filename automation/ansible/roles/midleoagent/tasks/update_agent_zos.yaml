@@ -2,6 +2,7 @@
 - name: "Set z/OS update defaults"
   set_fact:
     agent_install_dir: "{{ (midleo_zos_agent_install_dir | default(agent_install_dir | default('/u/midleoagent/'))) | regex_replace('/+$', '') }}/"
+    python_install_dir: "{{ midleo_zos_python | default(python_install_dir | default('/usr/lpp/IBM/cyp/v3r12/pyz/bin/python3')) }}"
     midleo_mwuser: "{{ midleo_zos_user | default(midleo_mwuser | default('MWADMIN')) }}"
 
 - name: "Check existing z/OS Midleo config directory"

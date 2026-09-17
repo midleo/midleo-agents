@@ -43,6 +43,7 @@ def getInstalledSW(hive, flag):
                         "name": name,
                         "version": _registry_value(subkey, "DisplayVersion"),
                         "publisher": publisher,
+                        "install_location": _registry_value(subkey, "InstallLocation"),
                         "description": "",
                     }
                 )
@@ -276,6 +277,7 @@ def getApplicationServerEvidence():
             str(item.get("name") or "").strip().lower(),
             str(item.get("version") or "").strip(),
             str(item.get("publisher") or "").strip().lower(),
+            str(item.get("install_location") or "").strip().lower(),
         )
         if not key[0] or key in seen:
             continue

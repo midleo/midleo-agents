@@ -24,9 +24,12 @@ if exist "%HOMEDIR%\mwagent.config.bat" (
 
 if not defined PYTHON set "PYTHON=python"
 
-"%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; cfgdir=os.path.join(os.getcwd(),'config'); os.makedirs(cfgdir, exist_ok=True); cronf=os.path.join(cfgdir,'cronjobs.json'); 
-import sys as _s; 
-_s.exit('missing config\\cronjobs.json' if not os.path.isfile(cronf) else 0)"
+:: Read the same installed config as the agent; a separate config.bat is optional.
+if exist "%HOMEDIR%\mwagent.config" (
+  for /f "tokens=1,* delims==" %%A in ('findstr /b /c:"PYTHON=" "%HOMEDIR%\mwagent.config"') do set "PYTHON=%%B"
+)
+
+"%PYTHON%" -c "import os,sys; sys.path.insert(0, os.getcwd()); from modules.base import configs; cfgdir=os.path.join(os.getcwd(),'config'); os.makedirs(cfgdir, exist_ok=True); cronf=os.path.join(cfgdir,'cronjobs.json'); sys.exit('missing config/cronjobs.json' if not os.path.isfile(cronf) else 0)"
 if errorlevel 1 exit /b 1
 
 if not exist "%HOMEDIR%\certs.json" echo {}>"%HOMEDIR%\certs.json"

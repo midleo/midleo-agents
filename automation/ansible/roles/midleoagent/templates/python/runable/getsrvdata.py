@@ -10,7 +10,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
-from modules.base import makerequest, classes, certcheck, configs, appsrv_discover
+from modules.base import makerequest, classes, certcheck, configs, appsrv_discover, vulnerability_inventory
 from midleo_client import AGENT_VER
 from getlocaljobs import getLocalJobsBody
 
@@ -82,15 +82,20 @@ def _safe_jobsdata():
     return {"jobs": []}
 
 
-def _attach_application_servers(config, evidence):
+def _attach_application_servers(config, evidence, settings=None):
     if evidence is None:
         return
     try:
-        config.application_servers = appsrv_discover.discover_application_servers(
+        observations = appsrv_discover.discover_application_servers(
             evidence,
             os_type=OS_TYPE,
             os_release=OS_RELEASE,
         )
+        observations = vulnerability_inventory.identify_variants(observations, evidence)
+        observations = vulnerability_inventory.enrich(
+            observations, evidence, settings if settings is not None else configs.getcfgData(), os_type=OS_TYPE,
+        )
+        config.application_servers = observations
     except Exception as ex:
         classes.Err("Exception in application server discovery: " + str(ex))
 

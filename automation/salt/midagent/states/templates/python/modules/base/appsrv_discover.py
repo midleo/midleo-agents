@@ -1,16 +1,18 @@
+
 import os
 import platform
 import re
+import signal
 import shutil
 import subprocess
 import threading
 
-from modules.base import appsrv_catalog, classes
+from modules.base import appsrv_catalog, classes, configs
 
 
 try:
     DEFAULT_CMD_TIMEOUT = max(1, min(30, int(
-        os.environ.get("MIDLEO_APPSRV_CMD_TIMEOUT_SECONDS", "3")
+        configs.getcfgData().get("APPSRV_CMD_TIMEOUT_SECONDS", "3")
     )))
 except (TypeError, ValueError):
     DEFAULT_CMD_TIMEOUT = 3
@@ -98,6 +100,8 @@ def _parse_version_output(text):
         return ""
     lines = [line.strip() for line in str(text).splitlines() if line.strip()]
 
+    # Prefer explicitly labelled product-version lines. This avoids returning a
+    # copyright year, Java level, installer level, or an error-code number.
     for line in lines:
         if _VERSION_LABEL_RE.search(line):
             version = normalize_version(line)
@@ -126,9 +130,29 @@ def _default_run_command(argv, timeout=DEFAULT_CMD_TIMEOUT):
         return ""
 
     process = None
+    reader = None
     chunks = []
     output_size = [0]
     overflow = threading.Event()
+
+    def stop_detector():
+        if process is None:
+            return
+        try:
+            if os.name == "posix":
+                os.killpg(process.pid, signal.SIGKILL)
+            elif process.poll() is None:
+                # Version scripts can launch Java children which inherit stdout.
+                subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                               timeout=2, creationflags=subprocess.CREATE_NO_WINDOW)
+        except Exception:
+            pass
+        if process.poll() is None:
+            try:
+                process.kill()
+            except Exception:
+                pass
 
     try:
         process = subprocess.Popen(
@@ -137,6 +161,8 @@ def _default_run_command(argv, timeout=DEFAULT_CMD_TIMEOUT):
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             shell=False,
+            start_new_session=os.name == "posix",
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         )
 
         def read_stdout():
@@ -152,7 +178,7 @@ def _default_run_command(argv, timeout=DEFAULT_CMD_TIMEOUT):
                     if len(chunk) > remaining:
                         overflow.set()
                         try:
-                            process.kill()
+                            stop_detector()
                         except Exception:
                             pass
                         break
@@ -166,24 +192,28 @@ def _default_run_command(argv, timeout=DEFAULT_CMD_TIMEOUT):
                 timeout=max(1, int(timeout or DEFAULT_CMD_TIMEOUT))
             )
         except subprocess.TimeoutExpired:
-            process.kill()
+            stop_detector()
             process.wait(timeout=1)
             return ""
         finally:
             reader.join(timeout=1)
 
+        if reader.is_alive():
+            stop_detector()
+            reader.join(timeout=1)
+            return ""
         if return_code != 0 or overflow.is_set():
             return ""
         return b"".join(chunks).decode("utf-8", errors="ignore")
     except Exception:
         if process is not None:
             try:
-                process.kill()
+                stop_detector()
             except Exception:
                 pass
         return ""
     finally:
-        if process is not None and process.stdout is not None:
+        if process is not None and process.stdout is not None and (reader is None or not reader.is_alive()):
             try:
                 process.stdout.close()
             except Exception:
@@ -265,6 +295,7 @@ def discover_application_servers(
     path_exists_fn=None,
     **_ignored,
 ):
+    """Return deterministic ``[{type, version}, ...]`` product facts."""
     os_type = os_type or platform.system()
     os_release = os_release or platform.release()
     which_fn = which_fn or _default_which
