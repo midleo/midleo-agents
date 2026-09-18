@@ -216,6 +216,31 @@ midagent_update_runable:
     - require:
       - test: midagent_update_existing_config_required
 
+midagent_update_sudoer:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: '0440'
+    - template: jinja
+    - names:
+      - /etc/sudoers.d/{{ midleo_mwuser }}.conf:
+        - source: salt://midagent/templates/mwadmin.sudo.j2
+    - context:
+        midleo_mwuser: "{{ midleo_mwuser }}"
+        weblogic_home: "{{ salt['pillar.get']('INPUT:weblogic_home', salt['pillar.get']('midagent_vars:weblogic_home', '/opt/oracle/middleware')) }}"
+        ibmmq_home: "{{ salt['pillar.get']('INPUT:ibmmq_home', salt['pillar.get']('midagent_vars:ibmmq_home', '/opt/mqm')) }}"
+        ibmace_home: "{{ salt['pillar.get']('INPUT:ibmace_home', salt['pillar.get']('midagent_vars:ibmace_home', '/opt/ibm/ace-12/server')) }}"
+        ibmiib_home: "{{ salt['pillar.get']('INPUT:ibmiib_home', salt['pillar.get']('midagent_vars:ibmiib_home', '/opt/ibm/iib-10.0.0.11/server')) }}"
+        tomcat_home: "{{ salt['pillar.get']('INPUT:tomcat_home', salt['pillar.get']('midagent_vars:tomcat_home', '')) }}"
+        jboss_home: "{{ salt['pillar.get']('INPUT:jboss_home', salt['pillar.get']('midagent_vars:jboss_home', '')) }}"
+        ibmwas_home: "{{ salt['pillar.get']('INPUT:ibmwas_home', salt['pillar.get']('midagent_vars:ibmwas_home', '')) }}"
+        rabbitmq_home: "{{ salt['pillar.get']('INPUT:rabbitmq_home', salt['pillar.get']('midagent_vars:rabbitmq_home', '')) }}"
+        tibcoems_home: "{{ salt['pillar.get']('INPUT:tibcoems_home', salt['pillar.get']('midagent_vars:tibcoems_home', '')) }}"
+        activemq_home: "{{ salt['pillar.get']('INPUT:activemq_home', salt['pillar.get']('midagent_vars:activemq_home', '')) }}"
+        kafka_home: "{{ salt['pillar.get']('INPUT:kafka_home', salt['pillar.get']('midagent_vars:kafka_home', '')) }}"
+    - require:
+      - test: midagent_update_existing_config_required
+
 midagent_update_agent_service:
   service.running:
     - name: midleoagent

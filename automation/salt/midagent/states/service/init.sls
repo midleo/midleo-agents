@@ -255,6 +255,17 @@ midagent_create_sudoer:
         - source: salt://midagent/templates/mwadmin.sudo.j2
     - context:
         midleo_mwuser: "{{ midleo_mwuser }}"
+        weblogic_home: "{{ weblogic_home }}"
+        ibmmq_home: "{{ ibmmq_home }}"
+        ibmace_home: "{{ ibmace_home }}"
+        ibmiib_home: "{{ ibmiib_home }}"
+        tomcat_home: "{{ tomcat_home }}"
+        jboss_home: "{{ jboss_home }}"
+        ibmwas_home: "{{ ibmwas_home }}"
+        rabbitmq_home: "{{ rabbitmq_home }}"
+        tibcoems_home: "{{ tibcoems_home }}"
+        activemq_home: "{{ activemq_home }}"
+        kafka_home: "{{ kafka_home }}"
 
 /etc/cron.allow:
    file.append:

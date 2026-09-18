@@ -126,6 +126,9 @@
     group: "{{ midleo_mwuser }}"
     mode: '0600'
 
+- name: "Collect existing product homes for sudoers"
+  include_tasks: product_sudo_homes.yaml
+
 - name: "Install Midleo sudoers policy"
   template:
     src: templates/mwadmin.sudo.j2
@@ -134,6 +137,8 @@
     group: root
     mode: '0440'
     validate: /usr/sbin/visudo -cf %s
+  vars:
+    midleo_product_homes: "{{ midleo_product_homes | default([]) }}"
 
 - name: "Create module directories"
   file:

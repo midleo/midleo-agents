@@ -1,3 +1,48 @@
 Defaults:{{ midleo_mwuser }} !requiretty
-{{ midleo_mwuser }} ALL=(mqbrk) NOPASSWD: ALL
-{{ midleo_mwuser }} ALL=(mqm) NOPASSWD: ALL
+{% set product_cmds = {
+  'weblogic': ['OPatch/opatch', 'oracle_common/OPatch/opatch'],
+  'ibmmq': ['bin/dspmqver', 'bin/dspmq', 'bin/runmqsc', 'bin/amqsevt'],
+  'ibmace': ['bin/mqsiservice', 'bin/mqsilist'],
+  'ibmiib': ['bin/mqsiservice', 'bin/mqsilist'],
+  'tomcat': ['bin/version.sh'],
+  'jboss': ['bin/standalone.sh'],
+  'ibmwas': ['bin/versionInfo.sh', 'bin/productInfo'],
+  'rabbitmq': ['sbin/rabbitmqctl', 'bin/rabbitmqctl'],
+  'tibcoems': ['bin/tibemsadmin'],
+  'activemq': ['bin/activemq', 'bin/artemis'],
+  'kafka': ['bin/kafka-topics.sh']
+} %}
+{% if midleo_product_homes is not defined %}
+{% set ns = namespace(homes=[]) %}
+{% set product_homes = {
+  'weblogic': weblogic_home | default(''),
+  'ibmmq': ibmmq_home | default(''),
+  'ibmace': ibmace_home | default(''),
+  'ibmiib': ibmiib_home | default(''),
+  'tomcat': tomcat_home | default(''),
+  'jboss': jboss_home | default(''),
+  'ibmwas': ibmwas_home | default(''),
+  'rabbitmq': rabbitmq_home | default(''),
+  'tibcoems': tibcoems_home | default(''),
+  'activemq': activemq_home | default(''),
+  'kafka': kafka_home | default('')
+} %}
+{% for type, raw in product_homes.items() %}
+{% for part in (raw | string).split(',') %}
+{% set home = part | trim | regex_replace('/+$', '') %}
+{% if home %}
+{% if salt is defined and salt['file.directory_exists'](home) %}
+{% set ns.homes = ns.homes + [{'type': type, 'home': home}] %}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% set midleo_product_homes = ns.homes %}
+{% endif %}
+{% for item in midleo_product_homes | default([]) %}
+{% if item.home and item.type in product_cmds %}
+{% for rel in product_cmds[item.type] %}
+{{ midleo_mwuser }} ALL=(ALL) NOPASSWD: {{ item.home }}/{{ rel }}
+{% endfor %}
+{% endif %}
+{% endfor %}

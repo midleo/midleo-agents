@@ -128,6 +128,20 @@
 - name: "Merge missing keys into existing mwagent.config"
   include_tasks: merge_mwagent_config.yaml
 
+- name: "Collect existing product homes for sudoers"
+  include_tasks: product_sudo_homes.yaml
+
+- name: "Install Midleo sudoers policy"
+  template:
+    src: templates/mwadmin.sudo.j2
+    dest: "/etc/sudoers.d/{{ midleo_mwuser }}.conf"
+    owner: root
+    group: root
+    mode: '0440'
+    validate: /usr/sbin/visudo -cf %s
+  vars:
+    midleo_product_homes: "{{ midleo_product_homes | default([]) }}"
+
 - name: "Reload systemd after unit update"
   systemd:
     daemon_reload: yes

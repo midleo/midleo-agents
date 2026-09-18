@@ -1,0 +1,23 @@
+{% set ns = namespace(items=[]) %}
+{% set product_homes = {
+  'weblogic': weblogic_home | default(''),
+  'ibmmq': ibmmq_home | default(''),
+  'ibmace': ibmace_home | default(''),
+  'ibmiib': ibmiib_home | default(''),
+  'tomcat': tomcat_home | default(''),
+  'jboss': jboss_home | default(''),
+  'ibmwas': ibmwas_home | default(''),
+  'rabbitmq': rabbitmq_home | default(''),
+  'tibcoems': tibcoems_home | default(''),
+  'activemq': activemq_home | default(''),
+  'kafka': kafka_home | default('')
+} %}
+{% for type, raw in product_homes.items() %}
+{% for part in (raw | string).split(',') %}
+{% set home = part | trim | regex_replace('/+$', '') %}
+{% if home %}
+{% set ns.items = ns.items + [{'type': type, 'home': home}] %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{{ ns.items | to_yaml }}

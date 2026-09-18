@@ -1,0 +1,16 @@
+- name: "Build configured product home candidates"
+  set_fact:
+    midleo_product_home_candidates: "{{ lookup('template', 'product_home_candidates.j2') | from_yaml | default([], true) | list }}"
+
+- name: "Stat configured product homes"
+  stat:
+    path: "{{ item.home }}"
+  loop: "{{ midleo_product_home_candidates }}"
+  register: midleo_product_home_stats
+  when: midleo_product_home_candidates | length > 0
+  loop_control:
+    label: "{{ item.type }} {{ item.home }}"
+
+- name: "Select product homes that exist on this host"
+  set_fact:
+    midleo_product_homes: "{{ ((midleo_product_home_stats | default({})).results | default([])) | selectattr('stat.isdir', 'defined') | selectattr('stat.isdir') | map(attribute='item') | list }}"
