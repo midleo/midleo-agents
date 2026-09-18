@@ -10,9 +10,73 @@ midagent_update_existing_config_required:
     - name: Existing {{ agent_install_dir }}config directory is required. Use midagent.installAgent for first install.
     - unless: test -d {{ agent_install_dir }}config
 
+midagent_render_config_defaults:
+  file.managed:
+    - name: {{ agent_install_dir }}config/.mwagent.config.desired
+    - source: salt://midagent/templates/mwagent.config.merge.j2
+    - template: jinja
+    - user: {{ midleo_mwuser }}
+    - group: {{ midleo_mwuser }}
+    - mode: '0600'
+    - context:
+        weblogic_home: "{{ salt['pillar.get']('INPUT:weblogic_home', salt['pillar.get']('midagent_vars:weblogic_home', '/opt/oracle/middleware')) }}"
+        ibmmq_home: "{{ salt['pillar.get']('INPUT:ibmmq_home', salt['pillar.get']('midagent_vars:ibmmq_home', '/opt/mqm')) }}"
+        ibmace_home: "{{ salt['pillar.get']('INPUT:ibmace_home', salt['pillar.get']('midagent_vars:ibmace_home', '/opt/ibm/ace-12/server')) }}"
+        ibmiib_home: "{{ salt['pillar.get']('INPUT:ibmiib_home', salt['pillar.get']('midagent_vars:ibmiib_home', '/opt/ibm/iib-10.0.0.11/server')) }}"
+        tomcat_home: "{{ salt['pillar.get']('INPUT:tomcat_home', salt['pillar.get']('midagent_vars:tomcat_home', '')) }}"
+        jboss_home: "{{ salt['pillar.get']('INPUT:jboss_home', salt['pillar.get']('midagent_vars:jboss_home', '')) }}"
+        ibmwas_home: "{{ salt['pillar.get']('INPUT:ibmwas_home', salt['pillar.get']('midagent_vars:ibmwas_home', '')) }}"
+        rabbitmq_home: "{{ salt['pillar.get']('INPUT:rabbitmq_home', salt['pillar.get']('midagent_vars:rabbitmq_home', '')) }}"
+        tibcoems_home: "{{ salt['pillar.get']('INPUT:tibcoems_home', salt['pillar.get']('midagent_vars:tibcoems_home', '')) }}"
+        activemq_home: "{{ salt['pillar.get']('INPUT:activemq_home', salt['pillar.get']('midagent_vars:activemq_home', '')) }}"
+        kafka_home: "{{ salt['pillar.get']('INPUT:kafka_home', salt['pillar.get']('midagent_vars:kafka_home', '')) }}"
+        msiis_home: "{{ salt['pillar.get']('INPUT:msiis_home', salt['pillar.get']('midagent_vars:msiis_home', '')) }}"
+    - require:
+      - test: midagent_update_existing_config_required
+    - onlyif: test -f {{ agent_install_dir }}config/mwagent.config
+
+midagent_copy_merge_helper:
+  file.managed:
+    - name: {{ agent_install_dir }}config/.merge_mwagent_config.py
+    - source: salt://midagent/files/merge_mwagent_config.py
+    - user: {{ midleo_mwuser }}
+    - group: {{ midleo_mwuser }}
+    - mode: '0700'
+    - require:
+      - file: midagent_render_config_defaults
+    - onlyif: test -f {{ agent_install_dir }}config/mwagent.config
+
+midagent_merge_config:
+  cmd.run:
+    - name: |
+        {{ python_install_dir }} {{ agent_install_dir }}config/.merge_mwagent_config.py {{ agent_install_dir }}config/mwagent.config {{ agent_install_dir }}config/.mwagent.config.desired
+        status=$?
+        rm -f {{ agent_install_dir }}config/.mwagent.config.desired {{ agent_install_dir }}config/.merge_mwagent_config.py
+        exit $status
+    - python_shell: True
+    - require:
+      - file: midagent_copy_merge_helper
+    - onlyif: test -f {{ agent_install_dir }}config/mwagent.config
+
+midagent_secure_config_after_merge:
+  file.managed:
+    - name: {{ agent_install_dir }}config/mwagent.config
+    - user: {{ midleo_mwuser }}
+    - group: {{ midleo_mwuser }}
+    - mode: '0600'
+    - replace: False
+    - require:
+      - cmd: midagent_merge_config
+
 midagent_stop_agent_service:
   service.dead:
     - name: midleoagent
+
+{% if not is_zos %}
+midagent_stop_actions_service:
+  service.dead:
+    - name: midleoactions
+{% endif %}
 
 {% if is_zos %}
 midagent_zos_update_client:

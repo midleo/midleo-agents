@@ -16,7 +16,6 @@ except ImportError:
 _MQRFH_STRUC_ID = b"RFH "
 _MQHRF2_FORMAT = "MQHRF2  "
 
-
 def _hex_bytes(value):
     if value is None:
         return ""
@@ -28,7 +27,6 @@ def _hex_bytes(value):
     if all(c in "0123456789abcdefABCDEF" for c in text):
         return text.lower()
     return binascii.hexlify(text.encode("utf-8", errors="replace")).decode("ascii")
-
 
 def _safe_mq_text(value):
     if value is None:
@@ -43,11 +41,9 @@ def _safe_mq_text(value):
             return _hex_bytes(value)
     return str(value).strip().replace("\u0000", "")
 
-
 def _safe_mq_format(value):
     text = _safe_mq_text(value)
     return text.strip()
-
 
 def _json_safe_property(value):
     if isinstance(value, dict):
@@ -63,7 +59,6 @@ def _json_safe_property(value):
         return value
     return _safe_mq_text(value)
 
-
 def _md_field(md, name, transform=None):
     if md is None:
         return None
@@ -74,7 +69,6 @@ def _md_field(md, name, transform=None):
     if transform is not None:
         return transform(value)
     return value
-
 
 def _extract_mqmd_fields(md):
     fields = {
@@ -110,16 +104,13 @@ def _extract_mqmd_fields(md):
     fields["correlationId"] = correl
     return fields
 
-
 def _message_handle_supported():
     return pymqi is not None and hasattr(pymqi, "MessageHandle")
-
 
 def _message_handle_get_handle(msg_h):
     if hasattr(msg_h, "get_handle"):
         return msg_h.get_handle()
     return getattr(msg_h, "msg_handle", None)
-
 
 def _build_gmo(qmgr, timeout_ms):
     gmo = pymqi.GMO()
@@ -140,7 +131,6 @@ def _build_gmo(qmgr, timeout_ms):
         except Exception:
             msg_h = None
     return gmo, msg_h
-
 
 def _iter_message_properties(msg_h):
     properties = {}
@@ -165,7 +155,6 @@ def _iter_message_properties(msg_h):
 
     return properties
 
-
 def _xml_element_to_value(element):
     children = list(element)
     if not children:
@@ -186,7 +175,6 @@ def _xml_element_to_value(element):
         else:
             result[tag] = value
     return result
-
 
 def _parse_rfh2_folder(folder_bytes):
     if not folder_bytes:
@@ -213,7 +201,6 @@ def _parse_rfh2_folder(folder_bytes):
         return parsed
     return {tag: parsed}
 
-
 def _is_rfh2_message(md, body):
     fmt = _safe_mq_format(_md_field(md, "Format"))
     if fmt.strip() == _MQHRF2_FORMAT.strip() or fmt == "MQHRF2":
@@ -221,7 +208,6 @@ def _is_rfh2_message(md, body):
     if isinstance(body, (bytes, bytearray)) and len(body) >= 4:
         return bytes(body[:4]) == _MQRFH_STRUC_ID
     return False
-
 
 def _parse_rfh2(body, md):
     result = {
@@ -263,7 +249,6 @@ def _parse_rfh2(body, md):
 
     return result
 
-
 def _split_body_for_envelope(body, md, body_mode):
     if body_mode == "none" or body is None:
         return None, {}, {}
@@ -271,7 +256,6 @@ def _split_body_for_envelope(body, md, body_mode):
         return body, {}, {}
     parsed = _parse_rfh2(body, md)
     return parsed.get("application_body", body), parsed.get("headers", {}), parsed.get("properties", {})
-
 
 class IbmMqMessageBackupProvider(MessageBackupProvider):
     def __init__(self, job_cfg, broker_cfg):

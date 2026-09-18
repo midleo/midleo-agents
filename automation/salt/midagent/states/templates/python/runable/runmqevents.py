@@ -14,7 +14,6 @@ from modules.base import classes, configs, makerequest
 AMQSEVT = os.environ["AMQSEVT"]
 MQ_EVENT_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_MQ_EVENT_TIMEOUT_SECONDS", "20"))
 
-
 def _mq_event_command(qmgr, queue="SYSTEM.ADMIN.PERFM.EVENT"):
     return (
         shlex.quote(AMQSEVT)
@@ -24,7 +23,6 @@ def _mq_event_command(qmgr, queue="SYSTEM.ADMIN.PERFM.EVENT"):
         + shlex.quote(queue)
         + " -w 1 -o json | jq . -c --slurp"
     )
-
 
 def _run_mq_event(qmgr, srvtype, item):
     if srvtype == "ibmmqdocker":
@@ -53,7 +51,6 @@ def _run_mq_event(qmgr, srvtype, item):
     except json.JSONDecodeError:
         classes.Err("Return error:" + output[-1000:])
         return []
-
 
 try:
     avl_data = configs.getAvlData()

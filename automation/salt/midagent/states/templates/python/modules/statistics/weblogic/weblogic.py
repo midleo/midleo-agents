@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from modules.base import classes, makerequest
 from modules.statistics import common
 
-
 OPTADVISOR_SCHEMA_VERSION = "1.0"
 OPTADVISOR_COLLECTOR_NAME = "weblogic-rest-collector"
 OPTADVISOR_COLLECTOR_VERSION = "1.0.0"
@@ -32,10 +31,8 @@ OPTADVISOR_CONFIG_KEYS = {
     "docker",
 }
 
-
 def _utc_now():
     return datetime.now(timezone.utc).replace(microsecond=0)
-
 
 def _iso_utc(value):
     if value is None:
@@ -44,16 +41,13 @@ def _iso_utc(value):
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-
 def _truthy(value):
     return str(value).strip().lower() in ("1", "y", "yes", "true", "on", "enabled")
-
 
 def _safe_text(value):
     if value is None:
         return ""
     return str(value).strip().replace("\u0000", "")
-
 
 def _optadvisor_enabled(config):
     return _truthy(
@@ -62,7 +56,6 @@ def _optadvisor_enabled(config):
         or config.get("optimization_advisor")
     )
 
-
 def _split_optadvisor_config(data):
     config = {}
     metrics = dict(data)
@@ -70,7 +63,6 @@ def _split_optadvisor_config(data):
         if key in OPTADVISOR_CONFIG_KEYS or str(key).startswith("optadvisor_"):
             config[key] = metrics.pop(key)
     return config, metrics
-
 
 def _get_server_id(config, thisnode):
     return (
@@ -81,20 +73,16 @@ def _get_server_id(config, thisnode):
         or thisnode
     )
 
-
 def _get_appserver(config, thisnode):
     return config.get("managed_server") or config.get("appserver") or thisnode
 
-
 def _optadvisor_log_path(thisnode):
     return os.path.join(os.getcwd(), "logs", "weblogic_" + str(thisnode) + "_optadvisor.jsonl")
-
 
 def _append_optadvisor_payload(thisnode, payload):
     os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
     with open(_optadvisor_log_path(thisnode), "a", encoding="utf-8") as f:
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
-
 
 def _normalize_status(value):
     text = _safe_text(value).lower().replace("-", "_").replace(" ", "_")
@@ -107,7 +95,6 @@ def _normalize_status(value):
     if "failed" in text or "critical" in text:
         return "failed"
     return "unknown"
-
 
 def _normalize_target(thisnode, collect_result, resources):
     target = collect_result.get("target", {})
@@ -126,7 +113,6 @@ def _normalize_target(thisnode, collect_result, resources):
         status = "running" if "running" in resource_statuses else "unknown"
     target["status"] = status
     return target
-
 
 def _normalize_resources(resources, target):
     target_status = _normalize_status(target.get("status") if isinstance(target, dict) else "")
@@ -158,7 +144,6 @@ def _normalize_resources(resources, target):
             item["metrics"] = metrics
         normalized_resources.append(item)
     return normalized_resources
-
 
 def buildOptAdvisorPayload(thisnode, config, collect_result, collected_at=None):
     if not _optadvisor_enabled(config):
@@ -201,12 +186,10 @@ def buildOptAdvisorPayload(thisnode, config, collect_result, collected_at=None):
     }
     return payload
 
-
 def _resource_key(appserver, name):
     appserver = _safe_text(appserver)
     name = _safe_text(name)
     return appserver + "/" + name if appserver and name else name or appserver
-
 
 def _resource(resource_type, key, name, status, metrics, metadata=None):
     item = {
@@ -219,24 +202,19 @@ def _resource(resource_type, key, name, status, metrics, metadata=None):
     }
     return item if item["metrics"] else None
 
-
 def _add_number_metric(metrics, key, value):
     common.add_metric(metrics, common.metric_number(key, value))
 
-
 def _add_string_metric(metrics, key, value):
     common.add_metric(metrics, common.metric_string(key, value))
-
 
 def _payload_items(payload):
     if isinstance(payload, list):
         return [item for item in payload if isinstance(item, dict)]
     return _weblogic_rest_items(payload)
 
-
 def _rest_item_name(item):
     return _safe_text(_case_value(item, ("name", "Name", "serverName", "ServerName")))
-
 
 def _rest_first(base_url, values, paths, label):
     for path in paths:
@@ -248,7 +226,6 @@ def _rest_first(base_url, values, paths, label):
             classes.Err("weblogic optadvisor REST " + label + " failed path:" + path + " error:" + str(err))
     return {}
 
-
 def _server_runtime_paths(appserver):
     encoded_server = urllib.parse.quote(_safe_text(appserver), safe="")
     paths = []
@@ -257,7 +234,6 @@ def _server_runtime_paths(appserver):
     paths.append("/management/weblogic/latest/serverRuntime")
     paths.append("/management/weblogic/latest/domainRuntime/serverRuntimes")
     return paths
-
 
 def _select_named_payload(payload, wanted_name):
     wanted = _safe_text(wanted_name).lower()
@@ -270,7 +246,6 @@ def _select_named_payload(payload, wanted_name):
             return item
     return payload if isinstance(payload, dict) and not _payload_items(payload) else {}
 
-
 def _local_and_domain_paths(appserver, suffix):
     encoded_server = urllib.parse.quote(_safe_text(appserver), safe="")
     paths = []
@@ -278,7 +253,6 @@ def _local_and_domain_paths(appserver, suffix):
         paths.append("/management/weblogic/latest/domainRuntime/serverRuntimes/" + encoded_server + suffix)
     paths.append("/management/weblogic/latest/serverRuntime" + suffix)
     return paths
-
 
 def _is_internal_application(item):
     name = _safe_text(_case_value(item, ("applicationName", "ApplicationName", "name", "Name"))).lower()
@@ -295,7 +269,6 @@ def _is_internal_application(item):
         or name.startswith("bea_wls_internal")
         or name.startswith("jms-internal")
     )
-
 
 def _deployment_counts(base_url, values, appserver):
     payload = _rest_first(
@@ -321,7 +294,6 @@ def _deployment_counts(base_url, values, appserver):
             active += 1
     return deployed, active
 
-
 def _server_resource(base_url, values, appserver, target):
     server_name = _safe_text(target.get("server_name")) or _safe_text(appserver) or "weblogic-server"
     status = _normalize_status(target.get("status"))
@@ -331,7 +303,6 @@ def _server_resource(base_url, values, appserver, target):
     _add_number_metric(metrics, "deployment_count", deployed)
     _add_number_metric(metrics, "active_deployment_count", active)
     return _resource("weblogic_server", _resource_key(server_name, "server"), server_name, status, metrics)
-
 
 def _collect_jvm_resource(base_url, values, appserver):
     payload = _rest_first(
@@ -358,7 +329,6 @@ def _collect_jvm_resource(base_url, values, appserver):
         _add_number_metric(metrics, "heap_free_percent", 100.0 - used_percent)
     return _resource("weblogic_jvm", _resource_key(appserver, name), name, "running", metrics)
 
-
 def _collect_thread_pool_resource(base_url, values, appserver):
     payload = _rest_first(
         base_url,
@@ -379,7 +349,6 @@ def _collect_thread_pool_resource(base_url, values, appserver):
     if total is not None and idle is not None and total > 0 and idle <= total:
         _add_number_metric(metrics, "execute_thread_busy_percent", max(0.0, total - idle) * 100.0 / total)
     return _resource("weblogic_thread_pool", _resource_key(appserver, name), name, "running", metrics)
-
 
 def _collect_jdbc_resources(base_url, values, appserver):
     payload = _rest_first(
@@ -405,7 +374,6 @@ def _collect_jdbc_resources(base_url, values, appserver):
         if resource:
             resources.append(resource)
     return resources
-
 
 def _collect_jms_resources(base_url, values, appserver):
     server_payload = _rest_first(
@@ -445,7 +413,6 @@ def _collect_jms_resources(base_url, values, appserver):
                 resources.append(resource)
     return resources
 
-
 def _rest_collect_optadvisor(thisnode, config, values):
     base_url, _ = common.rest_base_url(thisnode, values, values.get("mngmport") or "7001")
     appserver = _safe_text(_get_appserver(config, thisnode))
@@ -476,7 +443,6 @@ def _rest_collect_optadvisor(thisnode, config, values):
     resources.extend(_collect_jms_resources(base_url, values, server_name))
     return {"target": target, "resources": resources}
 
-
 def _collect_optadvisor(thisnode, config, values):
     classes.Err("weblogic optadvisor REST start:" + str(thisnode))
     try:
@@ -486,7 +452,6 @@ def _collect_optadvisor(thisnode, config, values):
             _append_optadvisor_payload(thisnode, payload)
     except Exception as err:
         classes.Err("weblogic optadvisor REST error:" + str(err))
-
 
 def _weblogic_rest_path(subtype):
     subtype = str(subtype or "").strip()
@@ -503,7 +468,6 @@ def _weblogic_rest_path(subtype):
     if subtype.startswith("/"):
         return subtype
     return paths.get(subtype, "")
-
 
 WEBLOGIC_REST_LEGACY_FIELDS = {
     "JVMRuntime": (
@@ -546,10 +510,8 @@ WEBLOGIC_REST_LEGACY_FIELDS = {
     ),
 }
 
-
 def _legacy_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 
 def _legacy_value(value):
     if value is None:
@@ -566,7 +528,6 @@ def _legacy_value(value):
     except ValueError:
         return text
 
-
 def _case_value(source, names):
     if not isinstance(source, dict):
         return None
@@ -579,11 +540,9 @@ def _case_value(source, names):
             return lower_map[lowered]
     return None
 
-
 def _weblogic_rest_sources(payload):
     items = _weblogic_rest_items(payload)
     return items if items else ([payload] if isinstance(payload, dict) else [])
-
 
 def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
     formatted = _legacy_value(value)
@@ -596,7 +555,6 @@ def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
         if new_file:
             f.write("key,server,timestamp,value\n")
         f.write(str(key) + "," + str(server) + "," + str(timestamp) + "," + formatted + "\n")
-
 
 def _write_weblogic_rest_legacy(logdir, subtype, thisnode, payload):
     fields = WEBLOGIC_REST_LEGACY_FIELDS.get(str(subtype))
@@ -613,7 +571,6 @@ def _write_weblogic_rest_legacy(logdir, subtype, thisnode, payload):
             wrote = True
     return wrote
 
-
 def _collect_rest_statistics(thisnode, values, metrics):
     base_url, _ = common.rest_base_url(thisnode, values, values.get("mngmport") or "7001")
     for subtype, logdir in metrics.items():
@@ -627,7 +584,6 @@ def _collect_rest_statistics(thisnode, values, metrics):
                 common.write_numeric_tree(logdir, subtype, thisnode, payload)
         except Exception as err:
             classes.Err("weblogic rest statistics error:" + str(err))
-
 
 def _weblogic_rest_items(payload):
     if isinstance(payload, list):
@@ -644,7 +600,6 @@ def _weblogic_rest_items(payload):
                 return nested
     return []
 
-
 def _weblogic_rest_state(payload, appserver):
     if not isinstance(payload, dict):
         return ""
@@ -660,7 +615,6 @@ def _weblogic_rest_state(payload, appserver):
         if state:
             return state
     return ""
-
 
 def restAvailabilityCheck(thisnode, values):
     appserver = common.safe_text(
@@ -683,7 +637,6 @@ def restAvailabilityCheck(thisnode, values):
         except Exception:
             continue
     return 0
-
 
 def getStat(thisqm, inpdata):
     try:
@@ -749,7 +702,6 @@ def getStat(thisqm, inpdata):
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in weblogic statistics:" + str(err))
 
-
 def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata):
     if not isinstance(thisdata, dict):
         return
@@ -790,7 +742,6 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata)
             f.writelines(remaining)
     except OSError as err:
         classes.Err("weblogic optadvisor file error:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = _split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {})

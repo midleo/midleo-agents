@@ -9,7 +9,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import decrypt, configs, secrets
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]
@@ -19,7 +18,6 @@ def _arg(index, name):
     if not value:
         raise ValueError("Empty required argument: " + name)
     return value
-
 
 def createMonJson():
     srvtype = _arg(1, "SRVTYPE")
@@ -55,7 +53,6 @@ def createMonJson():
 
     configs.savemonData(mon_data)
     print(appsrv + " of type " + srvtype + " have been added")
-
 
 if __name__ == "__main__":
     createMonJson()

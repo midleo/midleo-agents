@@ -8,14 +8,11 @@ from modules.message_backup import envelope as envelope_mod
 
 DEFAULT_OUTBOX_DIR = os.path.join(os.getcwd(), "data", "message-backup-outbox")
 
-
 def _ensure_dir(path):
     os.makedirs(path, mode=0o750, exist_ok=True)
 
-
 def _entry_path(outbox_dir, entry_id):
     return os.path.join(outbox_dir, entry_id + ".json")
-
 
 def _payload_for_outbox(envelope):
     payload = envelope_mod.envelope_for_submit(envelope)
@@ -25,7 +22,6 @@ def _payload_for_outbox(envelope):
     if body_mode == "none":
         payload["body_sha256"] = None
     return payload
-
 
 class MessageBackupOutbox:
     def __init__(self, config):

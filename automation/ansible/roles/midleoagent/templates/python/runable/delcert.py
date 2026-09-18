@@ -8,7 +8,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import configs
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]

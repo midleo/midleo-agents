@@ -23,7 +23,6 @@ IBMMQ_OPTADVISOR_DEFAULTS = {
     "collect_system_queues": False,
 }
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]
@@ -34,12 +33,10 @@ def _arg(index, name):
         raise ValueError("Empty required argument: " + name)
     return value
 
-
 def _store_value(key, value):
     if secrets.is_encrypted_secret_key(key) and value:
         return decrypt.encryptPWD(str(value))
     return value
-
 
 def createOptAdvisorJson():
     srvtype = _arg(1, "SRVTYPE")
@@ -87,7 +84,6 @@ def createOptAdvisorJson():
 
     configs.saveOptAdvisorData(opt_data)
     print(appsrv + " optadvisor configuration of type " + srvtype + " have been added")
-
 
 if __name__ == "__main__":
     createOptAdvisorJson()

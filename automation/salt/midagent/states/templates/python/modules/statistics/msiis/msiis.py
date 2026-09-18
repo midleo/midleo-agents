@@ -19,7 +19,6 @@ from modules.statistics.msiis.modules import srvinfo
 
 _original_hashlib_new = hashlib.new
 
-
 def md4_patched(name, data=b''):
     if name == 'md4':
         if MD4 is None:
@@ -29,9 +28,7 @@ def md4_patched(name, data=b''):
         return h
     return _original_hashlib_new(name, data)
 
-
 hashlib.new = md4_patched
-
 
 def _decode_password(value):
     if not value:
@@ -39,10 +36,8 @@ def _decode_password(value):
     padded = value + "=" * (4 - len(value) % 4)
     return base64.b64decode(padded).decode("utf-8")
 
-
 OPTADVISOR_COLLECTOR_NAME = "msiis-winrm-collector"
 OPTADVISOR_TECHNOLOGY = "msiis"
-
 
 def _resource(resource_type, technical_key, name, status="unknown", metadata=None, metrics=None):
     return {
@@ -54,7 +49,6 @@ def _resource(resource_type, technical_key, name, status="unknown", metadata=Non
         "metrics": metrics or [],
     }
 
-
 def _parse_winrm_json(output):
     try:
         parsed = json.loads(output or "[]")
@@ -64,12 +58,10 @@ def _parse_winrm_json(output):
         return [parsed]
     return parsed if isinstance(parsed, list) else []
 
-
 def _run_json_ps(session, script, thisnode):
     result = session.run_ps(script.format(serverName=thisnode))
     output = result.std_out.decode('utf-8', errors='ignore')
     return _parse_winrm_json(output)
-
 
 def _status_from_value(value):
     number = common.numeric_value(value)
@@ -78,7 +70,6 @@ def _status_from_value(value):
     if number == 0:
         return "stopped"
     return "unknown"
-
 
 def buildOptAdvisorPayload(thisnode, config, app_pool_rows=None, perf_rows=None, collected_at=None):
     resources = []
@@ -135,7 +126,6 @@ def buildOptAdvisorPayload(thisnode, config, app_pool_rows=None, perf_rows=None,
         collected_at,
     )
 
-
 def _collect_optadvisor(thisnode, config, session, functions):
     app_pool_rows = []
     perf_rows = []
@@ -146,7 +136,6 @@ def _collect_optadvisor(thisnode, config, session, functions):
     payload = buildOptAdvisorPayload(thisnode, config, app_pool_rows, perf_rows, common.utc_now())
     if payload is not None:
         common.append_optadvisor_payload("msiis", thisnode, payload)
-
 
 def getStat(thisqm, inpdata):
     try:
@@ -194,7 +183,6 @@ def getStat(thisqm, inpdata):
 
     except Exception as err:
         classes.Err("Error in msiis statistics:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = common.split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {})

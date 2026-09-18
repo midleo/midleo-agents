@@ -29,7 +29,6 @@ elif OS_TYPE == "Windows":
 else:
     raise RuntimeError("Unsupported operating system: " + OS_TYPE)
 
-
 def _safe_get_config():
     config_data = configs.getcfgData()
     if not config_data:
@@ -42,7 +41,6 @@ def _safe_get_config():
 
     return config_data
 
-
 def _safe_cert_check(uid):
     if not os.path.isfile(CERTS_FILE):
         return []
@@ -53,7 +51,6 @@ def _safe_cert_check(uid):
         classes.Err("Exception in certificate check: " + str(ex))
         return []
 
-
 def _safe_application_evidence_windows():
     try:
         data = win_utils.getApplicationServerEvidence()
@@ -61,7 +58,6 @@ def _safe_application_evidence_windows():
     except Exception as ex:
         classes.Err("Exception in win_utils.getApplicationServerEvidence(): " + str(ex))
         return None
-
 
 def _safe_application_evidence_linux():
     try:
@@ -71,7 +67,6 @@ def _safe_application_evidence_linux():
         classes.Err("Exception in lin_packages.getApplicationServerEvidence(): " + str(ex))
         return None
 
-
 def _safe_jobsdata():
     try:
         data = getLocalJobsBody()
@@ -80,7 +75,6 @@ def _safe_jobsdata():
     except Exception as ex:
         classes.Err("Exception in getLocalJobsBody(): " + str(ex))
     return {"jobs": []}
-
 
 def _attach_application_servers(config, evidence, settings=None):
     if evidence is None:
@@ -98,7 +92,6 @@ def _attach_application_servers(config, evidence, settings=None):
         config.application_servers = observations
     except Exception as ex:
         classes.Err("Exception in application server discovery: " + str(ex))
-
 
 def _build_windows_config(uid, groupid, updint, certs):
     cpu = classes.CPU(win_utils.getCPUName(), win_utils.getCPUCoreCount())
@@ -127,7 +120,6 @@ def _build_windows_config(uid, groupid, updint, certs):
     _attach_application_servers(config, evidence)
     return config
 
-
 def _build_linux_config(uid, groupid, updint, certs):
     cpu = classes.CPU(lin_utils.getCPUName(), lin_utils.getCPUCoreCount())
     hw_config = classes.HWConfig(
@@ -155,12 +147,10 @@ def _build_linux_config(uid, groupid, updint, certs):
     _attach_application_servers(config, evidence)
     return config
 
-
 def _sanitize_output(output):
     output = re.sub(r"<([a-zA-Z\-_]+)?\.([a-zA-Z\-_]+)(\d?):(\s?)", "", output)
     output = re.sub(r">", "", output)
     return output
-
 
 def _write_next_run(updint):
     timenow = datetime.now() + timedelta(minutes=updint)
@@ -172,7 +162,6 @@ def _write_next_run(updint):
         os.chmod(NEXTRUN_FILE, 0o600)
     except Exception:
         pass
-
 
 def create():
     try:
@@ -204,7 +193,6 @@ def create():
 
     return None
 
-
 def main():
     try:
         config = create()
@@ -229,7 +217,6 @@ def main():
         classes.Err("Error in main: " + str(err))
     except Exception as ex:
         classes.Err("Exception in main: " + str(ex))
-
 
 if __name__ == "__main__":
     main()

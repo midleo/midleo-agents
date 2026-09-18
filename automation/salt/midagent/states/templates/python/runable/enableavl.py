@@ -9,7 +9,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import decrypt, configs
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]
@@ -20,12 +19,10 @@ def _arg(index, name):
         raise ValueError("Empty required argument: " + name)
     return value
 
-
 def _json_arg(index):
     if len(sys.argv) <= index:
         return "{}"
     return " ".join(str(item) for item in sys.argv[index:])
-
 
 def _strip_shell_wrapper(value):
     value = str(value).strip()
@@ -43,7 +40,6 @@ def _strip_shell_wrapper(value):
         break
 
     return value
-
 
 def _parse_json_arg(value):
     value = _strip_shell_wrapper(value)
@@ -71,18 +67,15 @@ def _parse_json_arg(value):
 
     return parsed
 
-
 def _json_value(data, *keys, default=""):
     for key in keys:
         if key in data and data[key] not in (None, ""):
             return data[key]
     return default
 
-
 def _normalize_conntype(value):
     value = str(value or "jms").strip().lower()
     return value if value in ("jms", "rest") else "jms"
-
 
 def createAvlJson():
     appsrv = _arg(1, "APPSRV")
@@ -130,7 +123,6 @@ def createAvlJson():
 
     configs.saveAvlData(avl_data)
     print("Availability check for " + appsrv + " have been enabled")
-
 
 if __name__ == "__main__":
     createAvlJson()

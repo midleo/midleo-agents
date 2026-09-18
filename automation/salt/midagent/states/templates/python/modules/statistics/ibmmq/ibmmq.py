@@ -12,7 +12,6 @@ except ImportError as ex:
     MQ_ERROR = Exception
     PYMQI_IMPORT_ERROR = ex
 
-
 OPTADVISOR_SCHEMA_VERSION = "1.0"
 OPTADVISOR_COLLECTOR_NAME = "mq-pymqi-collector"
 OPTADVISOR_COLLECTOR_VERSION = "1.0.0"
@@ -76,7 +75,6 @@ CHSTAT_DATA_KEYS = [
     "starttime",
 ]
 
-
 def qmConn(thisqm):
     if pymqi is None:
         classes.Err("Exception:pymqi is not available:" + str(PYMQI_IMPORT_ERROR))
@@ -87,7 +85,6 @@ def qmConn(thisqm):
         classes.Err("Exception:" + str(ex))
         qmgr = None
     return qmgr
-
 
 def _client_connect_ready(broker_cfg, qmgr_name=""):
     broker_cfg = broker_cfg or {}
@@ -112,7 +109,6 @@ def _client_connect_ready(broker_cfg, qmgr_name=""):
         return None
     return channel, host, port_int
 
-
 def _ssl_key_repository(broker_cfg):
     for key in ("sslkey", "keyrepo", "ssl_key_repository"):
         value = _safe_text((broker_cfg or {}).get(key))
@@ -120,9 +116,8 @@ def _ssl_key_repository(broker_cfg):
             return value
     return _safe_text(os.environ.get("MQSSLKEYR") or os.environ.get("MQSCOUT_SSL_KEY_REPOSITORY") or "")
 
-
 def connect_qmgr(broker_cfg, qmgr_name=None):
-    """Connect to a queue manager using client or bindings mode from broker config."""
+                                                                                      
     if pymqi is None:
         classes.Err("Exception:pymqi is not available:" + str(PYMQI_IMPORT_ERROR))
         return None
@@ -181,15 +176,12 @@ def connect_qmgr(broker_cfg, qmgr_name=None):
         classes.Err("Exception:" + str(ex))
         return None
 
-
 def qmDisc(thisqm):
     if thisqm is not None:
         thisqm.disconnect()
 
-
 def _utc_now():
     return datetime.now(timezone.utc).replace(microsecond=0)
-
 
 def _iso_utc(value):
     if value is None:
@@ -198,10 +190,8 @@ def _iso_utc(value):
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-
 def _truthy(value):
     return str(value).strip().lower() in ("1", "y", "yes", "true", "on", "enabled")
-
 
 def _int_config(inpdata, key, default, min_value=0, max_value=1000000):
     try:
@@ -209,7 +199,6 @@ def _int_config(inpdata, key, default, min_value=0, max_value=1000000):
     except (TypeError, ValueError):
         value = default
     return max(min_value, min(value, max_value))
-
 
 def _parse_patterns(value):
     if isinstance(value, list):
@@ -219,7 +208,6 @@ def _parse_patterns(value):
     else:
         values = []
     return [_safe_text(item) for item in values if _safe_text(item)]
-
 
 def _optadvisor_mq_config(inpdata):
     cfg = {}
@@ -273,14 +261,12 @@ def _optadvisor_mq_config(inpdata):
     )
     return cfg
 
-
 def _optadvisor_enabled(inpdata):
     return _truthy(
         inpdata.get("optadvisor")
         or inpdata.get("optadvisor_enabled")
         or inpdata.get("optimization_advisor")
     )
-
 
 def _safe_text(value):
     if value is None:
@@ -289,10 +275,8 @@ def _safe_text(value):
         return value.decode("utf-8", errors="replace").strip().replace("\u0000", "")
     return str(value).strip().replace("\u0000", "")
 
-
 def _is_internal_temp_queue(qname):
     return _safe_text(qname).upper().startswith("PYMQPCF.")
-
 
 def _pcf_get(row, parameter, default=None):
     if parameter is None:
@@ -302,15 +286,12 @@ def _pcf_get(row, parameter, default=None):
     except Exception:
         return default
 
-
 def _put_if(target, key, value):
     if value is not None and value != "":
         target[key] = value
 
-
 def _pcf_text(row, parameter):
     return _safe_text(_pcf_get(row, parameter))
-
 
 def _number_metric(key, value):
     if value is None:
@@ -320,13 +301,11 @@ def _number_metric(key, value):
     except (TypeError, ValueError):
         return None
 
-
 def _string_metric(key, value):
     value = _safe_text(value)
     if not value:
         return None
     return {"key": key, "value": value, "value_type": "string"}
-
 
 def _boolean_metric(key, value):
     if value is None:
@@ -340,25 +319,20 @@ def _boolean_metric(key, value):
             bool_value = _truthy(value)
     return {"key": key, "value": bool_value, "value_type": "boolean"}
 
-
 def _add_metric(metrics, metric):
     if metric is not None:
         metrics.append(metric)
 
-
 def _optadvisor_log_path(thisqm):
     return os.path.join(os.getcwd(), "logs", "ibmmq_" + str(thisqm) + "_optadvisor.jsonl")
 
-
 def _optadvisor_state_path(thisqm):
     return os.path.join(os.getcwd(), "logs", "ibmmq_" + str(thisqm) + "_optadvisor_state.json")
-
 
 def _append_optadvisor_payload(thisqm, payload):
     os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
     with open(_optadvisor_log_path(thisqm), "a", encoding="utf-8") as f:
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
-
 
 def _read_optadvisor_state(thisqm):
     path = _optadvisor_state_path(thisqm)
@@ -369,7 +343,6 @@ def _read_optadvisor_state(thisqm):
     except Exception:
         return {}
 
-
 def _write_optadvisor_state(thisqm, data):
     try:
         os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
@@ -377,7 +350,6 @@ def _write_optadvisor_state(thisqm, data):
             json.dump(data if isinstance(data, dict) else {}, f, separators=(",", ":"), sort_keys=True)
     except Exception as ex:
         classes.Err("ibmmq optadvisor state write error:" + str(ex))
-
 
 def _parse_iso_epoch(value):
     try:
@@ -387,7 +359,6 @@ def _parse_iso_epoch(value):
         return datetime.fromisoformat(text).timestamp()
     except Exception:
         return 0
-
 
 def _deep_scan_allowed(thisqm, cfg):
     if cfg.get("collection_mode") != "deep_scan":
@@ -402,7 +373,6 @@ def _deep_scan_allowed(thisqm, cfg):
     interval_seconds = int(cfg.get("deep_scan_interval_hours") or 24) * 3600
     return (time.time() - last_epoch) >= interval_seconds, last
 
-
 def _get_server_id(inpdata, thisqm):
     return (
         inpdata.get("server_id")
@@ -412,7 +382,6 @@ def _get_server_id(inpdata, thisqm):
         or inpdata.get("qmid")
         or thisqm
     )
-
 
 def qMgrInfo(thisqm):
     info = {"status": "running"}
@@ -434,7 +403,6 @@ def qMgrInfo(thisqm):
     except Exception as ex:
         classes.Err("ibmmq qmgr info error:" + str(ex))
     return info
-
 
 def qStat(thisqm, q, queues):
     try:
@@ -506,7 +474,6 @@ def qStat(thisqm, q, queues):
         classes.Err("Exception:" + str(ex))
     return queues
 
-
 def qStatInfo(thisqm, q, queues, include_empty=False):
     try:
         args = []
@@ -567,7 +534,6 @@ def qStatInfo(thisqm, q, queues, include_empty=False):
         classes.Err("Exception:" + str(ex))
     return queues
 
-
 def qResStat(thisqm, q, queues):
     try:
         args = []
@@ -593,7 +559,6 @@ def qResStat(thisqm, q, queues):
     except MQ_ERROR as ex:
         classes.Err("Exception:" + str(ex))
     return queues
-
 
 def chStat(thisqm, ch, chls):
     try:
@@ -666,7 +631,6 @@ def chStat(thisqm, ch, chls):
         classes.Err("Exception:" + str(ex))
     return chls
 
-
 def chl_st():
     return {
         pymqi.CMQCFC.MQCHS_INACTIVE: "inactive",
@@ -681,7 +645,6 @@ def chl_st():
         pymqi.CMQCFC.MQCHS_INITIALIZING: "initializing",
     }
 
-
 def listener_st():
     cmqcfc = pymqi.CMQCFC
     return {
@@ -691,7 +654,6 @@ def listener_st():
         getattr(cmqcfc, "MQSVC_STATUS_STOPPING", -1): "stopping",
         getattr(cmqcfc, "MQSVC_STATUS_RETRYING", -1): "retrying",
     }
-
 
 def listenerStat(thisqm, listener_name, listeners):
     name_param = getattr(pymqi.CMQCFC, "MQCACH_LISTENER_NAME", None)
@@ -723,7 +685,6 @@ def listenerStat(thisqm, listener_name, listeners):
         classes.Err("ibmmq listener status error:" + str(ex))
     return listeners
 
-
 def _is_system_queue(qname):
     upper = _safe_text(qname).upper()
     return (
@@ -733,11 +694,9 @@ def _is_system_queue(qname):
         or _is_internal_temp_queue(upper)
     )
 
-
 def _matches_any(name, patterns):
     qname = _safe_text(name)
     return any(fnmatch.fnmatchcase(qname.upper(), _safe_text(pattern).upper()) for pattern in patterns)
-
 
 def _depth_value(qdata):
     try:
@@ -745,13 +704,11 @@ def _depth_value(qdata):
     except (TypeError, ValueError):
         return 0.0
 
-
 def _age_value(qdata):
     try:
         return float(qdata.get("oldmessage") or 0)
     except (TypeError, ValueError):
         return 0.0
-
 
 def _open_input(qdata):
     try:
@@ -759,20 +716,17 @@ def _open_input(qdata):
     except (TypeError, ValueError):
         return 0
 
-
 def _open_output(qdata):
     try:
         return int(qdata.get("opoutcount") or 0)
     except (TypeError, ValueError):
         return 0
 
-
 def _depth_percent(qdata):
     try:
         return float(qdata.get("percfull") or 0)
     except (TypeError, ValueError):
         return 0.0
-
 
 def _selection_reason_counts(selected):
     counts = {}
@@ -781,11 +735,9 @@ def _selection_reason_counts(selected):
             counts[reason] = counts.get(reason, 0) + 1
     return ",".join(key + "=" + str(counts[key]) for key in sorted(counts))
 
-
 def _queue_type(qdata):
     text = _safe_text(qdata.get("qtype"))
     return text if text else "local"
-
 
 def _select_detail_queues(thisqm, queues, qmgr_info, cfg):
     mode = cfg["collection_mode"]
@@ -884,7 +836,6 @@ def _select_detail_queues(thisqm, queues, qmgr_info, cfg):
         "deep_scan_due": bool(deep_allowed),
     }
 
-
 def _qmgr_resource(thisqm, qmgr_info, queues, channels, listeners, selected_queues, cfg, selection_state):
     dlq = _safe_text(qmgr_info.get("dead_letter_queue"))
     app_queues = 0
@@ -980,7 +931,6 @@ def _qmgr_resource(thisqm, qmgr_info, queues, channels, listeners, selected_queu
         "metrics": metrics,
     }
 
-
 def _queue_resource(qname, qdata, qmgr_info, selection_reasons=None):
     metrics = []
     _add_metric(metrics, _number_metric("current_depth", qdata.get("curdepth")))
@@ -1010,7 +960,6 @@ def _queue_resource(qname, qdata, qmgr_info, selection_reasons=None):
         "metrics": metrics,
     }
 
-
 def _channel_resource(chname, chdata):
     metrics = []
     _add_metric(metrics, _string_metric("channel_status", chdata.get("status")))
@@ -1027,7 +976,6 @@ def _channel_resource(chname, chdata):
         "metrics": metrics,
     }
 
-
 def _listener_resource(listener_name, listener_data):
     metrics = []
     status = _safe_text(listener_data.get("status"))
@@ -1042,7 +990,6 @@ def _listener_resource(listener_name, listener_data):
         "metadata": {},
         "metrics": metrics,
     }
-
 
 def buildOptAdvisorPayload(
     thisqm,
@@ -1119,7 +1066,6 @@ def buildOptAdvisorPayload(
         "target": target,
         "resources": resources,
     }
-
 
 def getStat(thisqm, inpdata):
     qmgr = None
@@ -1261,7 +1207,6 @@ def getStat(thisqm, inpdata):
             except Exception:
                 pass
 
-
 def depthperc(queue_info):
     if (
         pymqi.CMQC.MQIA_CURRENT_Q_DEPTH not in queue_info
@@ -1274,7 +1219,6 @@ def depthperc(queue_info):
         return 0
     depthperc = (depthcur / depthmax) * 100
     return depthperc
-
 
 def flushOptAdvisorTelemetry(thisqm, website, webssl, _legacy_token, thisdata):
     if not isinstance(thisdata, dict) or not common.optadvisor_enabled(thisdata):
@@ -1306,7 +1250,6 @@ def flushOptAdvisorTelemetry(thisqm, website, webssl, _legacy_token, thisdata):
             f.writelines(remaining)
     except OSError as err:
         classes.Err("ibmmq optadvisor file error:" + str(err))
-
 
 def resetStat(thisqm, website, webssl, _legacy_token, thisdata):
     try:

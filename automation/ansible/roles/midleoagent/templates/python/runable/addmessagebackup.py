@@ -28,7 +28,6 @@ DEFAULT_OUTBOX = {
 VALID_ACK_AFTER = frozenset({"backend_persisted", "outbox_handoff"})
 JOB_NAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]
@@ -39,12 +38,10 @@ def _arg(index, name):
         raise ValueError("Empty required argument: " + name)
     return value
 
-
 def _root_config(config_data):
     config_data = config_data if isinstance(config_data, dict) else {}
     root = config_data.get("message_backup")
     return root if isinstance(root, dict) else config_data
-
 
 def _as_bool(value, default=False):
     if isinstance(value, bool):
@@ -53,14 +50,12 @@ def _as_bool(value, default=False):
         return default
     return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
 
-
 def _bounded_int(data, key, default, minimum, maximum):
     try:
         value = int(data.get(key, default))
     except Exception:
         value = default
     data[key] = min(maximum, max(minimum, value))
-
 
 def _store_connection_values(data):
     if not isinstance(data, dict):
@@ -79,7 +74,6 @@ def _store_connection_values(data):
             stored[store_key] = value
     return stored
 
-
 def _ensure_root(config_data):
     root = _root_config(config_data)
     if not root or root is config_data:
@@ -96,7 +90,6 @@ def _ensure_root(config_data):
     root.setdefault("brokers", {})
     root.setdefault("jobs", [])
     return root
-
 
 def _merge_brokers(root, brokers_payload):
     if not isinstance(brokers_payload, dict):
@@ -116,7 +109,6 @@ def _merge_brokers(root, brokers_payload):
             existing = dict(brokers[transport_key].get(instance) or {})
             existing.update(_store_connection_values(conn))
             brokers[transport_key][instance] = existing
-
 
 def add_message_backup():
     job_name = _arg(1, "JOB_NAME")
@@ -193,7 +185,6 @@ def add_message_backup():
 
     configs.saveMessageBackupData(config_data)
     print("Message backup job " + job_name + " has been added")
-
 
 if __name__ == "__main__":
     add_message_backup()

@@ -8,7 +8,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import configs
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]
@@ -19,14 +18,12 @@ def _arg(index, name):
         raise ValueError("Empty required argument: " + name)
     return value
 
-
 def disableTrackQm():
     qmgr = _arg(1, "QMGR")
     track_data = configs.gettrackData()
     track_data.pop(qmgr, None)
     configs.savetrackData(track_data)
     print(qmgr + " configuration deleted")
-
 
 if __name__ == "__main__":
     disableTrackQm()

@@ -5,7 +5,6 @@ import shlex
 from modules.base import classes
 from modules.statistics import common
 
-
 def getStat(thisqm, inpdata):
     try:
         inpdata = common.parse_json_object(inpdata)

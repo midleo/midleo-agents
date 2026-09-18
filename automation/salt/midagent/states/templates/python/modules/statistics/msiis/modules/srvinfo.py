@@ -97,5 +97,4 @@ foreach ($instance in $instances) {{
 $output | ConvertTo-Json -Depth 4
 ''',
 
-
 }

@@ -23,7 +23,6 @@ _SECRET_PATH = Path(
 _SECRET = None
 _SUFFIX = b"|midleo|v1"
 
-
 def _get_secret() -> bytes:
     global _SECRET
     if _SECRET is None:
@@ -32,10 +31,8 @@ def _get_secret() -> bytes:
         ).strip().encode("utf-8")
     return _SECRET
 
-
 def _derive_key() -> bytes:
     return SHA256.new(_get_secret() + _SUFFIX).digest()
-
 
 def encryptPWD(payload: str) -> str:
     key = _derive_key()
@@ -43,7 +40,6 @@ def encryptPWD(payload: str) -> str:
     cipher = AES.new(key, AES.MODE_CBC, iv)
     ciphertext = cipher.encrypt(pad(payload.encode("utf-8"), AES.block_size))
     return base64.b64encode(iv + ciphertext).decode("ascii")
-
 
 def decryptPWD(payload: str) -> str:
     if not payload:
@@ -54,7 +50,6 @@ def decryptPWD(payload: str) -> str:
     ciphertext = raw[16:]
     cipher = AES.new(_derive_key(), AES.MODE_CBC, iv)
     return unpad(cipher.decrypt(ciphertext), AES.block_size).decode("utf-8")
-
 
 def encrypt(data: dict, passphrase) -> str:
     try:
@@ -71,7 +66,6 @@ def encrypt(data: dict, passphrase) -> str:
         return base64.b64encode(json.dumps(payload).encode()).decode()
     except Exception as ex:
         classes.Err("Exception:" + str(ex))
-
 
 def decryptit(data: str, passphrase) -> dict:
     try:

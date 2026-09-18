@@ -27,10 +27,8 @@ PYTHON_PACKAGES = (
     "pymqi",
 )
 
-
 def _iso_now():
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
 
 def _read_json(path):
     try:
@@ -39,7 +37,6 @@ def _read_json(path):
             return data if isinstance(data, dict) else {}
     except Exception:
         return {}
-
 
 def _agent_version():
     try:
@@ -51,17 +48,14 @@ def _agent_version():
         pass
     return "unknown"
 
-
 def _mode(path):
     try:
         return stat.S_IMODE(os.stat(path).st_mode)
     except Exception:
         return None
 
-
 def _mode_text(mode):
     return "" if mode is None else oct(mode)
-
 
 def _count_lines(path):
     try:
@@ -70,13 +64,11 @@ def _count_lines(path):
     except Exception:
         return 0
 
-
 def _file_size(path):
     try:
         return os.path.getsize(path)
     except Exception:
         return 0
-
 
 def _installed_version(package_name):
     try:
@@ -84,7 +76,6 @@ def _installed_version(package_name):
         return metadata.version(package_name)
     except Exception:
         return ""
-
 
 def _dependency_status():
     packages = []
@@ -99,7 +90,6 @@ def _dependency_status():
         "missing_required": missing,
         "packages": packages,
     }
-
 
 def _cron_status():
     state = _read_json(CRON_STATE_FILE)
@@ -126,7 +116,6 @@ def _cron_status():
         "jobs": jobs,
     }
 
-
 def _upload_status():
     state = configs.getUploadState()
     if not isinstance(state, dict):
@@ -142,7 +131,6 @@ def _upload_status():
         "consecutive_failures": int(state.get("consecutive_failures", 0)),
         "total_attempts": int(state.get("total_attempts", 0)),
     }
-
 
 def _backlog_status():
     optadvisor_files = []
@@ -168,7 +156,6 @@ def _backlog_status():
         "local_stat_bytes": sum(_file_size(path) for path in set(local_stat_files)),
     }
 
-
 def _permission_status():
     checks = []
     for path, max_mode in (
@@ -186,7 +173,6 @@ def _permission_status():
         checks.append({"path": os.path.relpath(path, BASE_DIR), "mode": _mode_text(mode), "ok": ok})
     insecure = sum(1 for item in checks if not item["ok"])
     return {"checked": len(checks), "insecure": insecure, "items": checks}
-
 
 def main():
     cron = _cron_status()
@@ -218,7 +204,6 @@ def main():
         "permissions": perms,
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
-
 
 if __name__ == "__main__":
     main()

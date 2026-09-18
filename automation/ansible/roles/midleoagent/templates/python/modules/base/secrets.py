@@ -1,6 +1,5 @@
 import re
 
-
 ENCRYPTED_SECRET_KEYS = {
     "pwd",
     "pass",
@@ -50,14 +49,11 @@ _SECRET_TEXT_RE = re.compile(
 _AUTH_HEADER_RE = re.compile(r'(\b(?:authorization|proxy-authorization)\s*[:=]\s*)(?:Bearer|Basic)\s+[^\s,;}]+', re.IGNORECASE)
 _URL_AUTH_RE = re.compile(r'(\b[a-z][a-z0-9+.-]*://)[^\s/@]+:[^\s/@]*@', re.IGNORECASE)
 
-
 def normalize_key(key):
     return str(key or "").strip().lower()
 
-
 def is_encrypted_secret_key(key):
     return normalize_key(key) in ENCRYPTED_SECRET_KEYS
-
 
 def is_secret_key(key):
     key = normalize_key(key)
@@ -69,12 +65,10 @@ def is_secret_key(key):
         or key.endswith("secret")
     )
 
-
 def redact_text(value):
     text = _URL_AUTH_RE.sub(r'\1...@', str(value))
     text = _AUTH_HEADER_RE.sub(r'\1"..."', text)
     return _SECRET_TEXT_RE.sub(r'\1"..."', text)
-
 
 def redact_data(value, drop_keys=None):
     drop_keys = {normalize_key(key) for key in (drop_keys or set())}

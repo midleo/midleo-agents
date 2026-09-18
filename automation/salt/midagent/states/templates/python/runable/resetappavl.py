@@ -6,7 +6,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import makerequest, classes, configs, file_utils
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]

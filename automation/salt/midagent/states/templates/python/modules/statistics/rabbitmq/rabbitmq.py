@@ -8,11 +8,9 @@ import urllib3
 from modules.base import classes
 from modules.statistics import common
 
-
 OPTADVISOR_COLLECTOR_NAME = "rabbitmq-management-collector"
 OPTADVISOR_TECHNOLOGY = "rabbitmq"
 RABBITMQ_CONFIG_KEYS = {"usr", "pwd", "mngmport", "port", "ssl", "sslverify", "ssl_verify", "vhost"}
-
 
 def _decode_password(value):
     if not value:
@@ -22,7 +20,6 @@ def _decode_password(value):
         return base64.b64decode(padded).decode("utf-8")
     except Exception:
         return value
-
 
 def _resource(resource_type, technical_key, name, status="unknown", metadata=None, metrics=None):
     return {
@@ -34,11 +31,9 @@ def _resource(resource_type, technical_key, name, status="unknown", metadata=Non
         "metrics": metrics or [],
     }
 
-
 def _rate(row, *path):
     value = common.nested(row, *path)
     return value
-
 
 def buildOptAdvisorPayload(thisnode, config, nodes=None, queues=None, exchanges=None, connections=None, channels=None, collected_at=None):
     resources = []
@@ -107,7 +102,6 @@ def buildOptAdvisorPayload(thisnode, config, nodes=None, queues=None, exchanges=
         collected_at,
     )
 
-
 def _request_json(base_url, path, auth, verify):
     try:
         if not verify:
@@ -125,7 +119,6 @@ def _request_json(base_url, path, auth, verify):
     except Exception as err:
         classes.Err("rabbitmq optadvisor request error:" + str(err))
     return []
-
 
 def _collect_optadvisor(thisnode, config, values):
     scheme = "https" if common.truthy(values.get("ssl")) else "http"
@@ -146,7 +139,6 @@ def _collect_optadvisor(thisnode, config, values):
     if payload is not None:
         common.append_optadvisor_payload("rabbitmq", thisnode, payload)
 
-
 def getStat(thisqm, inpdata):
     try:
         inpdata = common.parse_json_object(inpdata)
@@ -159,7 +151,6 @@ def getStat(thisqm, inpdata):
             _collect_optadvisor(thisqm, optadvisor_config, values)
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in rabbitmq statistics:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     common.flush_optadvisor_telemetry("rabbitmq", thisnode, website, webssl, _legacy_token, stat_data, RABBITMQ_CONFIG_KEYS)

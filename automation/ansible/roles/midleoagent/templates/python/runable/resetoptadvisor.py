@@ -13,7 +13,6 @@ from modules.statistics import common
 
 MODULE_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
-
 try:
     lock = common.acquire_optadvisor_lock("runtime")
     if not lock:

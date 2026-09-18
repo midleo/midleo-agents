@@ -13,7 +13,6 @@ from modules.base import configs, secrets
 
 CRON_STATE_FILE = os.path.join(os.getcwd(), "config", "cron_state.json")
 
-
 def _read_json(path):
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -22,13 +21,11 @@ def _read_json(path):
     except Exception:
         return {}
 
-
 def _sanitize_dict(data):
     return secrets.redact_data(
         data if isinstance(data, dict) else {},
         drop_keys={"usr", "user", "ssl", "mngmport"},
     )
-
 
 def _append_job(jobs_map, job_name, item):
     if job_name not in jobs_map:
@@ -45,7 +42,6 @@ def _append_job(jobs_map, job_name, item):
 
     jobs_map[job_name].setdefault("data", [])
     jobs_map[job_name]["data"].append(item)
-
 
 def getLocalJobsBody():
     jobs_map = {}
@@ -156,7 +152,6 @@ def getLocalJobsBody():
     jobs = list(jobs_map.values())
 
     return {"generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "jobs": jobs}
-
 
 if __name__ == "__main__":
     print(json.dumps(getLocalJobsBody(), ensure_ascii=False))

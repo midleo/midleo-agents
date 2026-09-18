@@ -66,14 +66,12 @@ SECTION_FILE_MAP = {
     "confactions": ACTIONS_FILE,
 }
 
-
 def _ensure_dir():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     try:
         os.chmod(CONFIG_DIR, 0o700)
     except Exception:
         pass
-
 
 def _read_json_file(path, default=None):
     if default is None:
@@ -84,7 +82,6 @@ def _read_json_file(path, default=None):
             return data if isinstance(data, dict) else default
     except Exception:
         return default
-
 
 def _write_json_atomic(path, data):
     _ensure_dir()
@@ -104,7 +101,6 @@ def _write_json_atomic(path, data):
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-
 def _write_identity_atomic(data):
     _ensure_dir()
     fd, tmp_path = tempfile.mkstemp(
@@ -123,7 +119,6 @@ def _write_identity_atomic(data):
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-
 def getAgentIdentity():
     env_agent_id = os.environ.get("MIDLEO_AGENT_ID", "").strip()
     env_agent_token = os.environ.get("MIDLEO_AGENT_TOKEN", "").strip()
@@ -134,7 +129,6 @@ def getAgentIdentity():
         data["source"] = "file"
         return data
     return {}
-
 
 def getInstallationId():
     env_installation_id = (
@@ -151,7 +145,6 @@ def getInstallationId():
     _write_identity_atomic(data)
     return data["installation_id"]
 
-
 def saveAgentIdentity(agent_id, agent_token, extra=None):
     if not agent_id or not agent_token:
         return
@@ -162,10 +155,8 @@ def saveAgentIdentity(agent_id, agent_token, extra=None):
     data["updated_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     _write_identity_atomic(data)
 
-
 def _has_items(data):
     return isinstance(data, dict) and len(data) > 0
-
 
 def _as_bool_value(value, default=False):
     if isinstance(value, bool):
@@ -173,7 +164,6 @@ def _as_bool_value(value, default=False):
     if value is None:
         return default
     return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
-
 
 def _messageBackupActive(config_data):
     if not isinstance(config_data, dict):
@@ -191,10 +181,8 @@ def _messageBackupActive(config_data):
         for job in jobs
     )
 
-
 def _section_to_file(section_name):
     return SECTION_FILE_MAP.get(section_name)
-
 
 def getcfgData():
     parser = {}
@@ -212,26 +200,21 @@ def getcfgData():
         parser = {}
     return parser
 
-
 def getCronjobs():
     return _read_json_file(CRONJOBS_FILE, {})
-
 
 def saveCronjobs(data):
     if not isinstance(data, dict):
         data = {}
     _write_json_atomic(CRONJOBS_FILE, data)
 
-
 def getUploadState():
     return _read_json_file(UPLOAD_STATE_FILE, {})
-
 
 def saveUploadState(data):
     if not isinstance(data, dict):
         data = {}
     _write_json_atomic(UPLOAD_STATE_FILE, data)
-
 
 def syncCronjobsForConfig(config_filename, config_data):
     jobs = FILE_TO_CRONJOBS.get(config_filename, [])
@@ -256,10 +239,8 @@ def syncCronjobsForConfig(config_filename, config_data):
 
     saveCronjobs(cronjobs)
 
-
 def _get_config(path):
     return _read_json_file(path, {})
-
 
 def _save_config(path, data, config_filename=None):
     if not isinstance(data, dict):
@@ -268,20 +249,17 @@ def _save_config(path, data, config_filename=None):
     if config_filename:
         syncCronjobsForConfig(config_filename, data)
 
-
 def getSection(section_name):
     path = _section_to_file(section_name)
     if not path:
         return {}
     return _get_config(path)
 
-
 def setSection(section_name, section_data):
     path = _section_to_file(section_name)
     if not path:
         return
     _save_config(path, section_data, os.path.basename(path))
-
 
 def upsertSectionItem(section_name, item_key, item_value):
     path = _section_to_file(section_name)
@@ -290,7 +268,6 @@ def upsertSectionItem(section_name, item_key, item_value):
     data = _get_config(path)
     data[item_key] = item_value
     _save_config(path, data, os.path.basename(path))
-
 
 def deleteSectionItem(section_name, item_key):
     path = _section_to_file(section_name)
@@ -301,58 +278,44 @@ def deleteSectionItem(section_name, item_key):
         del data[item_key]
     _save_config(path, data, os.path.basename(path))
 
-
 def getmonData():
     return _get_config(MON_FILE)
-
 
 def savemonData(data):
     _save_config(MON_FILE, data, "confapplstat.json")
 
-
 def getOptAdvisorData():
     return _get_config(OPTADVISOR_FILE)
-
 
 def saveOptAdvisorData(data):
     _save_config(OPTADVISOR_FILE, data, "confoptadvisor.json")
 
-
 def getMessageBackupData():
     return _get_config(MESSAGE_BACKUP_FILE)
-
 
 def saveMessageBackupData(data):
     _save_config(MESSAGE_BACKUP_FILE, data, "confmessagebackup.json")
 
-
 def getcertData():
     return _get_config(CERT_FILE)
-
 
 def savecertData(data):
     _save_config(CERT_FILE, data)
 
-
 def gettrackData():
     return _get_config(TRACK_FILE)
-
 
 def savetrackData(data):
     _save_config(TRACK_FILE, data, "conftrack.json")
 
-
 def getAvlData():
     return _get_config(AVL_FILE)
-
 
 def saveAvlData(data):
     _save_config(AVL_FILE, data, "confavl.json")
 
-
 def getActionData():
     return _get_config(ACTIONS_FILE)
-
 
 def saveActionData(data):
     _save_config(ACTIONS_FILE, data, "confactions.json")

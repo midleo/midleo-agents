@@ -13,7 +13,6 @@ from modules.base import classes, configs
 
 MODULE_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
-
 try:
     if len(sys.argv) != 4:
         raise ValueError("input: <type> <thisqm> <inpdata_json>")

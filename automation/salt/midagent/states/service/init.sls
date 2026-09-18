@@ -10,6 +10,18 @@
 {% set update_interval_minutes = salt['pillar.get']('INPUT:update_interval_minutes') %}
 {% set osfam = grains.get('os_family', '') %}
 {% set agent_unique_id = salt['cmd.run'](cmd="head -c 8 /dev/urandom | xxd -p", python_shell=True) %}
+{% set weblogic_home = salt['pillar.get']('INPUT:weblogic_home', salt['pillar.get']('midagent_vars:weblogic_home', '/opt/oracle/middleware')) %}
+{% set ibmmq_home = salt['pillar.get']('INPUT:ibmmq_home', salt['pillar.get']('midagent_vars:ibmmq_home', '/opt/mqm')) %}
+{% set ibmace_home = salt['pillar.get']('INPUT:ibmace_home', salt['pillar.get']('midagent_vars:ibmace_home', '/opt/ibm/ace-12/server')) %}
+{% set ibmiib_home = salt['pillar.get']('INPUT:ibmiib_home', salt['pillar.get']('midagent_vars:ibmiib_home', '/opt/ibm/iib-10.0.0.11/server')) %}
+{% set tomcat_home = salt['pillar.get']('INPUT:tomcat_home', salt['pillar.get']('midagent_vars:tomcat_home', '')) %}
+{% set jboss_home = salt['pillar.get']('INPUT:jboss_home', salt['pillar.get']('midagent_vars:jboss_home', '')) %}
+{% set ibmwas_home = salt['pillar.get']('INPUT:ibmwas_home', salt['pillar.get']('midagent_vars:ibmwas_home', '')) %}
+{% set rabbitmq_home = salt['pillar.get']('INPUT:rabbitmq_home', salt['pillar.get']('midagent_vars:rabbitmq_home', '')) %}
+{% set tibcoems_home = salt['pillar.get']('INPUT:tibcoems_home', salt['pillar.get']('midagent_vars:tibcoems_home', '')) %}
+{% set activemq_home = salt['pillar.get']('INPUT:activemq_home', salt['pillar.get']('midagent_vars:activemq_home', '')) %}
+{% set kafka_home = salt['pillar.get']('INPUT:kafka_home', salt['pillar.get']('midagent_vars:kafka_home', '')) %}
+{% set msiis_home = salt['pillar.get']('INPUT:msiis_home', salt['pillar.get']('midagent_vars:msiis_home', '')) %}
 
 midagent_create_group:
    group.present:
@@ -197,6 +209,18 @@ midagent_create_config:
           {% endif %}
         update_interval_minutes: "{{update_interval_minutes}}"
         python_install_dir: "{{python_install_dir}}"
+        weblogic_home: "{{ weblogic_home }}"
+        ibmmq_home: "{{ ibmmq_home }}"
+        ibmace_home: "{{ ibmace_home }}"
+        ibmiib_home: "{{ ibmiib_home }}"
+        tomcat_home: "{{ tomcat_home }}"
+        jboss_home: "{{ jboss_home }}"
+        ibmwas_home: "{{ ibmwas_home }}"
+        rabbitmq_home: "{{ rabbitmq_home }}"
+        tibcoems_home: "{{ tibcoems_home }}"
+        activemq_home: "{{ activemq_home }}"
+        kafka_home: "{{ kafka_home }}"
+        msiis_home: "{{ msiis_home }}"
 {% endif %}
 
 midagent_secure_config:

@@ -1,9 +1,8 @@
 from modules.base import classes
 from modules.message_backup.provider import MessageBackupProvider
 
-
 class TibcoEmsMessageBackupProvider(MessageBackupProvider):
-    """TIBCO EMS receive scaffolding; wire Java/JMS collector when deployed."""
+                                                                               
 
     def __init__(self, job_cfg, broker_cfg):
         self.job_cfg = dict(job_cfg or {})

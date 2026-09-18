@@ -17,14 +17,12 @@ CORRELATION_HEADER_KEYS = (
     "traceparent",
 )
 
-
 def _utc_iso(value=None):
     if value is None:
         value = datetime.now(timezone.utc)
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
 
 def _safe_text(value):
     if value is None:
@@ -37,7 +35,6 @@ def _safe_text(value):
             return binascii.hexlify(raw).decode("ascii")
     return str(value).strip().replace("\u0000", "")
 
-
 def _json_safe(value):
     if isinstance(value, dict):
         return {_safe_text(k): _json_safe(v) for k, v in value.items()}
@@ -46,7 +43,6 @@ def _json_safe(value):
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     return _safe_text(value)
-
 
 def _header_lookup(headers, keys):
     if not isinstance(headers, dict):
@@ -59,7 +55,6 @@ def _header_lookup(headers, keys):
         if low in lowered and lowered[low] not in (None, ""):
             return _safe_text(lowered[low])
     return ""
-
 
 def extract_correlation_id(transport, raw, properties=None, headers=None, config=None):
     transport = _safe_text(transport).lower()
@@ -99,7 +94,6 @@ def extract_correlation_id(transport, raw, properties=None, headers=None, config
 
     return ""
 
-
 def apply_body_mode(body_mode, body_bytes):
     body_mode = _safe_text(body_mode).lower() or "none"
     if body_mode not in VALID_BODY_MODES:
@@ -122,7 +116,6 @@ def apply_body_mode(body_mode, body_bytes):
 
     return body_mode, body_value, digest
 
-
 def idempotency_key(envelope):
     agent_id = _safe_text(envelope.get("agent_id"))
     transport = _safe_text(envelope.get("transport"))
@@ -137,7 +130,6 @@ def idempotency_key(envelope):
     delivery = envelope.get("delivery_metadata") if isinstance(envelope.get("delivery_metadata"), dict) else {}
     delivery_json = json.dumps(delivery, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return "|".join([agent_id, transport, instance, source, correl, delivery_json])
-
 
 def build_envelope(
     transport,
@@ -193,12 +185,10 @@ def build_envelope(
     envelope["idempotency_key"] = idempotency_key(envelope)
     return envelope
 
-
 def envelope_for_submit(envelope):
     payload = dict(envelope)
     payload.pop("_raw_handle", None)
     return payload
-
 
 def log_fields(envelope, operation, result, error_code=""):
     return {

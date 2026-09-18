@@ -30,7 +30,7 @@ To update an existing Linux or z/OS USS agent without changing runtime configura
 salt-call -c saltconfig state.apply midagent.updateAgent
 ```
 
-The update state requires an existing `config/` directory and does not manage `config/`, `logs/`, `cronjobs.json`, `banned.json`, `mwagent.config`, `agent.identity`, or `crypto.secret`. It updates agent code, wrappers, modules, and runable scripts, then restarts the existing service or z/OS USS wrapper when files changed.
+The update state requires an existing `config/` directory and does not replace `logs/`, `cronjobs.json`, `banned.json`, `agent.identity`, or `crypto.secret`. It updates agent code, wrappers, modules, and runable scripts, then restarts the existing service or z/OS USS wrapper when files changed. For `mwagent.config` it only appends missing keys and leaves existing values unchanged, including `GROUPID`, `INTTOKEN`, `ALLOWED_COMMANDS`, `SRVUID`, and `MWADMIN`.
 
 ## Pillar Variables
 
@@ -42,12 +42,18 @@ Runtime input:
 - `INPUT:agent_bootstrap_token`: bootstrap token used only for first agent registration. Runtime requests use the per-agent identity saved during registration.
 - `INPUT:update_interval_minutes`: server inventory update interval.
 - `INPUT:install_pymqi`: optional, install `pymqi` on IBM MQ hosts only.
+- Product install homes default in `pillars/midagent_vars.sls` (`weblogic_home`, `ibmmq_home`, `ibmace_home`, `ibmiib_home`, `tomcat_home`, `jboss_home`, `ibmwas_home`, `rabbitmq_home`, `tibcoems_home`, `activemq_home`, `kafka_home`, `msiis_home`). Override per minion or via `INPUT:<name>_home` when a product is not in the default home.
 
 Static defaults are in `pillars/midagent_vars.sls`:
 
 - `agent_install_dir`: default `/var/midleoagent/`
 - `python_install_dir`: default `/usr/bin/python3`
 - `midleo_mwuser`: default `mwadmin`
+- `ibmmq_home`: default `/opt/mqm`
+- `ibmace_home`: default `/opt/ibm/ace-12/server`
+- `ibmiib_home`: default `/opt/ibm/iib-10.0.0.11/server`
+- `weblogic_home`: default `/opt/oracle/middleware`
+- `tomcat_home`, `jboss_home`, `ibmwas_home`, `rabbitmq_home`, `tibcoems_home`, `activemq_home`, `kafka_home`, `msiis_home`: default empty
 
 For z/OS USS, override the static defaults before applying the state:
 

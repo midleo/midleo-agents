@@ -10,7 +10,6 @@ OPTADVISOR_COLLECTOR_NAME = "ibmwas-adminclient-collector"
 OPTADVISOR_TECHNOLOGY = "ibmwas"
 OPTADVISOR_CONFIG_KEYS = {"appsrv", "appserver", "managed_server", "optadvisor_technology"}
 
-
 def _resource(resource_type, technical_key, name, status="unknown", metadata=None, metrics=None):
     return {
         "resource_type": resource_type,
@@ -21,17 +20,14 @@ def _resource(resource_type, technical_key, name, status="unknown", metadata=Non
         "metrics": metrics or [],
     }
 
-
 def _technology(config):
     value = common.safe_text(config.get("optadvisor_technology")).lower()
     if value in ("ibmwas", "liberty"):
         return value
     return OPTADVISOR_TECHNOLOGY
 
-
 def _appserver(config, thisnode):
     return config.get("appsrv") or config.get("appserver") or config.get("managed_server") or "*"
-
 
 def _load_java_json(command, label):
     try:
@@ -63,7 +59,6 @@ def _load_java_json(command, label):
         classes.Err(label + " optadvisor payload parse error:" + str(err))
         return None
 
-
 def _java_command(thisnode, values, config, jar_path, function):
     return [
         "java",
@@ -82,7 +77,6 @@ def _java_command(thisnode, values, config, jar_path, function):
             }
         ),
     ]
-
 
 def _build_from_results(thisnode, config, metrics_result=None, apps_result=None):
     technology = _technology(config)
@@ -147,13 +141,11 @@ def _build_from_results(thisnode, config, metrics_result=None, apps_result=None)
 
     return target, resources
 
-
 def _direct_optadvisor_result(result):
     if isinstance(result, dict) and result.get("error") != "yes" and isinstance(result.get("resources"), list):
         target = result.get("target") if isinstance(result.get("target"), dict) else {"status": "running"}
         return target, result.get("resources")
     return None, None
-
 
 def buildOptAdvisorPayload(thisnode, config, metrics_result=None, apps_result=None, collected_at=None):
     target, resources = _build_from_results(thisnode, config, metrics_result, apps_result)
@@ -167,7 +159,6 @@ def buildOptAdvisorPayload(thisnode, config, metrics_result=None, apps_result=No
         resources,
         collected_at,
     )
-
 
 def _collect_optadvisor(thisnode, config, values, jar_path):
     direct_result = _load_java_json(_java_command(thisnode, values, config, jar_path, "getoptadvisor"), "ibmwas")
@@ -193,7 +184,6 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
     if payload is not None:
         common.append_optadvisor_payload("ibmwas", thisnode, payload)
 
-
 def _ibmwas_rest_path(subtype):
     subtype = str(subtype or "").strip()
     if subtype.startswith("/"):
@@ -212,17 +202,14 @@ def _ibmwas_rest_path(subtype):
         return paths[subtype]
     return "/IBMJMXConnectorREST/mbeans/WebSphere:feature=kernel,name=ServerInfo/attributes"
 
-
 def _legacy_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 
 def _legacy_number(value):
     number = common.numeric_value(value)
     if number is None:
         return None
     return "{:,.2f}".format(float(number))
-
 
 def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
     formatted = _legacy_number(value)
@@ -236,7 +223,6 @@ def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
             f.write("key,server,timestamp,value\n")
         f.write(str(key) + "," + str(server) + "," + str(timestamp) + "," + formatted + "\n")
     return True
-
 
 def _ibmwas_attributes(payload):
     attrs = {}
@@ -265,7 +251,6 @@ def _ibmwas_attributes(payload):
     walk(payload)
     return attrs
 
-
 def _case_value(source, names):
     if not isinstance(source, dict):
         return None
@@ -277,7 +262,6 @@ def _case_value(source, names):
         if lowered in lower_map:
             return lower_map[lowered]
     return None
-
 
 def _write_ibmwas_rest_legacy(logdir, subtype, thisnode, payload):
     attrs = _ibmwas_attributes(payload)
@@ -295,7 +279,6 @@ def _write_ibmwas_rest_legacy(logdir, subtype, thisnode, payload):
         wrote = _write_legacy_stat_row(logdir, subtype, key, thisnode, timestamp, value) or wrote
     return wrote
 
-
 def _collect_rest_statistics(thisnode, values, metrics):
     base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "9443")
     for subtype, logdir in metrics.items():
@@ -305,7 +288,6 @@ def _collect_rest_statistics(thisnode, values, metrics):
                 common.write_numeric_tree(logdir, subtype, thisnode, payload)
         except Exception as err:
             classes.Err("ibmwas rest statistics error:" + str(err))
-
 
 def restAvailabilityCheck(thisnode, values):
     base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "9443")
@@ -322,7 +304,6 @@ def restAvailabilityCheck(thisnode, values):
     if isinstance(payload, dict) and (payload.get("value") or payload.get("Name") or payload.get("attributes")):
         return 1
     return 0
-
 
 def getStat(thisqm, inpdata):
     try:
@@ -383,7 +364,6 @@ def getStat(thisqm, inpdata):
 
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in ibmwas statistics:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = common.split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {}, OPTADVISOR_CONFIG_KEYS)

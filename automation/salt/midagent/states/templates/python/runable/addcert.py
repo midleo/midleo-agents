@@ -11,7 +11,6 @@ from modules.base import decrypt, configs
 
 ALLOWED_TOOLS = {"keytool", "runmqakm"}
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]

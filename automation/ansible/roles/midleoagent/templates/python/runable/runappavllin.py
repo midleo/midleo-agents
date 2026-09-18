@@ -21,7 +21,6 @@ AVL_TIMEOUT_SECONDS = int(
 now = datetime.now()
 current_time = now.strftime("%Y-%m-%d %H:%M:%S")
 
-
 def _credentials(item):
     cred = {}
     if item.get("usr"):
@@ -49,7 +48,6 @@ def _credentials(item):
             cred[key] = item[key]
     return cred
 
-
 def _availability_module_name(srvtype):
     srvtype = str(srvtype or "").strip().lower()
     if srvtype == "wildfly":
@@ -57,7 +55,6 @@ def _availability_module_name(srvtype):
     if srvtype == "ibmacedocker":
         return "ibmace"
     return srvtype
-
 
 def _rest_availability_count(srvtype, appsrv, cred):
     module_name = _availability_module_name(srvtype)
@@ -74,7 +71,6 @@ def _rest_availability_count(srvtype, appsrv, cred):
         classes.Err("rest availability error:" + str(srvtype) + "/" + str(appsrv) + ":" + str(err))
         return 0
 
-
 def _availability_count(srvtype, appsrv, item):
     cred = _credentials(item)
     rest_type = str(srvtype).strip().lower()
@@ -88,7 +84,6 @@ def _availability_count(srvtype, appsrv, item):
         classes.Err("avlCheck unsupported type:" + str(srvtype))
         return None
     return _run_avl_command(command)
-
 
 def _run_avl_command(command):
     proc = subprocess.run(
@@ -106,7 +101,6 @@ def _run_avl_command(command):
         classes.Err("avlCheck unexpected output:" + output[:500])
         return 0
 
-
 def _send_offline_alert(webssl, website, uid, srvtype, appsrv, item):
     if "monid" not in item:
         return
@@ -120,7 +114,6 @@ def _send_offline_alert(webssl, website, uid, srvtype, appsrv, item):
         "alerttime": current_time,
     }
     makerequest.postMonAl(webssl, website, json.dumps(req))
-
 
 try:
     avl_data = configs.getAvlData()

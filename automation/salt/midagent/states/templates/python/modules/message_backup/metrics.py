@@ -23,21 +23,17 @@ _LOCK = threading.Lock()
 _METRICS_FILE = os.path.join(os.getcwd(), "config", "message_backup_metrics.json")
 _LAST_FLUSH = None
 
-
 def increment(name, amount=1):
     with _LOCK:
         _COUNTERS[name] = int(_COUNTERS.get(name, 0)) + int(amount)
-
 
 def set_gauge(name, value):
     with _LOCK:
         _COUNTERS[name] = int(value)
 
-
 def snapshot():
     with _LOCK:
         return dict(_COUNTERS)
-
 
 def flush():
     global _LAST_FLUSH

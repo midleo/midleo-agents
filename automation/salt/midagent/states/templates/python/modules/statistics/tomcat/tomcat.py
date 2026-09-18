@@ -9,7 +9,6 @@ from modules.statistics import common
 OPTADVISOR_COLLECTOR_NAME = "tomcat-jmx-collector"
 OPTADVISOR_TECHNOLOGY = "tomcat"
 
-
 def _resource(resource_type, technical_key, name, status="unknown", metadata=None, metrics=None):
     return {
         "resource_type": resource_type,
@@ -19,7 +18,6 @@ def _resource(resource_type, technical_key, name, status="unknown", metadata=Non
         "metadata": metadata or {},
         "metrics": metrics or [],
     }
-
 
 def _load_java_json(command, label):
     try:
@@ -52,7 +50,6 @@ def _load_java_json(command, label):
         classes.Err(label + " optadvisor payload parse error:" + str(err))
         return None
 
-
 def _java_command(thisnode, values, jar_path, function):
     return [
         "java",
@@ -69,7 +66,6 @@ def _java_command(thisnode, values, jar_path, function):
             }
         ),
     ]
-
 
 def _build_from_results(thisnode, metrics_result=None, datasources_result=None, apps_result=None):
     resources = []
@@ -149,13 +145,11 @@ def _build_from_results(thisnode, metrics_result=None, datasources_result=None, 
 
     return target, resources
 
-
 def _direct_optadvisor_result(result):
     if isinstance(result, dict) and result.get("error") != "yes" and isinstance(result.get("resources"), list):
         target = result.get("target") if isinstance(result.get("target"), dict) else {"status": "running"}
         return target, result.get("resources")
     return None, None
-
 
 def buildOptAdvisorPayload(thisnode, config, metrics_result=None, datasources_result=None, apps_result=None, collected_at=None):
     target, resources = _build_from_results(thisnode, metrics_result, datasources_result, apps_result)
@@ -169,7 +163,6 @@ def buildOptAdvisorPayload(thisnode, config, metrics_result=None, datasources_re
         resources,
         collected_at,
     )
-
 
 def _collect_optadvisor(thisnode, config, values, jar_path):
     direct_result = _load_java_json(_java_command(thisnode, values, jar_path, "getoptadvisor"), "tomcat")
@@ -195,7 +188,6 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
     payload = buildOptAdvisorPayload(thisnode, config, metrics_result, datasources_result, apps_result, common.utc_now())
     if payload is not None:
         common.append_optadvisor_payload("tomcat", thisnode, payload)
-
 
 TOMCAT_REST_LEGACY_FIELDS = {
     "ThreadPoolCurrentBusy": ("connector_thread", ("currentThreadsBusy", "current_threads_busy")),
@@ -223,17 +215,14 @@ TOMCAT_REST_LEGACY_FIELDS = {
     "OSFreePhysicalMemory": ("os", ("freePhysicalMemorySize", "free_physical_memory")),
 }
 
-
 def _legacy_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 
 def _legacy_number(value):
     number = common.numeric_value(value)
     if number is None:
         return None
     return str(int(number)) if float(number).is_integer() else str(number)
-
 
 def _case_value(source, names):
     if not isinstance(source, dict):
@@ -247,20 +236,17 @@ def _case_value(source, names):
             return lower_map[lowered]
     return None
 
-
 def _tomcat_payload_root(payload):
     if not isinstance(payload, dict):
         return {}
     tomcat = payload.get("tomcat")
     return tomcat if isinstance(tomcat, dict) else payload
 
-
 def _tomcat_connectors(root):
     connectors = root.get("connectors") if isinstance(root, dict) else []
     if isinstance(connectors, dict):
         return list(connectors.values())
     return connectors if isinstance(connectors, list) else []
-
 
 def _connector_section(root, section):
     for connector in _tomcat_connectors(root):
@@ -270,7 +256,6 @@ def _connector_section(root, section):
         if isinstance(value, dict):
             return value
     return {}
-
 
 def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
     formatted = _legacy_number(value)
@@ -285,7 +270,6 @@ def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
         f.write(str(key) + "," + str(server) + "," + str(timestamp) + "," + formatted + "\n")
     return True
 
-
 def _write_tomcat_memory_usage(logdir, subtype, thisnode, root):
     jvm = root.get("jvm") if isinstance(root, dict) and isinstance(root.get("jvm"), dict) else {}
     free_memory = common.numeric_value(_case_value(jvm, ("freeMemory", "free_memory")))
@@ -299,7 +283,6 @@ def _write_tomcat_memory_usage(logdir, subtype, thisnode, root):
     if max_memory is not None:
         wrote = _write_legacy_stat_row(logdir, subtype, "max_mb", thisnode, timestamp, max_memory / 1048576) or wrote
     return wrote
-
 
 def _write_tomcat_rest_legacy(logdir, subtype, thisnode, payload):
     root = _tomcat_payload_root(payload)
@@ -319,7 +302,6 @@ def _write_tomcat_rest_legacy(logdir, subtype, thisnode, payload):
     value = _case_value(source, field_names)
     return _write_legacy_stat_row(logdir, subtype, subtype, thisnode, _legacy_timestamp(), value)
 
-
 def _collect_rest_statistics(thisnode, values, metrics):
     base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "8080")
     cache = {}
@@ -335,7 +317,6 @@ def _collect_rest_statistics(thisnode, values, metrics):
         except Exception as err:
             classes.Err("tomcat rest statistics error:" + str(err))
 
-
 def restAvailabilityCheck(thisnode, values):
     base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "8080")
     try:
@@ -346,7 +327,6 @@ def restAvailabilityCheck(thisnode, values):
     if isinstance(tomcat, dict) and (tomcat.get("jvm") or tomcat.get("serverInfo")):
         return 1
     return 0
-
 
 def getStat(thisqm, inpdata):
     try:
@@ -406,7 +386,6 @@ def getStat(thisqm, inpdata):
 
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in tomcat statistics:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = common.split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {})

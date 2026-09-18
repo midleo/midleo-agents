@@ -18,7 +18,6 @@ KAFKA_CONFIG_KEYS = {
     "bootstrap_servers",
 }
 
-
 def _resource(resource_type, technical_key, name, status="unknown", metadata=None, metrics=None):
     return {
         "resource_type": resource_type,
@@ -28,7 +27,6 @@ def _resource(resource_type, technical_key, name, status="unknown", metadata=Non
         "metadata": metadata or {},
         "metrics": metrics or [],
     }
-
 
 def _load_java_json(command, label):
     try:
@@ -60,7 +58,6 @@ def _load_java_json(command, label):
         classes.Err(label + " optadvisor payload parse error:" + str(err))
         return None
 
-
 def _java_command(thisnode, values, jar_path, function):
     payload = {
         "server": thisnode,
@@ -87,7 +84,6 @@ def _java_command(thisnode, values, jar_path, function):
         "midleo_kafka.kafka_main",
         json.dumps(payload),
     ]
-
 
 def _build_from_results(thisnode, srvinfo=None, topics=None):
     resources = []
@@ -133,13 +129,11 @@ def _build_from_results(thisnode, srvinfo=None, topics=None):
 
     return target, resources
 
-
 def _direct_optadvisor_result(result):
     if isinstance(result, dict) and result.get("error") != "yes" and isinstance(result.get("resources"), list):
         target = result.get("target") if isinstance(result.get("target"), dict) else {"status": "running"}
         return target, result.get("resources")
     return None, None
-
 
 def buildOptAdvisorPayload(thisnode, config, srvinfo=None, topics=None, collected_at=None):
     target, resources = _build_from_results(thisnode, srvinfo, topics)
@@ -153,7 +147,6 @@ def buildOptAdvisorPayload(thisnode, config, srvinfo=None, topics=None, collecte
         resources,
         collected_at,
     )
-
 
 def _collect_optadvisor(thisnode, config, values, jar_path):
     direct_result = _load_java_json(_java_command(thisnode, values, jar_path, "getoptadvisor"), "kafka")
@@ -178,7 +171,6 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
     payload = buildOptAdvisorPayload(thisnode, config, srvinfo, topics, common.utc_now())
     if payload is not None:
         common.append_optadvisor_payload("kafka", thisnode, payload)
-
 
 def getStat(thisqm, inpdata):
     try:
@@ -240,7 +232,6 @@ def getStat(thisqm, inpdata):
 
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in kafka statistics:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = common.split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {}, KAFKA_CONFIG_KEYS)

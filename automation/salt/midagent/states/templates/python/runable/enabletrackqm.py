@@ -8,7 +8,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import configs
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]
@@ -19,7 +18,6 @@ def _arg(index, name):
         raise ValueError("Empty required argument: " + name)
     return value
 
-
 def createTrackJson():
     qmgr = _arg(1, "QMGR")
     track_data = configs.gettrackData()
@@ -28,7 +26,6 @@ def createTrackJson():
     }
     configs.savetrackData(track_data)
     print(qmgr + " have been added")
-
 
 if __name__ == "__main__":
     createTrackJson()

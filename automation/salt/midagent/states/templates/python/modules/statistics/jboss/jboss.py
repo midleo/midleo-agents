@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from modules.base import classes, makerequest
 from modules.statistics import common
 
-
 OPTADVISOR_SCHEMA_VERSION = "1.0"
 OPTADVISOR_COLLECTOR_NAME = "jboss-wildfly-management-collector"
 OPTADVISOR_COLLECTOR_VERSION = "1.0.0"
@@ -26,10 +25,8 @@ OPTADVISOR_CONFIG_KEYS = {
     "srvid",
 }
 
-
 def _utc_now():
     return datetime.now(timezone.utc).replace(microsecond=0)
-
 
 def _iso_utc(value):
     if value is None:
@@ -38,16 +35,13 @@ def _iso_utc(value):
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-
 def _truthy(value):
     return str(value).strip().lower() in ("1", "y", "yes", "true", "on", "enabled")
-
 
 def _safe_text(value):
     if value is None:
         return ""
     return str(value).strip().replace("\u0000", "")
-
 
 def _optadvisor_enabled(config):
     return _truthy(
@@ -55,7 +49,6 @@ def _optadvisor_enabled(config):
         or config.get("optadvisor_enabled")
         or config.get("optimization_advisor")
     )
-
 
 def _split_optadvisor_config(data):
     config = {}
@@ -65,13 +58,11 @@ def _split_optadvisor_config(data):
             config[key] = metrics.pop(key)
     return config, metrics
 
-
 def _technology(config):
     value = _safe_text(config.get("optadvisor_technology")).lower()
     if value in ("jboss", "wildfly"):
         return value
     return OPTADVISOR_DEFAULT_TECHNOLOGY
-
 
 def _get_server_id(config, thisnode):
     return (
@@ -82,16 +73,13 @@ def _get_server_id(config, thisnode):
         or thisnode
     )
 
-
 def _optadvisor_log_path(thisnode):
     return os.path.join(os.getcwd(), "logs", "jboss_" + str(thisnode) + "_optadvisor.jsonl")
-
 
 def _append_optadvisor_payload(thisnode, payload):
     os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
     with open(_optadvisor_log_path(thisnode), "a", encoding="utf-8") as f:
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
-
 
 def _java_payload_line(stdout):
     lines = [line.strip() for line in str(stdout or "").splitlines() if line.strip()]
@@ -99,7 +87,6 @@ def _java_payload_line(stdout):
         if line.startswith("{") and line.endswith("}"):
             return line
     return ""
-
 
 def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
     if not _optadvisor_enabled(config):
@@ -132,7 +119,6 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
         "target": java_result.get("target", {}),
         "resources": resources,
     }
-
 
 def _collect_optadvisor(thisnode, config, values, jar_path):
     java_arg = json.dumps(
@@ -185,7 +171,6 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("jboss optadvisor payload parse error:" + str(err))
 
-
 def _management_address(value):
     text = str(value or "").strip()
     if not text.startswith("/"):
@@ -198,7 +183,6 @@ def _management_address(value):
         if key and val:
             address.append({key: val})
     return address
-
 
 JBOSS_REST_SIMPLE_FIELDS = {
     "Threading": ("/core-service=platform-mbean/type=threading", ("thread-count", "ThreadCount")),
@@ -221,7 +205,6 @@ JBOSS_REST_SIMPLE_FIELDS = {
     "G1OldGenCollectionTime": ("/core-service=platform-mbean/type=garbage-collector/name=G1 Old Generation", ("collection-time", "CollectionTime")),
 }
 
-
 def _rest_address_for_subtype(subtype):
     if str(subtype).startswith("/"):
         return subtype
@@ -230,17 +213,14 @@ def _rest_address_for_subtype(subtype):
     config = JBOSS_REST_SIMPLE_FIELDS.get(str(subtype))
     return config[0] if config else ""
 
-
 def _legacy_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 
 def _legacy_number(value):
     number = common.numeric_value(value)
     if number is None:
         return None
     return str(int(number)) if float(number).is_integer() else str(number)
-
 
 def _case_value(source, names):
     if not isinstance(source, dict):
@@ -253,7 +233,6 @@ def _case_value(source, names):
         if lowered in lower_map:
             return lower_map[lowered]
     return None
-
 
 def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
     formatted = _legacy_number(value)
@@ -268,7 +247,6 @@ def _write_legacy_stat_row(logdir, subtype, key, server, timestamp, value):
         f.write(str(key) + "," + str(server) + "," + str(timestamp) + "," + formatted + "\n")
     return True
 
-
 def _write_jboss_memory_usage(logdir, subtype, thisnode, result):
     field = "heap-memory-usage" if str(subtype) == "MemoryHeapMemoryUsage" else "non-heap-memory-usage"
     usage = result.get(field) if isinstance(result, dict) and isinstance(result.get(field), dict) else {}
@@ -281,7 +259,6 @@ def _write_jboss_memory_usage(logdir, subtype, thisnode, result):
         wrote = _write_legacy_stat_row(logdir, subtype, key + "_mb", thisnode, timestamp, value / 1048576) or wrote
     return wrote
 
-
 def _write_jboss_rest_legacy(logdir, subtype, thisnode, payload):
     result = payload.get("result") if isinstance(payload, dict) and isinstance(payload.get("result"), dict) else {}
     if str(subtype) in ("MemoryHeapMemoryUsage", "MemoryNonHeapMemoryUsage"):
@@ -291,7 +268,6 @@ def _write_jboss_rest_legacy(logdir, subtype, thisnode, payload):
         return False
     value = _case_value(result, config[1])
     return _write_legacy_stat_row(logdir, subtype, subtype, thisnode, _legacy_timestamp(), value)
-
 
 def _collect_rest_statistics(thisnode, values, metrics):
     base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "9990")
@@ -318,7 +294,6 @@ def _collect_rest_statistics(thisnode, values, metrics):
         except Exception as err:
             classes.Err("jboss rest statistics error:" + str(err))
 
-
 def restAvailabilityCheck(thisnode, values):
     base_url, _ = common.rest_base_url(thisnode, values, values.get("port") or "9990")
     try:
@@ -337,7 +312,6 @@ def restAvailabilityCheck(thisnode, values):
         return 0
     state = result.get("server-state") or result.get("state") or result.get("status")
     return 1 if common.safe_text(state).lower() == "running" else 0
-
 
 def getStat(thisqm, inpdata):
     try:
@@ -398,7 +372,6 @@ def getStat(thisqm, inpdata):
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in jboss statistics:" + str(err))
 
-
 def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata):
     if not isinstance(thisdata, dict):
         return
@@ -432,7 +405,6 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata)
             f.writelines(remaining)
     except OSError as err:
         classes.Err("jboss optadvisor file error:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = _split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {})

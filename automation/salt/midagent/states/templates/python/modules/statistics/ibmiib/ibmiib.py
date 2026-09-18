@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from modules.base import classes, makerequest
 from modules.statistics import common
 
-
 OPTADVISOR_SCHEMA_VERSION = "1.0"
 OPTADVISOR_COLLECTOR_NAME = "ibmiib-integration-api-collector"
 OPTADVISOR_COLLECTOR_VERSION = "1.0.0"
@@ -37,10 +36,8 @@ OPTADVISOR_CONFIG_KEYS = {
     "optadvisor_monitoring_mode",
 }
 
-
 def _utc_now():
     return datetime.now(timezone.utc).replace(microsecond=0)
-
 
 def _iso_utc(value):
     if value is None:
@@ -49,16 +46,13 @@ def _iso_utc(value):
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-
 def _truthy(value):
     return str(value).strip().lower() in ("1", "y", "yes", "true", "on", "enabled")
-
 
 def _safe_text(value):
     if value is None:
         return ""
     return str(value).strip().replace("\u0000", "")
-
 
 def _optadvisor_enabled(config):
     return _truthy(
@@ -67,7 +61,6 @@ def _optadvisor_enabled(config):
         or config.get("optimization_advisor")
     )
 
-
 def _split_optadvisor_config(data):
     config = {}
     metrics = dict(data)
@@ -75,7 +68,6 @@ def _split_optadvisor_config(data):
         if key in OPTADVISOR_CONFIG_KEYS or str(key).startswith("optadvisor_"):
             config[key] = metrics.pop(key)
     return config, metrics
-
 
 def _get_server_id(config, thisnode):
     return (
@@ -86,10 +78,8 @@ def _get_server_id(config, thisnode):
         or thisnode
     )
 
-
 def _optadvisor_log_path(thisnode):
     return os.path.join(os.getcwd(), "logs", "ibmiib_" + str(thisnode) + "_optadvisor.jsonl")
-
 
 def _append_optadvisor_payload(thisnode, payload):
     os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
@@ -98,14 +88,12 @@ def _append_optadvisor_payload(thisnode, payload):
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
     classes.Err("ibmiib optadvisor payload queued:" + file)
 
-
 def _java_payload_line(stdout):
     lines = [line.strip() for line in str(stdout or "").splitlines() if line.strip()]
     for line in reversed(lines):
         if line.startswith("{") and line.endswith("}"):
             return line
     return ""
-
 
 def _java_result_error(java_result):
     if not isinstance(java_result, dict):
@@ -119,7 +107,6 @@ def _java_result_error(java_result):
         or "unknown error"
     )
     return _safe_text(message)[:common.MAX_LOG_BYTES]
-
 
 def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
     if not _optadvisor_enabled(config):
@@ -156,7 +143,6 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
     }
     return payload
 
-
 def _execution_group_filter(thisnode, config, values):
     explicit = _safe_text(values.get("execution_group") or config.get("execution_group"))
     if explicit:
@@ -167,7 +153,6 @@ def _execution_group_filter(thisnode, config, values):
         return candidate
 
     return ""
-
 
 def _java_arg(thisnode, config, values):
     return json.dumps(
@@ -183,7 +168,6 @@ def _java_arg(thisnode, config, values):
         }
     )
 
-
 def _java_classpath(jar_path):
     return (
         "/midleolibs/vendor/bipbroker.jar:"
@@ -193,13 +177,11 @@ def _java_classpath(jar_path):
         + jar_path
     )
 
-
 def _java_env():
     env = os.environ.copy()
     env["LANG"] = "C"
     env["LC_ALL"] = "C"
     return env
-
 
 def _collect_optadvisor(thisnode, config, values, jar_path):
     classes.Err("ibmiib optadvisor java start:" + str(thisnode))
@@ -248,7 +230,6 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("ibmiib optadvisor payload parse error:" + str(err))
 
-
 def getStat(thisqm, inpdata):
     try:
         inpdata = common.parse_json_object(inpdata)
@@ -294,7 +275,6 @@ def getStat(thisqm, inpdata):
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in ibmiib statistics:" + str(err))
 
-
 def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata):
     if not isinstance(thisdata, dict):
         return
@@ -333,7 +313,6 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata)
             f.writelines(remaining)
     except OSError as err:
         classes.Err("ibmiib optadvisor file error:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, stat_data)

@@ -42,7 +42,6 @@ _BROKER_JOB_KEYS = frozenset({
     "conntype",
 })
 
-
 def _load_provider(transport, job_cfg, broker_cfg):
     path = _PROVIDER_MAP.get(str(transport).lower())
     if not path:
@@ -52,7 +51,6 @@ def _load_provider(transport, job_cfg, broker_cfg):
     provider_cls = getattr(module, class_name)
     return provider_cls(job_cfg, broker_cfg)
 
-
 def _log_envelope(envelope_data, operation, result, error_code=""):
     level = "DEBUG" if result in ("persisted", "duplicate") else "WARNING"
     if not classes.log_enabled(level):
@@ -60,15 +58,12 @@ def _log_envelope(envelope_data, operation, result, error_code=""):
     fields = envelope.log_fields(envelope_data, operation, result, error_code)
     classes.Log(json_safe(fields), level, "message_backup")
 
-
 def json_safe(data):
     return json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-
 
 def _root_config(config_data):
     config_data = config_data if isinstance(config_data, dict) else {}
     return config_data.get("message_backup") if isinstance(config_data.get("message_backup"), dict) else config_data
-
 
 def _as_bool(value, default=False):
     if isinstance(value, bool):
@@ -77,13 +72,10 @@ def _as_bool(value, default=False):
         return default
     return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
 
-
 def _is_enabled(data, default=True):
     return _as_bool(data.get("enabled"), default) if isinstance(data, dict) else default
 
-
 _DEFAULT_BATCH_SIZE = 50
-
 
 def _batch_size(backend_cfg, ceiling=None, job_cfg=None):
     backend_cfg = backend_cfg if isinstance(backend_cfg, dict) else {}
@@ -100,11 +92,9 @@ def _batch_size(backend_cfg, ceiling=None, job_cfg=None):
         size = min(size, max(1, int(ceiling)))
     return size
 
-
 def _job_label(index, job):
     name = job.get("name") if isinstance(job, dict) else ""
     return str(name or ("job[" + str(index) + "]"))
-
 
 def _valid_int(value, minimum, maximum):
     try:
@@ -112,7 +102,6 @@ def _valid_int(value, minimum, maximum):
     except Exception:
         return False
     return minimum <= parsed <= maximum
-
 
 def validate_config(config_data):
     root = _root_config(config_data)
@@ -183,7 +172,6 @@ def validate_config(config_data):
 
     return errors
 
-
 def _process_job(job, global_cfg, outbox):
     if not isinstance(job, dict) or not _is_enabled(job, True):
         return
@@ -239,7 +227,6 @@ def _process_job(job, global_cfg, outbox):
             except Exception:
                 pass
 
-
 def _submit_batch(items, provider, outbox, backend_cfg, ack_after, requeue):
     if not items:
         return
@@ -280,7 +267,6 @@ def _submit_batch(items, provider, outbox, backend_cfg, ack_after, requeue):
     summary.update(counts)
     classes.Log(json_safe(summary), "WARNING" if counts["temporary_failure"] or counts["rejected"] else "INFO", "message_backup")
 
-
 def _resolve_broker_config(transport, job, root=None):
     instance = str(job.get("middleware_instance") or "")
     broker_cfg = {}
@@ -308,7 +294,6 @@ def _resolve_broker_config(transport, job, root=None):
             broker_cfg[key] = job[key]
     return broker_cfg
 
-
 def flush_outbox(global_cfg, outbox):
     backend = global_cfg.get("backend") if isinstance(global_cfg.get("backend"), dict) else {}
     retry = backend.get("retry") if isinstance(backend.get("retry"), dict) else {}
@@ -329,7 +314,6 @@ def flush_outbox(global_cfg, outbox):
             delay = min(initial_delay * (2 ** min(30, max(0, int(record.get("retry_count", 0))))), int(retry.get("max_delay_ms", 60000) / 1000))
             outbox.mark_retry(record, status, delay)
             metrics.increment("message_backup_outbox_retry_count")
-
 
 def run_once(config_data=None):
     config_data = config_data if isinstance(config_data, dict) else configs.getMessageBackupData()

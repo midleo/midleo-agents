@@ -13,10 +13,8 @@ except Exception as PSUTIL_IMPORT_ERROR:
 
 from modules.base import classes
 
-
 def _log_error(err, function_name):
     classes.Err("Exception:" + str(err) + " at " + function_name + "()")
-
 
 def _psutil_available(function_name):
     if psutil is not None:
@@ -24,10 +22,8 @@ def _psutil_available(function_name):
     classes.Err("Exception:psutil is not available:" + str(PSUTIL_IMPORT_ERROR) + " at " + function_name + "()")
     return False
 
-
 def _namedtuple_to_dict(value):
     return {field: getattr(value, field) for field in getattr(value, "_fields", ())}
-
 
 def _addr_to_dict(addr):
     if not addr:
@@ -40,7 +36,6 @@ def _addr_to_dict(addr):
             "port": addr[1] if len(addr) > 1 else "",
         }
     return {"addr": str(addr)}
-
 
 def _link_families():
     families = set()

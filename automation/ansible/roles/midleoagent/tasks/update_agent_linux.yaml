@@ -11,6 +11,12 @@
     state: stopped
     enabled: yes
 
+- name: "Stop Midleo action service before update"
+  service:
+    name: midleoactions
+    state: stopped
+    enabled: yes
+
 - name: "Check existing Midleo config directory"
   stat:
     path: "{{ agent_install_dir }}config"
@@ -119,6 +125,9 @@
     - "'__pycache__' not in item.path"
     - not (item.path | regex_search('\\.pyc$'))
 
+- name: "Merge missing keys into existing mwagent.config"
+  include_tasks: merge_mwagent_config.yaml
+
 - name: "Reload systemd after unit update"
   systemd:
     daemon_reload: yes
@@ -126,12 +135,12 @@
 - name: "Start Midleo agent service after update"
   service:
     name: midleoagent
-    state: restarted
+    state: started
     enabled: yes
 
 - name: "Start Midleo action service after update"
   service:
     name: midleoactions
-    state: restarted
+    state: started
     enabled: yes
 ...

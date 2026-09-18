@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from modules.base import classes, makerequest
 from modules.statistics import common
 
-
 OPTADVISOR_SCHEMA_VERSION = "1.0"
 OPTADVISOR_COLLECTOR_NAME = "tibcoems-admin-collector"
 OPTADVISOR_COLLECTOR_VERSION = "1.0.0"
@@ -37,10 +36,8 @@ OPTADVISOR_CONFIG_KEYS = {
     "sslcipher",
 }
 
-
 def _utc_now():
     return datetime.now(timezone.utc).replace(microsecond=0)
-
 
 def _iso_utc(value):
     if value is None:
@@ -49,16 +46,13 @@ def _iso_utc(value):
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-
 def _truthy(value):
     return str(value).strip().lower() in ("1", "y", "yes", "true", "on", "enabled")
-
 
 def _safe_text(value):
     if value is None:
         return ""
     return str(value).strip().replace("\u0000", "")
-
 
 def _optadvisor_enabled(config):
     return _truthy(
@@ -67,7 +61,6 @@ def _optadvisor_enabled(config):
         or config.get("optimization_advisor")
     )
 
-
 def _split_optadvisor_config(data):
     config = {}
     metrics = dict(data)
@@ -75,7 +68,6 @@ def _split_optadvisor_config(data):
         if key in OPTADVISOR_CONFIG_KEYS or str(key).startswith("optadvisor_"):
             config[key] = metrics.pop(key)
     return config, metrics
-
 
 def _get_server_id(config, thisnode):
     return (
@@ -86,16 +78,13 @@ def _get_server_id(config, thisnode):
         or thisnode
     )
 
-
 def _optadvisor_log_path(thisnode):
     return os.path.join(os.getcwd(), "logs", "tibcoems_" + str(thisnode) + "_optadvisor.jsonl")
-
 
 def _append_optadvisor_payload(thisnode, payload):
     os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
     with open(_optadvisor_log_path(thisnode), "a", encoding="utf-8") as f:
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
-
 
 def _java_payload_line(stdout):
     lines = [line.strip() for line in str(stdout or "").splitlines() if line.strip()]
@@ -103,7 +92,6 @@ def _java_payload_line(stdout):
         if line.startswith("{") and line.endswith("}"):
             return line
     return ""
-
 
 def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
     if not _optadvisor_enabled(config):
@@ -137,13 +125,11 @@ def buildOptAdvisorPayload(thisnode, config, java_result, collected_at=None):
         "resources": resources,
     }
 
-
 def _int_limit(value):
     try:
         return max(1, min(240, int(value)))
     except Exception:
         return 200
-
 
 def _java_arg(thisnode, config, values):
     host = values.get("tibcosrv") or values.get("host") or config.get("tibcosrv") or config.get("host") or thisnode
@@ -168,7 +154,6 @@ def _java_arg(thisnode, config, values):
     if sslcipher:
         payload["sslcipher"] = sslcipher
     return json.dumps(payload)
-
 
 def _collect_optadvisor(thisnode, config, values, jar_path):
     command = [
@@ -213,7 +198,6 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("tibcoems optadvisor payload parse error:" + str(err))
 
-
 def getStat(thisnode, inpdata):
     try:
         inpdata = common.parse_json_object(inpdata)
@@ -249,7 +233,6 @@ def getStat(thisnode, inpdata):
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in tibcoems statistics:" + str(err))
 
-
 def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata):
     if not isinstance(thisdata, dict):
         return
@@ -283,7 +266,6 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata)
             f.writelines(remaining)
     except OSError as err:
         classes.Err("tibcoems optadvisor file error:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, stat_data)

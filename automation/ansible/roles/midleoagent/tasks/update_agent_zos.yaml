@@ -103,6 +103,9 @@
     - "'__pycache__' not in item.path"
     - not (item.path | regex_search('\\.pyc$'))
 
+- name: "Merge missing keys into existing mwagent.config"
+  include_tasks: merge_mwagent_config.yaml
+
 - name: "Restart z/OS USS Midleo wrapper after update"
   shell: "{{ agent_install_dir }}midleoagent.zos.sh restart"
   args:

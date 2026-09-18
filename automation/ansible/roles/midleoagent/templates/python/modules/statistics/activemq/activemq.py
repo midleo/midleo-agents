@@ -9,7 +9,6 @@ OPTADVISOR_COLLECTOR_NAME = "activemq-jmx-collector"
 OPTADVISOR_TECHNOLOGY = "activemq"
 ACTIVEMQ_CONFIG_KEYS = {"broker", "jmxport"}
 
-
 def _resource(resource_type, technical_key, name, status="unknown", metadata=None, metrics=None):
     return {
         "resource_type": resource_type,
@@ -20,10 +19,8 @@ def _resource(resource_type, technical_key, name, status="unknown", metadata=Non
         "metrics": metrics or [],
     }
 
-
 def _broker_name(config, thisnode):
     return config.get("broker") or thisnode
-
 
 def _load_java_json(command, label):
     try:
@@ -55,7 +52,6 @@ def _load_java_json(command, label):
         classes.Err(label + " optadvisor payload parse error:" + str(err))
         return None
 
-
 def _java_command(thisnode, values, config, jar_path, function):
     return [
         "java",
@@ -73,7 +69,6 @@ def _java_command(thisnode, values, config, jar_path, function):
             }
         ),
     ]
-
 
 def _build_from_results(thisnode, config, srvinfo=None, queues=None, topics=None, connections=None):
     resources = []
@@ -128,13 +123,11 @@ def _build_from_results(thisnode, config, srvinfo=None, queues=None, topics=None
 
     return target, resources
 
-
 def _direct_optadvisor_result(result):
     if isinstance(result, dict) and result.get("error") != "yes" and isinstance(result.get("resources"), list):
         target = result.get("target") if isinstance(result.get("target"), dict) else {"status": "running"}
         return target, result.get("resources")
     return None, None
-
 
 def buildOptAdvisorPayload(thisnode, config, srvinfo=None, queues=None, topics=None, connections=None, collected_at=None):
     target, resources = _build_from_results(thisnode, config, srvinfo, queues, topics, connections)
@@ -148,7 +141,6 @@ def buildOptAdvisorPayload(thisnode, config, srvinfo=None, queues=None, topics=N
         resources,
         collected_at,
     )
-
 
 def _collect_optadvisor(thisnode, config, values, jar_path):
     direct_result = _load_java_json(_java_command(thisnode, values, config, jar_path, "getoptadvisor"), "activemq")
@@ -175,7 +167,6 @@ def _collect_optadvisor(thisnode, config, values, jar_path):
     payload = buildOptAdvisorPayload(thisnode, config, srvinfo, queues, topics, connections, common.utc_now())
     if payload is not None:
         common.append_optadvisor_payload("activemq", thisnode, payload)
-
 
 def getStat(thisqm, inpdata):
     try:
@@ -219,7 +210,6 @@ def getStat(thisqm, inpdata):
 
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in activemq statistics:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     _, legacy_stat_data = common.split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {}, ACTIVEMQ_CONFIG_KEYS)

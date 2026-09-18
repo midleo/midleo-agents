@@ -15,7 +15,6 @@ from modules.statistics import common
 
 MODULE_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 
-
 try:
     lock = None
     runtime_status = common.optadvisor_runtime_status()

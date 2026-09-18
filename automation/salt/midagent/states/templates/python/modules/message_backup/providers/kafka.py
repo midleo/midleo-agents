@@ -11,7 +11,6 @@ except ImportError:
     TopicPartition = None
     OffsetAndMetadata = None
 
-
 class KafkaMessageBackupProvider(MessageBackupProvider):
     def __init__(self, job_cfg, broker_cfg):
         self.job_cfg = dict(job_cfg or {})
@@ -106,7 +105,6 @@ class KafkaMessageBackupProvider(MessageBackupProvider):
                 classes.Err("kafka message_backup close:" + str(err))
             self.consumer = None
 
-
 def _record_handle(message, pending):
     if isinstance(message, dict):
         raw = message.get("_raw_handle") if isinstance(message.get("_raw_handle"), dict) else message.get("raw")
@@ -117,7 +115,6 @@ def _record_handle(message, pending):
         key = (meta.get("topic"), meta.get("partition"), meta.get("offset"))
         return pending.get(key)
     return None
-
 
 def _timestamp_iso(value):
     if not value:

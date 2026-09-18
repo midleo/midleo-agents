@@ -11,11 +11,9 @@ def _bounded_env_int(name, default, minimum, maximum):
     except (TypeError, ValueError):
         return default
 
-
 DEFAULT_TIMEOUT_SECONDS = _bounded_env_int("MIDLEO_PACKAGE_SCAN_TIMEOUT_SECONDS", 30, 1, 120)
 MAX_SOFTWARE_ITEMS = _bounded_env_int("MIDLEO_MAX_SOFTWARE_ITEMS", 20000, 1, 20000)
 MAX_PACKAGE_OUTPUT_BYTES = _bounded_env_int("MIDLEO_MAX_PACKAGE_OUTPUT_BYTES", 16 * 1024 * 1024, 1024 * 1024, 64 * 1024 * 1024)
-
 
 def _which(*names):
     for name in names:
@@ -23,7 +21,6 @@ def _which(*names):
         if found:
             return found
     return ""
-
 
 def run(cmd, timeout=DEFAULT_TIMEOUT_SECONDS):
     if not isinstance(cmd, (list, tuple)) or not cmd:
@@ -88,7 +85,6 @@ def run(cmd, timeout=DEFAULT_TIMEOUT_SECONDS):
             except Exception:
                 pass
 
-
 def _append(software_list, name, version="", publisher="", description=""):
     if (
         not name
@@ -104,7 +100,6 @@ def _append(software_list, name, version="", publisher="", description=""):
             "description": str(description or "").strip(),
         }
     )
-
 
 def get_apt(package_tool=None):
     dpkg_query = (
@@ -123,13 +118,11 @@ def get_apt(package_tool=None):
         return run([dpkg, "-l"])
     return []
 
-
 def get_rpm(rpm=None):
     rpm = rpm or _which("rpm")
     if not rpm:
         return []
     return run([rpm, "-qa", "--qf", "%{NAME}\t%{VERSION}-%{RELEASE}\n"])
-
 
 def get_pkginfo(pkginfo=None):
     pkginfo = pkginfo or _which("pkginfo")
@@ -137,20 +130,18 @@ def get_pkginfo(pkginfo=None):
         return []
     return run([pkginfo, "-l"])
 
-
 def get_pkgs11(pkg=None):
     pkg = pkg or _which("pkg")
     if not pkg:
         return []
     return run([pkg, "list", "-H"])
 
-
 def _collect_debian(software_list, package_tool=None):
     for line in get_apt(package_tool):
         if "\t" in line:
             parts = line.split("\t", 2)
-            # dpkg keeps removed packages with residual configuration. Only the
-            # installed state counts; held-but-installed packages count too.
+                                                                               
+                                                                            
             if len(parts) == 3 and len(parts[0]) >= 2 and parts[0][1] == "i":
                 _append(
                     software_list,
@@ -165,7 +156,6 @@ def _collect_debian(software_list, package_tool=None):
             if len(parts) >= 5:
                 _append(software_list, parts[1], parts[2], "debian", parts[4])
 
-
 def _collect_rpm(software_list, rpm=None):
     for line in get_rpm(rpm):
         parts = line.split("\t", 2)
@@ -176,7 +166,6 @@ def _collect_rpm(software_list, rpm=None):
                 parts[1],
                 parts[2] if len(parts) > 2 else "rpm",
             )
-
 
 def _collect_pkginfo(software_list, pkginfo=None):
     name = version = None
@@ -190,13 +179,11 @@ def _collect_pkginfo(software_list, pkginfo=None):
             _append(software_list, name, version, "solaris")
             name = version = None
 
-
 def _collect_pkgs11(software_list, pkg=None):
     for line in get_pkgs11(pkg):
         parts = line.split()
         if len(parts) >= 2:
             _append(software_list, parts[0], parts[1], "solaris")
-
 
 def getApplicationServerEvidence():
     software_list = []

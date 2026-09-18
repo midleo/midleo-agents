@@ -9,7 +9,6 @@ try:
 except ImportError:
     pika = None
 
-
 def _decode_password(value):
     if not value:
         return ""
@@ -21,7 +20,6 @@ def _decode_password(value):
         return base64.b64decode(padded).decode("utf-8")
     except Exception:
         return str(value)
-
 
 class RabbitMqMessageBackupProvider(MessageBackupProvider):
     def __init__(self, job_cfg, broker_cfg):
@@ -111,10 +109,8 @@ class RabbitMqMessageBackupProvider(MessageBackupProvider):
         self.channel = None
         self.connection = None
 
-
 def _safe(value):
     return "" if value is None else str(value)
-
 
 def _delivery_tag(message):
     if isinstance(message, dict):

@@ -6,7 +6,6 @@ from modules.base import classes
 
 LOG_DIR = os.path.join(os.getcwd(), "logs")
 
-
 def _safe_index(row, index):
     try:
         idx = int(index)
@@ -16,10 +15,8 @@ def _safe_index(row, index):
     except Exception:
         return None
 
-
 def _summary_name(value):
     return "sumarized" if value == "summary" else value
-
 
 def _group_key(row, mapping):
     node = _safe_index(row, mapping.get("node"))
@@ -28,7 +25,6 @@ def _group_key(row, mapping):
         return None
     return node + "#" + server + "#" + str(_summary_name(row[0]))
 
-
 def _truncate_file(path):
     try:
         with open(path, "w", encoding="utf-8"):
@@ -36,10 +32,8 @@ def _truncate_file(path):
     except OSError as err:
         classes.Err("Error cleaning the file:" + str(err))
 
-
 def truncate_file(path):
     _truncate_file(path)
-
 
 def csv_json(file,array,check=False,cleanit=True):
     in_arr={}

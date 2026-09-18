@@ -17,7 +17,7 @@ To update an existing Linux or z/OS USS agent without changing runtime configura
 ansible-playbook update_midleo_agent.yaml -i inventories/local-midleo.ini
 ```
 
-The update playbook requires an existing `config/` directory and does not manage `config/`, `logs/`, `cronjobs.json`, `banned.json`, `mwagent.config`, `agent.identity`, or `crypto.secret`. It updates agent code, wrappers, modules, and runable scripts, then restarts the existing agent services or z/OS USS wrapper.
+The update playbook requires an existing `config/` directory and does not replace `logs/`, `cronjobs.json`, `banned.json`, `agent.identity`, or `crypto.secret`. It updates agent code, wrappers, modules, and runable scripts, then restarts the existing agent services or z/OS USS wrapper. For `mwagent.config` it only **appends missing keys** (for example `WEBLOGIC_HOME`) and leaves existing values unchanged, including `GROUPID`, `INTTOKEN`, `ALLOWED_COMMANDS`, `SRVUID`, and `MWADMIN`.
 
 ## Required Inventory Variables
 
@@ -55,6 +55,7 @@ z/OS inventory should set:
 ## Optional Variables
 
 - `midleo_install_pymqi`: set to `true` only on IBM MQ hosts that have IBM MQ client development libraries installed.
+- Product install homes in inventory group or host vars (`weblogic_home`, `ibmmq_home`, `ibmace_home`, `ibmiib_home`, `tomcat_home`, `jboss_home`, `ibmwas_home`, `rabbitmq_home`, `tibcoems_home`, `activemq_home`, `kafka_home`, `msiis_home`). Defaults live in `inventories/hosts` and `roles/midleoagent/defaults/main.yaml`. Linux defaults include `weblogic_home=/opt/oracle/middleware` and `ibmmq_home=/opt/mqm`. Override per host when a product is not in the default home. Comma-separate multiple homes. Empty values keep bounded auto-discovery. The config templates still fall back to the same Linux/Windows defaults as `DSPMQVER` / `MQSIPROFILE`.
 
 ## Installed Dependencies
 

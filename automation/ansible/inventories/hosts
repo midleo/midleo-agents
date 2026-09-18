@@ -19,9 +19,20 @@ midleo_website_base_url="MIDLEO_BASE_URL"
 midleo_website_base_url_ssl="n"
 update_interval_minutes="5"
 midleo_mwuser="mwadmin"
-# Bootstrap only. Runtime requests use the registered agent identity.
 agent_bootstrap_token=""
 allowed_commands=['net']
+weblogic_home=""
+ibmmq_home="D:/apps/IBM/MQ"
+ibmace_home="D:/apps/IBM/ACE/server"
+ibmiib_home="D:/apps/IBM/IIB/server"
+tomcat_home=""
+jboss_home=""
+ibmwas_home=""
+rabbitmq_home=""
+tibcoems_home=""
+activemq_home=""
+kafka_home=""
+msiis_home=""
 
 [linux:vars]
 midleo_website_base_url="MIDLEO_BASE_URL"
@@ -31,6 +42,18 @@ midleo_mwuser="mwadmin"
 # Bootstrap only. Runtime requests use the registered agent identity.
 agent_bootstrap_token=""
 allowed_commands=['dspmq','dspmqver','uptime']
+weblogic_home="/opt/oracle/middleware"
+ibmmq_home="/opt/mqm"
+ibmace_home="/opt/ibm/ace-12/server"
+ibmiib_home="/opt/ibm/iib-10.0.0.11/server"
+tomcat_home=""
+jboss_home=""
+ibmwas_home=""
+rabbitmq_home=""
+tibcoems_home=""
+activemq_home=""
+kafka_home=""
+msiis_home=""
 
 [zos:vars]
 ansible_connection='ssh'
@@ -48,6 +71,18 @@ midleo_zos_steplib=""
 midleo_zos_zoau_home=""
 midleo_zos_install_cron=false
 allowed_commands=['dspmq','dspmqver']
+weblogic_home=""
+ibmmq_home=""
+ibmace_home=""
+ibmiib_home=""
+tomcat_home=""
+jboss_home=""
+ibmwas_home=""
+rabbitmq_home=""
+tibcoems_home=""
+activemq_home=""
+kafka_home=""
+msiis_home=""
 
 [middleware:children]
 linux

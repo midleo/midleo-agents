@@ -9,7 +9,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import configs
 
-
 def _action_roots():
     cfg = configs.getcfgData() or {}
     roots_raw = str(
@@ -20,7 +19,6 @@ def _action_roots():
     )
     return [item.strip() for item in roots_raw.split(",") if item.strip()]
 
-
 def _path_under(root, path):
     real_root = os.path.realpath(root)
     real_path = os.path.realpath(path)
@@ -28,7 +26,6 @@ def _path_under(root, path):
         return os.path.commonpath([real_root, real_path]) == real_root
     except ValueError:
         return False
-
 
 def _validate_action_script_path(script_path):
     if not script_path or "\x00" in script_path:
@@ -40,7 +37,6 @@ def _validate_action_script_path(script_path):
     )
     if not any(_path_under(root, candidate) for root in _action_roots()):
         raise ValueError("action script outside allowed roots")
-
 
 def _load_input():
     if len(sys.argv) < 2:
@@ -67,7 +63,6 @@ def _load_input():
         raise ValueError("Action configuration must be a JSON object")
     return action_key, action_body
 
-
 def _validate_action(action_key, action_body):
     if "." not in action_key:
         raise ValueError("action key must look like appserver_type.error_code")
@@ -81,7 +76,6 @@ def _validate_action(action_key, action_body):
     if "args" in action_body and not isinstance(args, list):
         raise ValueError("args must be a JSON array")
 
-
 def add_action():
     action_key, action_body = _load_input()
     _validate_action(action_key, action_body)
@@ -90,7 +84,6 @@ def add_action():
     action_data[action_key] = action_body
     configs.saveActionData(action_data)
     print("Action " + action_key + " saved")
-
 
 if __name__ == "__main__":
     add_action()

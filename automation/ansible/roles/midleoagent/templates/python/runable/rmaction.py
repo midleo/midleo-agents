@@ -8,7 +8,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import configs
 
-
 def remove_action():
     if len(sys.argv) < 2:
         raise ValueError("Missing action key")
@@ -21,7 +20,6 @@ def remove_action():
     action_data.pop(action_key, None)
     configs.saveActionData(action_data)
     print("Action " + action_key + " removed")
-
 
 if __name__ == "__main__":
     remove_action()

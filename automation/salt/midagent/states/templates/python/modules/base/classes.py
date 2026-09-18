@@ -23,7 +23,6 @@ _HARDENED_PATHS = set()
 _LAST_LOG_ERROR = None
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 
-
 def _safe_text(value):
     text = str(value)
     truncated = len(text) > MAX_LOG_LINE_BYTES
@@ -31,14 +30,11 @@ def _safe_text(value):
     text = _CONTROL_RE.sub(lambda match: "\\x%02x" % ord(match.group()), text)
     return text + (" [truncated]" if truncated else "")
 
-
 def log_timestamp():
     return datetime.now().astimezone().isoformat(sep=" ", timespec="milliseconds")
 
-
 def log_enabled(level="INFO"):
     return _LEVELS.get(str(level).upper(), 20) >= LOG_LEVEL
-
 
 def _ensure_log_dir():
     global _READY_LOG_DIR
@@ -51,7 +47,6 @@ def _ensure_log_dir():
         pass
     _READY_LOG_DIR = LOG_DIR
 
-
 def _rotate_log(path, incoming_bytes=0):
     try:
         size = os.stat(path).st_size
@@ -60,7 +55,6 @@ def _rotate_log(path, incoming_bytes=0):
             _HARDENED_PATHS.discard(path)
     except FileNotFoundError:
         pass
-
 
 def _write_log(path, line):
     global _READY_LOG_DIR
@@ -91,7 +85,6 @@ def _write_log(path, line):
         finally:
             os.close(fd)
 
-
 def Log(logdata, level="INFO", component="agent"):
     global _LAST_LOG_ERROR
     level = str(level).upper()
@@ -117,7 +110,6 @@ def Log(logdata, level="INFO", component="agent"):
             except Exception:
                 pass
         return False
-
 
 def ClearLog():
     return Log("Service started")

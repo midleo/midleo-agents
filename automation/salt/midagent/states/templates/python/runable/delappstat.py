@@ -8,7 +8,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import configs
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]
@@ -18,7 +17,6 @@ def _arg(index, name):
     if not value:
         raise ValueError("Empty required argument: " + name)
     return value
-
 
 def deleteMonJson():
     srvtype = _arg(1, "SRVTYPE")
@@ -32,7 +30,6 @@ def deleteMonJson():
 
     configs.savemonData(mon_data)
     print(appsrv + " configuration deleted")
-
 
 if __name__ == "__main__":
     deleteMonJson()

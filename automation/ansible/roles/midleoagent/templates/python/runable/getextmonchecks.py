@@ -20,13 +20,11 @@ current_time = now.strftime("%Y-%m-%d %H:%M:%S")
 line_pattern = re.compile(r'^([^{\s]+)\{(.*)\}\s+(-?\d+)\s*$')
 kv_pattern = re.compile(r'([A-Za-z0-9_\-]+)\s*=\s*"((?:\\"|[^"])*)"')
 
-
 def parse_attrs(attr_text):
     attrs = {}
     for key, value in kv_pattern.findall(attr_text):
         attrs[key] = value.replace('\\"', '"')
     return attrs
-
 
 try:
     config_data = configs.getcfgData()

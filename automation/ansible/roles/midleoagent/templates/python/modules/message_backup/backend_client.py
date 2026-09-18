@@ -7,7 +7,6 @@ from modules.message_backup import metrics
 
 VALID_RESULTS = frozenset({"persisted", "duplicate", "rejected", "temporary_failure"})
 
-
 def _retry_settings(backend_cfg):
     backend_cfg = backend_cfg if isinstance(backend_cfg, dict) else {}
     retry = backend_cfg.get("retry") if isinstance(backend_cfg.get("retry"), dict) else {}
@@ -17,16 +16,14 @@ def _retry_settings(backend_cfg):
         "max_delay_ms": max(1000, int(retry.get("max_delay_ms", 60000))),
     }
 
-
 def submit_envelope(envelope, backend_cfg=None):
     results = submit_batch([envelope], backend_cfg)
     return results[0][0] if results else "temporary_failure"
 
-
 def _parse_batch_response(res, count):
-    """Returns (per_item_results, is_retryable) where per_item_results is a
-    list of (status, error) tuples aligned 1:1 with the submitted envelopes.
-    """
+\
+\
+       
     if res is None:
         return [("temporary_failure", "no response")] * count, True
 
@@ -61,21 +58,20 @@ def _parse_batch_response(res, count):
             parsed.append((status, str(item.get("error") or "")[:512]))
         return parsed, False
 
-    # Backward-compatible fallback for a single-envelope-style response
-    # (older backend, or a batch of one) that returns a flat status.
+                                                                       
+                                                                    
     status = str(body.get("status") or "").lower()
     if status not in VALID_RESULTS:
         return [("temporary_failure", "missing backend acknowledgement")] * count, True
     is_retryable = status == "temporary_failure"
     return [(status, str(body.get("error") or "")[:512])] * count, is_retryable
 
-
 def submit_batch(envelopes, backend_cfg=None):
-    """Submits a batch of envelopes in a single HTTP POST to
-    /pubapi/submitmessagebackup and returns a list of (status, error) tuples
-    aligned 1:1 with the input envelopes so callers can ack/nack/outbox each
-    message individually.
-    """
+\
+\
+\
+\
+       
     if not envelopes:
         return []
 

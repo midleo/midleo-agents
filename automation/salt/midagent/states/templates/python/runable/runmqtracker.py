@@ -106,7 +106,6 @@ def _amqsevt_path():
 
     raise RuntimeError("amqsevt executable not found")
 
-
 def _json_values(output):
     decoder = JSONDecoder()
     index = 0
@@ -128,7 +127,6 @@ def _json_values(output):
 
     return values
 
-
 def _name_value(value, default=""):
     if isinstance(value, dict):
         if value.get("name") is not None:
@@ -141,7 +139,6 @@ def _name_value(value, default=""):
         return default
 
     return str(value)
-
 
 def _hex_value(value):
     if not isinstance(value, str):
@@ -162,11 +159,9 @@ def _hex_value(value):
 
     return value.lower()
 
-
 def _canonical_hash(record):
     payload = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
 
 def _run_mq_event(qmgr):
     cmd = [
@@ -215,7 +210,6 @@ def _run_mq_event(qmgr):
         classes.Err("amqsevt returned invalid JSON for " + str(qmgr) + ": " + output[-2000:])
         return []
 
-
 def _track_records(qmgr, events):
     for event in events:
         event_data = event.get("eventData") or {}
@@ -259,7 +253,6 @@ def _track_records(qmgr, events):
 
             yield record
 
-
 def _chunks(items, size):
     batch = []
 
@@ -273,14 +266,12 @@ def _chunks(items, size):
     if batch:
         yield batch
 
-
 def _spool_path():
     os.makedirs(MQ_EVENT_SPOOL_DIR, mode=0o750, exist_ok=True)
     return os.path.join(
         MQ_EVENT_SPOOL_DIR,
         str(int(time.time() * 1000)) + "-" + uuid.uuid4().hex + ".json",
     )
-
 
 def _spool_write(batch):
     path = _spool_path()
@@ -293,14 +284,12 @@ def _spool_write(batch):
 
     return path
 
-
 def _post_file(path, webssl, website):
     with open(path, "r", encoding="utf-8") as handler:
         payload = handler.read()
 
     makerequest.postTrackData(webssl, website, payload)
     os.remove(path)
-
 
 def _flush_spool(webssl, website):
     if not os.path.isdir(MQ_EVENT_SPOOL_DIR):
@@ -318,11 +307,9 @@ def _flush_spool(webssl, website):
             classes.Err("MQ track spool flush failed: " + str(err))
             return
 
-
 def _send_batch(batch, webssl, website):
     path = _spool_write(batch)
     _post_file(path, webssl, website)
-
 
 def main():
     track_data = configs.gettrackData()
@@ -344,7 +331,6 @@ def main():
                 classes.Err("MQ track post failed for " + str(qmgr) + ": " + str(err))
 
     _flush_spool(webssl, website)
-
 
 try:
     main()

@@ -39,13 +39,11 @@ OPTADVISOR_CONFIG_KEYS = {
 }
 REMOVED_OPTADVISOR_AUTH_KEYS = secrets.REMOVED_AUTH_KEYS
 
-
 def parse_json_object(payload):
     data = json.loads(payload) if isinstance(payload, str) else payload
     if not isinstance(data, dict):
         raise ValueError("statistics input must be a JSON object")
     return data
-
 
 def pop_fields(data, field_defaults):
     source = dict(data)
@@ -54,12 +52,10 @@ def pop_fields(data, field_defaults):
         values[key] = source.pop(key, default)
     return values, source
 
-
 def first_value(data):
     if not data:
         raise ValueError("statistics input has no metrics")
     return next(iter(data.values()))
-
 
 def run_command(command, label, timeout=DEFAULT_TIMEOUT_SECONDS):
     try:
@@ -87,10 +83,8 @@ def run_command(command, label, timeout=DEFAULT_TIMEOUT_SECONDS):
         return False
     return True
 
-
 def utc_now():
     return datetime.now(timezone.utc).replace(microsecond=0)
-
 
 def iso_utc(value=None):
     if value is None:
@@ -99,10 +93,8 @@ def iso_utc(value=None):
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-
 def truthy(value):
     return str(value).strip().lower() in ("1", "y", "yes", "true", "on", "enabled")
-
 
 def rest_verify_enabled(values):
     values = values or {}
@@ -115,7 +107,6 @@ def rest_verify_enabled(values):
         verify_value = "yes"
     return truthy(verify_value)
 
-
 def decrypt_password(value):
     if not value:
         return ""
@@ -124,10 +115,8 @@ def decrypt_password(value):
     except Exception:
         return str(value)
 
-
 def connection_type(values):
     return str((values or {}).get("conntype") or "jms").strip().lower()
-
 
 def rest_base_url(thisnode, values, default_port=""):
     values = values or {}
@@ -143,7 +132,6 @@ def rest_base_url(thisnode, values, default_port=""):
     use_ssl = truthy(values.get("ssl"))
     scheme = "https" if use_ssl else "http"
     return scheme + "://" + host + (":" + port if port else ""), use_ssl
-
 
 def rest_json_request(base_url, path, values, method="GET", payload=None, auth="basic"):
     values = values or {}
@@ -185,7 +173,6 @@ def rest_json_request(base_url, path, values, method="GET", payload=None, auth="
             body = response.read().decode("utf-8", errors="replace")
     return json.loads(body) if body else {}
 
-
 def write_stat_row(logdir, subtype, row):
     if not logdir or not subtype or not row:
         return
@@ -194,7 +181,6 @@ def write_stat_row(logdir, subtype, row):
     with open(file_path, "a", encoding="utf-8", newline="") as f:
         f.write(",".join(str(item).replace(",", " ") for item in row) + "\n")
 
-
 def write_simple_stat(logdir, subtype, server, key, value, timestamp=None):
     number = numeric_value(value)
     if number is None:
@@ -202,7 +188,6 @@ def write_simple_stat(logdir, subtype, server, key, value, timestamp=None):
     if timestamp is None:
         timestamp = iso_utc()
     write_stat_row(logdir, subtype, [key, server, timestamp, number])
-
 
 def write_numeric_tree(logdir, subtype, server, data, prefix="", timestamp=None, limit=250):
     if timestamp is None:
@@ -231,15 +216,12 @@ def write_numeric_tree(logdir, subtype, server, data, prefix="", timestamp=None,
     walk(data, prefix)
     return written
 
-
 def optadvisor_state_path():
     return os.path.join(os.getcwd(), "config", "optadvisor.json")
-
 
 def optadvisor_lock_path(name="runtime"):
     safe_name = "".join(ch if ch.isalnum() or ch in ("_", "-") else "-" for ch in str(name or "runtime"))
     return os.path.join(os.getcwd(), "config", "optadvisor_" + safe_name + ".lock")
-
 
 def _parse_utc_datetime(value):
     if not value:
@@ -254,7 +236,6 @@ def _parse_utc_datetime(value):
             continue
     return None
 
-
 def load_optadvisor_runtime_state():
     try:
         with open(optadvisor_state_path(), "r", encoding="utf-8") as f:
@@ -262,7 +243,6 @@ def load_optadvisor_runtime_state():
             return state if isinstance(state, dict) else {}
     except Exception:
         return {}
-
 
 def save_optadvisor_runtime_state(state):
     if not isinstance(state, dict):
@@ -283,7 +263,6 @@ def save_optadvisor_runtime_state(state):
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-
 def enable_optadvisor_runtime(days=MAX_OPTADVISOR_ENABLE_DAYS, actor="manual"):
     try:
         duration_days = int(days)
@@ -302,7 +281,6 @@ def enable_optadvisor_runtime(days=MAX_OPTADVISOR_ENABLE_DAYS, actor="manual"):
     save_optadvisor_runtime_state(state)
     return state
 
-
 def disable_optadvisor_runtime(actor="manual", reason="manual"):
     state = load_optadvisor_runtime_state()
     state["enabled"] = False
@@ -311,7 +289,6 @@ def disable_optadvisor_runtime(actor="manual", reason="manual"):
     state["disabled_reason"] = safe_text(reason)[:255] if reason else "manual"
     save_optadvisor_runtime_state(state)
     return state
-
 
 def optadvisor_runtime_status(now=None):
     if now is None:
@@ -333,10 +310,8 @@ def optadvisor_runtime_status(now=None):
     state["active"] = active
     return state
 
-
 def optadvisor_runtime_enabled(now=None):
     return bool(optadvisor_runtime_status(now).get("active"))
-
 
 def _lock_stale_seconds(default=1800):
     try:
@@ -344,7 +319,6 @@ def _lock_stale_seconds(default=1800):
     except (TypeError, ValueError):
         value = default
     return max(60, min(value, 86400))
-
 
 def _lock_is_stale(path, stale_seconds):
     now = time.time()
@@ -359,7 +333,6 @@ def _lock_is_stale(path, stale_seconds):
         except OSError:
             created_ts = now
     return created_ts <= 0 or (now - created_ts) > stale_seconds
-
 
 def acquire_optadvisor_lock(name="runtime", stale_seconds=None):
     if stale_seconds is None:
@@ -397,7 +370,6 @@ def acquire_optadvisor_lock(name="runtime", stale_seconds=None):
             return None
     return None
 
-
 def release_optadvisor_lock(lock):
     if not lock:
         return
@@ -409,7 +381,6 @@ def release_optadvisor_lock(lock):
     except OSError as err:
         classes.Err("optadvisor lock release error:" + str(err))
 
-
 def optadvisor_run_seconds_limit(default=240):
     try:
         value = int(os.environ.get("MIDLEO_OPTADVISOR_MAX_RUN_SECONDS", str(default)))
@@ -417,12 +388,10 @@ def optadvisor_run_seconds_limit(default=240):
         value = default
     return max(30, min(value, 3600))
 
-
 def safe_text(value):
     if value is None:
         return ""
     return str(value).strip().replace("\u0000", "")
-
 
 def optadvisor_enabled(config):
     return truthy(
@@ -431,14 +400,11 @@ def optadvisor_enabled(config):
         or config.get("optimization_advisor")
     )
 
-
 def optadvisor_collection_enabled(config):
     return optadvisor_enabled(config) and optadvisor_runtime_enabled()
 
-
 def optadvisor_post_token(config, default_token):
     return ""
-
 
 def split_optadvisor_config(data, extra_keys=None):
     config = {}
@@ -451,7 +417,6 @@ def split_optadvisor_config(data, extra_keys=None):
             config[key] = metrics.pop(key)
     return config, metrics
 
-
 def optadvisor_server_id(config, thisnode):
     return (
         config.get("server_id")
@@ -461,20 +426,16 @@ def optadvisor_server_id(config, thisnode):
         or thisnode
     )
 
-
 def optadvisor_node_id(thisnode, max_length=24):
     return "".join(ch if ch.isalnum() or ch in ("_", "-", ".") else "-" for ch in str(thisnode))[:max_length]
 
-
 def optadvisor_log_path(prefix, thisnode):
     return os.path.join(os.getcwd(), "logs", str(prefix) + "_" + str(thisnode) + "_optadvisor.jsonl")
-
 
 def append_optadvisor_payload(prefix, thisnode, payload):
     os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
     with open(optadvisor_log_path(prefix, thisnode), "a", encoding="utf-8") as f:
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
-
 
 def flush_optadvisor_telemetry(prefix, thisnode, website, webssl, _legacy_token, stat_data, extra_keys=None):
     if not isinstance(stat_data, dict):
@@ -522,7 +483,6 @@ def flush_optadvisor_telemetry(prefix, thisnode, website, webssl, _legacy_token,
     except OSError as err:
         classes.Err(prefix + " optadvisor file error:" + str(err))
 
-
 def java_payload_line(stdout):
     lines = [line.strip() for line in str(stdout or "").splitlines() if line.strip()]
     for line in reversed(lines):
@@ -531,7 +491,6 @@ def java_payload_line(stdout):
         if line.startswith("[") and line.endswith("]"):
             return line
     return ""
-
 
 def build_optadvisor_payload(prefix, technology, collector_name, thisnode, config, target, resources, collected_at=None):
     if not optadvisor_enabled(config):
@@ -563,20 +522,17 @@ def build_optadvisor_payload(prefix, technology, collector_name, thisnode, confi
     }
     return payload
 
-
 def metric_number(key, value):
     number = numeric_value(value)
     if number is None:
         return None
     return {"key": key, "value": number, "value_type": "number"}
 
-
 def metric_string(key, value):
     text = safe_text(value)
     if not text:
         return None
     return {"key": key, "value": text[:255], "value_type": "string"}
-
 
 def metric_bool(key, value):
     if isinstance(value, bool):
@@ -591,11 +547,9 @@ def metric_bool(key, value):
             return None
     return {"key": key, "value": bool_value, "value_type": "boolean"}
 
-
 def add_metric(metrics, metric):
     if metric is not None:
         metrics.append(metric)
-
 
 def numeric_value(value):
     if value is None:
@@ -616,7 +570,6 @@ def numeric_value(value):
     except Exception:
         return None
 
-
 def first_present(data, *keys):
     if not isinstance(data, dict):
         return None
@@ -624,7 +577,6 @@ def first_present(data, *keys):
         if key in data and data[key] is not None and str(data[key]).strip() != "":
             return data[key]
     return None
-
 
 def nested(data, *keys):
     current = data
@@ -634,13 +586,11 @@ def nested(data, *keys):
         current = current[key]
     return current
 
-
 def tag_value(metric_key, tag):
     marker = ";" + tag + "="
     if marker not in metric_key:
         return ""
     return metric_key.split(marker, 1)[1].split(";", 1)[0]
-
 
 def _stat_payload_json(stat_type, subtype, data):
     return json.dumps(
@@ -652,10 +602,8 @@ def _stat_payload_json(stat_type, subtype, data):
         separators=(",", ":"),
     )
 
-
 def _stat_payload_size(stat_type, subtype, data):
     return len(_stat_payload_json(stat_type, subtype, data).encode("utf-8"))
-
 
 def _iter_stat_value_chunks(stat_type, subtype, key, value, max_bytes):
     text = str(value or "")
@@ -681,7 +629,6 @@ def _iter_stat_value_chunks(stat_type, subtype, key, value, max_bytes):
 
     if chunk:
         yield chunk
-
 
 def iter_stat_payload_chunks(stat_type, subtype, data, max_bytes=MAX_STAT_PAYLOAD_BYTES):
     if not isinstance(data, dict) or not data:
@@ -709,7 +656,6 @@ def iter_stat_payload_chunks(stat_type, subtype, data, max_bytes=MAX_STAT_PAYLOA
     if current:
         yield current
 
-
 def post_stat_payloads(stat_type, subtype, website, webssl, data):
     chunk_count = 0
     for chunk in iter_stat_payload_chunks(stat_type, subtype, data):
@@ -734,7 +680,6 @@ def post_stat_payloads(stat_type, subtype, website, webssl, data):
     if chunk_count > 1:
         classes.Err("stat payload split for " + stat_type + ":" + str(subtype) + " chunks:" + str(chunk_count))
     return chunk_count > 0
-
 
 def post_csv_stats(stat_type, func_name, website, webssl, _legacy_token, stat_data, pattern_fn):
     try:

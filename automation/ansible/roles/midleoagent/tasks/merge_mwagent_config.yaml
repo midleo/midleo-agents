@@ -1,0 +1,48 @@
+---
+- name: "Check existing mwagent.config"
+  stat:
+    path: "{{ agent_install_dir }}config/mwagent.config"
+  register: midleo_mwagent_config_file
+
+- name: "Render mwagent.config defaults for missing-key merge"
+  template:
+    src: templates/mwagent.config.merge.j2
+    dest: "{{ agent_install_dir }}config/.mwagent.config.desired"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0600"
+  when: midleo_mwagent_config_file.stat.exists | default(false)
+
+- name: "Copy mwagent.config merge helper"
+  copy:
+    src: merge_mwagent_config.py
+    dest: "{{ agent_install_dir }}config/.merge_mwagent_config.py"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0700"
+  when: midleo_mwagent_config_file.stat.exists | default(false)
+
+- name: "Merge missing mwagent.config keys"
+  command: >-
+    {{ python_install_dir }}
+    {{ agent_install_dir }}config/.merge_mwagent_config.py
+    {{ agent_install_dir }}config/mwagent.config
+    {{ agent_install_dir }}config/.mwagent.config.desired
+  register: midleo_mwagent_config_merge
+  when: midleo_mwagent_config_file.stat.exists | default(false)
+
+- name: "Remove mwagent.config merge helpers"
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ agent_install_dir }}config/.mwagent.config.desired"
+    - "{{ agent_install_dir }}config/.merge_mwagent_config.py"
+
+- name: "Secure mwagent.config after merge"
+  file:
+    path: "{{ agent_install_dir }}config/mwagent.config"
+    owner: "{{ midleo_mwuser }}"
+    group: "{{ midleo_mwuser }}"
+    mode: "0600"
+  when: midleo_mwagent_config_file.stat.exists | default(false)

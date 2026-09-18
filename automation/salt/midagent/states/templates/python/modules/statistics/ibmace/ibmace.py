@@ -16,7 +16,6 @@ from modules.base import decrypt
 from modules.base import classes, makerequest, statarr
 from modules.statistics import common
 
-
 OPTADVISOR_SCHEMA_VERSION = "1.0"
 OPTADVISOR_COLLECTOR_NAME = "ibmace-integration-admin-collector"
 OPTADVISOR_COLLECTOR_VERSION = "1.0.0"
@@ -93,10 +92,8 @@ APPLSTAT_SKIP_KEYS = OPTADVISOR_CONFIG_KEYS | {
 APPLSTAT_MAX_FILES = int(os.environ.get("MIDLEO_OPTADVISOR_APPLSTAT_MAX_FILES", "100"))
 APPLSTAT_MAX_FILE_AGE_SECONDS = int(os.environ.get("MIDLEO_OPTADVISOR_APPLSTAT_MAX_AGE_SECONDS", "86400"))
 
-
 def _utc_now():
     return datetime.now(timezone.utc).replace(microsecond=0)
-
 
 def _iso_utc(value):
     if value is None:
@@ -105,16 +102,13 @@ def _iso_utc(value):
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-
 def _truthy(value):
     return str(value).strip().lower() in ("1", "y", "yes", "true", "on", "enabled")
-
 
 def _safe_text(value):
     if value is None:
         return ""
     return str(value).strip().replace("\u0000", "")
-
 
 def _raise_csv_field_limit():
     max_size = sys.maxsize
@@ -125,14 +119,12 @@ def _raise_csv_field_limit():
         except OverflowError:
             max_size = int(max_size / 10)
 
-
 def _optadvisor_enabled(config):
     return _truthy(
         config.get("optadvisor")
         or config.get("optadvisor_enabled")
         or config.get("optimization_advisor")
     )
-
 
 def _split_optadvisor_config(data):
     config = {}
@@ -142,17 +134,14 @@ def _split_optadvisor_config(data):
             config[key] = metrics.pop(key)
     return config, metrics
 
-
 def _normalize_logdir(logdir):
     text = _safe_text(logdir)
     if not text:
         return ""
     return text if text.endswith(("/", "\\")) else text + "/"
 
-
 def _resource_stats_pattern(logdir, thisnode, subtype):
     return _normalize_logdir(logdir) + "ResourceStats_" + str(thisnode) + "_*_" + str(subtype) + ".txt"
-
 
 def _get_applstat_metrics(thisnode, stat_data=None):
     metrics = {}
@@ -175,7 +164,6 @@ def _get_applstat_metrics(thisnode, stat_data=None):
             if isinstance(value, str) and value.strip():
                 metrics[key_text] = value.strip()
     return metrics
-
 
 def _applstat_stats_file_paths(thisnode, stat_metrics=None):
     metrics = stat_metrics if isinstance(stat_metrics, dict) and stat_metrics else _get_applstat_metrics(thisnode)
@@ -213,7 +201,6 @@ def _applstat_stats_file_paths(thisnode, stat_metrics=None):
         candidates = candidates[:APPLSTAT_MAX_FILES]
     return [path for _, path in candidates]
 
-
 def _get_server_id(config, thisnode):
     return (
         config.get("server_id")
@@ -223,16 +210,13 @@ def _get_server_id(config, thisnode):
         or thisnode
     )
 
-
 def _optadvisor_log_path(thisnode):
     return os.path.join(os.getcwd(), "logs", "ibmace_" + str(thisnode) + "_optadvisor.jsonl")
-
 
 def _append_optadvisor_payload(thisnode, payload):
     os.makedirs(os.path.join(os.getcwd(), "logs"), exist_ok=True)
     with open(_optadvisor_log_path(thisnode), "a", encoding="utf-8") as f:
         f.write(json.dumps(payload, separators=(",", ":"), sort_keys=True) + "\n")
-
 
 def _number(value):
     try:
@@ -243,19 +227,16 @@ def _number(value):
     except Exception:
         return None
 
-
 RESOURCE_STATS_CPU_HEADERS = (
     "PercentCPU",
     "ProcessCpuUtilization",
     "CpuUtilization",
 )
 
-
 def _statarr_for_resource_subtype(subtype):
     if str(subtype or "").lower() == "odbc":
         return statarr.ibmaceODBC()
     return statarr.ibmaceJVM()
-
 
 def _resource_stats_subtype_from_path(file_path):
     base = os.path.basename(str(file_path))
@@ -266,7 +247,6 @@ def _resource_stats_subtype_from_path(file_path):
     subtype = stem.rsplit("_", 1)[-1]
     return subtype or "jvm"
 
-
 def _memory_used_bytes_from_used_value(used_value):
     number = _number(used_value)
     if number is None:
@@ -275,12 +255,10 @@ def _memory_used_bytes_from_used_value(used_value):
         return number * 1024 * 1024
     return number
 
-
 def _resource_stats_min_row_len(stat_def):
     indices = [stat_def.get("node", 0), stat_def.get("server", 0)]
     indices.extend(stat_def.get("keys", {}).values())
     return max(indices) + 1
-
 
 def _queue_optadvisor_jvm_stats(thisnode, config, legacy_stat_data):
     if not isinstance(legacy_stat_data, dict):
@@ -358,7 +336,6 @@ def _queue_optadvisor_jvm_stats(thisnode, config, legacy_stat_data):
     if payload is not None:
         _append_optadvisor_payload(thisnode, payload)
 
-
 def _rest_verify(config, values):
     for source in (values or {}, config or {}):
         for key in ("ssl_verify", "sslverify"):
@@ -366,7 +343,6 @@ def _rest_verify(config, values):
             if value is not None and str(value).strip() != "":
                 return common.truthy(value)
     return False
-
 
 def _rest_password(values):
     pwd = values.get("pwd", "")
@@ -377,13 +353,11 @@ def _rest_password(values):
     except Exception:
         return str(pwd)
 
-
 def _rest_base_url(thisnode, config, values):
     host = values.get("host") or config.get("host") or thisnode
     port = values.get("port") or config.get("port") or "4414"
     scheme = "https" if common.truthy(values.get("ssl") or config.get("ssl")) else "http"
     return scheme + "://" + str(host).strip().rstrip("/") + ":" + str(port).strip()
-
 
 def _rest_get(base_url, path, auth, verify):
     if not verify:
@@ -411,7 +385,6 @@ def _rest_get(base_url, path, auth, verify):
         classes.Err("ibmace optadvisor REST parse error:" + str(err))
     return {}
 
-
 def _rest_get_statistics(base_url, path, auth, verify, context=""):
     payload = _rest_get(base_url, path, auth, verify)
     if not payload:
@@ -419,7 +392,6 @@ def _rest_get_statistics(base_url, path, auth, verify, context=""):
             classes.Err("ibmace optadvisor stats fetch failed:" + context + " path:" + path)
         return {}
     return payload
-
 
 def _statistics_payload_has_counters(properties):
     if not isinstance(properties, dict):
@@ -435,7 +407,6 @@ def _statistics_payload_has_counters(properties):
     )
     return any(key in properties and properties[key] not in (None, "") for key in counter_keys)
 
-
 def _statistics_publication_active(payload):
     if not isinstance(payload, dict):
         return False
@@ -448,7 +419,6 @@ def _statistics_publication_active(payload):
             if flag in ("active", "on", "enabled", "true", "yes"):
                 return True
     return False
-
 
 def _first_present_ci(data, *keys):
     if not isinstance(data, dict):
@@ -463,7 +433,6 @@ def _first_present_ci(data, *keys):
         if value not in (None, ""):
             return value
     return None
-
 
 def _iter_json_dict_nodes(payload):
     if not isinstance(payload, dict):
@@ -482,13 +451,11 @@ def _iter_json_dict_nodes(payload):
                     if isinstance(item, dict):
                         stack.append(item)
 
-
 def _flow_app_key(app_name):
     app = _safe_text(app_name)
     if not app or app.lower() == "_standalone":
         return "_default"
     return app
-
 
 def _flow_resource_key(server_name, app_name, flow_name):
     server = _safe_text(server_name)
@@ -497,14 +464,12 @@ def _flow_resource_key(server_name, app_name, flow_name):
         return ""
     return (server + "/" + _flow_app_key(app_name) + "/" + flow).lower()
 
-
 def _flow_server_name_key(server_name, flow_name):
     server = _safe_text(server_name)
     flow = _safe_text(flow_name)
     if not server or not flow:
         return ""
     return (server + "/" + flow).lower()
-
 
 def _flow_record_identity(record):
     if not isinstance(record, dict):
@@ -537,7 +502,6 @@ def _flow_record_identity(record):
         return server_name, app_name, flow_name
     return None, None, None
 
-
 def _iter_flow_statistics_records(payload):
     seen = set()
     for node in _iter_json_dict_nodes(payload):
@@ -558,7 +522,6 @@ def _iter_flow_statistics_records(payload):
                 continue
             seen.add(identity)
             yield server_name, app_name, flow_name, candidate
-
 
 def _iter_server_resource_records(payload):
     seen = set()
@@ -597,10 +560,8 @@ def _iter_server_resource_records(payload):
                             properties.update(identifier)
             yield server_name, properties
 
-
 def _normalize_csv_header(header):
     return _safe_text(header).replace("\ufeff", "")
-
 
 def _csv_row_to_properties(headers, row):
     properties = {}
@@ -614,7 +575,6 @@ def _csv_row_to_properties(headers, row):
         if value not in (None, ""):
             properties[key] = value
     return properties
-
 
 def _parse_flow_stats_csv_text(contents):
     rows = []
@@ -639,7 +599,6 @@ def _parse_flow_stats_csv_text(contents):
     except (csv.Error, TypeError, ValueError) as err:
         classes.Err("ibmace optadvisor stats csv parse error:" + str(err))
     return rows
-
 
 def _parse_resource_stats_text(contents, subtype="jvm"):
     rows = []
@@ -679,7 +638,6 @@ def _parse_resource_stats_text(contents, subtype="jvm"):
         classes.Err("ibmace optadvisor resource stats parse error:" + str(err))
     return rows
 
-
 def _parse_flow_stats_csv_file(file_path):
     try:
         with open(file_path, "r", encoding="utf-8", errors="ignore", newline="") as handle:
@@ -687,7 +645,6 @@ def _parse_flow_stats_csv_file(file_path):
     except OSError as err:
         classes.Err("ibmace optadvisor stats csv read error:" + str(err))
         return []
-
 
 def _parse_resource_stats_file(file_path):
     subtype = _resource_stats_subtype_from_path(file_path)
@@ -697,7 +654,6 @@ def _parse_resource_stats_file(file_path):
     except OSError as err:
         classes.Err("ibmace optadvisor resource stats read error:" + str(err))
         return []
-
 
 def _apply_flow_stats_records(resources, records):
     if not records:
@@ -730,7 +686,6 @@ def _apply_flow_stats_records(resources, records):
         if resource is not None:
             _merge_resource_metrics(resource, _flow_statistics_metrics(properties))
 
-
 def _apply_server_stats_records(resources, records):
     if not records:
         return
@@ -745,7 +700,6 @@ def _apply_server_stats_records(resources, records):
         resource = server_index.get(server_name.lower())
         if resource is not None:
             _merge_resource_metrics(resource, _server_statistics_metrics(properties))
-
 
 def _enrich_from_statistics_files(thisnode, config, values, resources, stat_metrics=None):
     flow_records = []
@@ -770,11 +724,9 @@ def _enrich_from_statistics_files(thisnode, config, values, resources, stat_metr
     if not flow_file_paths and not has_flow_metrics:
         classes.Err("ibmace optadvisor no flow stats files in confapplstat paths")
 
-
 def _apply_json_statistics_payload(resources, payload):
     _apply_flow_stats_records(resources, list(_iter_flow_statistics_records(payload)))
     _apply_server_stats_records(resources, list(_iter_server_resource_records(payload)))
-
 
 def _children(payload, child_key=None):
     if not isinstance(payload, dict):
@@ -793,7 +745,6 @@ def _children(payload, child_key=None):
         return [value for value in payload["children"].values() if isinstance(value, dict)]
     return []
 
-
 def _children_reliable(payload, child_key=None):
     if not isinstance(payload, dict):
         return False
@@ -802,13 +753,11 @@ def _children_reliable(payload, child_key=None):
         return isinstance(children, dict) and child_key in children
     return "children" in payload or payload.get("hasChildren") is False
 
-
 def _message_flow_children(payload):
     candidates = _children(payload, "messageflows")
     if not candidates:
         candidates = _children(payload)
     return [item for item in candidates if _is_message_flow(item)]
-
 
 def _is_message_flow(payload):
     if not isinstance(payload, dict) or not _safe_text(payload.get("name")):
@@ -824,7 +773,6 @@ def _is_message_flow(payload):
         return "messageflow" in item_type or "message flow" in item_type
     return True
 
-
 def _status_from(payload, default="connected"):
     if not isinstance(payload, dict):
         return default
@@ -838,11 +786,9 @@ def _status_from(payload, default="connected"):
                 return "running" if running else "stopped"
     return default
 
-
 def _is_active_flow_status(status):
     normalized = _safe_text(status).lower()
     return normalized in ("running", "started", "active", "statestarted")
-
 
 def _resource(resource_type, key, name, status, metadata, metrics, parent=None):
     item = {
@@ -857,7 +803,6 @@ def _resource(resource_type, key, name, status, metadata, metrics, parent=None):
         item["parent_technical_key"] = parent
     return item
 
-
 def _copy_metadata(metadata, source, mappings):
     if not isinstance(metadata, dict) or not isinstance(source, dict):
         return
@@ -865,7 +810,6 @@ def _copy_metadata(metadata, source, mappings):
         value = source.get(src_key)
         if value not in (None, ""):
             metadata[dst_key] = value
-
 
 def _resource_has_metric(resource, key):
     metrics = resource.get("metrics") if isinstance(resource, dict) else None
@@ -876,7 +820,6 @@ def _resource_has_metric(resource, key):
         if isinstance(metric, dict) and _safe_text(metric.get("key")) == wanted:
             return True
     return False
-
 
 def _collect_property_values(payload):
     values = {}
@@ -899,7 +842,6 @@ def _collect_property_values(payload):
                 values.update(_collect_property_values(child))
     return values
 
-
 def _collect_statistics_values(payload):
     values = _collect_property_values(payload)
     if not isinstance(payload, dict):
@@ -915,7 +857,6 @@ def _collect_statistics_values(payload):
             values.update(_collect_property_values(child))
     return values
 
-
 def _embedded_statistics_metrics(source_payload, resource_type):
     values = _collect_statistics_values(source_payload)
     if resource_type == "ace_message_flow":
@@ -923,7 +864,6 @@ def _embedded_statistics_metrics(source_payload, resource_type):
     if resource_type == "ace_integration_server":
         return _server_statistics_metrics(values)
     return []
-
 
 def _merge_resource_metrics(resource, new_metrics):
     if not isinstance(resource, dict) or not isinstance(new_metrics, list) or not new_metrics:
@@ -940,7 +880,6 @@ def _merge_resource_metrics(resource, new_metrics):
             existing.append(metric)
             seen.add(key)
     resource["metrics"] = existing
-
 
 def _flow_statistics_metrics(properties):
     if not isinstance(properties, dict):
@@ -976,7 +915,6 @@ def _flow_statistics_metrics(properties):
             common.add_metric(metrics, common.metric_number("elapsed_time_avg_ms", elapsed_number / 1000.0))
     return metrics
 
-
 def _server_statistics_metrics(properties):
     if not isinstance(properties, dict):
         return []
@@ -1006,7 +944,6 @@ def _server_statistics_metrics(properties):
     common.add_metric(metrics, common.metric_number("cpu_percent", cpu_value))
     return metrics
 
-
 def _flow_statistics_paths(server_name, app_name, flow_name):
     server = quote(server_name, safe="")
     app = quote(app_name, safe="")
@@ -1018,7 +955,6 @@ def _flow_statistics_paths(server_name, app_name, flow_name):
         base + "/statistics" + depth,
     )
 
-
 def _server_statistics_paths(server_name):
     server = quote(server_name, safe="")
     depth = "?depth=" + ACE_STATS_DEPTH
@@ -1028,11 +964,9 @@ def _server_statistics_paths(server_name):
         "/apiv2/servers/" + server + "/statistics" + depth,
     )
 
-
 def _snapshot_statistics_paths():
-    # Node-level statistics REST endpoints are not available on ACE 13.
+                                                                       
     return ()
-
 
 def _enrich_flow_resource_statistics(base_url, auth, verify, resource):
     if not isinstance(resource, dict) or resource.get("resource_type") != "ace_message_flow":
@@ -1059,7 +993,6 @@ def _enrich_flow_resource_statistics(base_url, auth, verify, resource):
         if _resource_has_metric(resource, "message_count") or _resource_has_metric(resource, "error_count"):
             return
 
-
 def _enrich_server_resource_statistics(base_url, auth, verify, resource):
     if not isinstance(resource, dict) or resource.get("resource_type") != "ace_integration_server":
         return
@@ -1082,7 +1015,6 @@ def _enrich_server_resource_statistics(base_url, auth, verify, resource):
             _merge_resource_metrics(resource, _server_statistics_metrics(properties))
         if _resource_has_metric(resource, "memory_used_bytes") or _resource_has_metric(resource, "cpu_percent"):
             return
-
 
 def _enrich_optadvisor_statistics(thisnode, config, values, result, stat_metrics=None):
     if not isinstance(result, dict):
@@ -1116,7 +1048,6 @@ def _enrich_optadvisor_statistics(thisnode, config, values, result, stat_metrics
 
     _enrich_from_statistics_files(thisnode, config, values, resources, stat_metrics)
     return result
-
 
 def _rest_collect_optadvisor(thisnode, config, values, stat_metrics=None):
     base_url = _rest_base_url(thisnode, config, values)
@@ -1279,7 +1210,6 @@ def _rest_collect_optadvisor(thisnode, config, values, stat_metrics=None):
         stat_metrics,
     )
 
-
 def restAvailabilityCheck(thisnode, values):
     base_url = _rest_base_url(thisnode, {}, values)
     verify = _rest_verify({}, values)
@@ -1296,7 +1226,6 @@ def restAvailabilityCheck(thisnode, values):
     if descriptive.get("version") or descriptive.get("productName"):
         return 1
     return 0
-
 
 def buildOptAdvisorPayload(thisnode, config, collect_result, collected_at=None):
     if not _optadvisor_enabled(config):
@@ -1346,7 +1275,6 @@ def buildOptAdvisorPayload(thisnode, config, collect_result, collected_at=None):
     }
     return payload
 
-
 def _collect_optadvisor(thisnode, config, values, stat_metrics=None):
     classes.Err("ibmace optadvisor REST start:" + str(thisnode))
     rest_result = _rest_collect_optadvisor(thisnode, config, values, stat_metrics)
@@ -1356,7 +1284,6 @@ def _collect_optadvisor(thisnode, config, values, stat_metrics=None):
     payload = buildOptAdvisorPayload(thisnode, config, rest_result, _utc_now())
     if payload is not None:
         _append_optadvisor_payload(thisnode, payload)
-
 
 def getStat(thisqm, inpdata):
     try:
@@ -1401,7 +1328,6 @@ def getStat(thisqm, inpdata):
     except (json.JSONDecodeError, TypeError, ValueError) as err:
         classes.Err("Error in ibmace statistics:" + str(err))
 
-
 def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata):
     if not isinstance(thisdata, dict):
         return
@@ -1435,7 +1361,6 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata)
             f.writelines(remaining)
     except OSError as err:
         classes.Err("ibmace optadvisor file error:" + str(err))
-
 
 def resetStat(thisnode, website, webssl, _legacy_token, stat_data):
     optadvisor_config, legacy_stat_data = _split_optadvisor_config(stat_data if isinstance(stat_data, dict) else {})

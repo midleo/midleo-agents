@@ -9,7 +9,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import classes, configs
 
-
 def _load_statistics_modules():
     modules = {}
     stats_dir = os.path.join(parentdir, "modules", "statistics")
@@ -21,7 +20,6 @@ def _load_statistics_modules():
         module = importlib.import_module("modules.statistics." + entry.name + "." + entry.name)
         modules[entry.name] = module
     return modules
-
 
 try:
     mon_data = configs.getmonData()

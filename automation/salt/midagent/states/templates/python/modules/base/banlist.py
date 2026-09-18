@@ -8,16 +8,13 @@ _DEFAULT_BANNED = {
     ],
 }
 
-
 def _banned_path():
     return Path.cwd() / "config" / "banned.json"
-
 
 def _peer_host(peername):
     if not peername:
         return ""
     return str(peername[0] if isinstance(peername, (tuple, list)) else peername).strip()
-
 
 def _peer_ip(peername):
     host = _peer_host(peername)
@@ -27,7 +24,6 @@ def _peer_ip(peername):
         return ipaddress.ip_address(host)
     except ValueError:
         return None
-
 
 def ensure_banned_file():
     path = _banned_path()
@@ -46,7 +42,6 @@ def ensure_banned_file():
     except OSError:
         pass
 
-
 def _load_banned_data():
     ensure_banned_file()
     path = _banned_path()
@@ -58,14 +53,12 @@ def _load_banned_data():
         return {}
     return data
 
-
 def _load_ip_entries():
     data = _load_banned_data()
     ips = data.get("ips", [])
     if not isinstance(ips, list):
         return []
     return ips
-
 
 def _parse_ban_entry(entry):
     text = str(entry).strip()
@@ -77,7 +70,6 @@ def _parse_ban_entry(entry):
         return ipaddress.ip_address(text)
     except ValueError:
         return None
-
 
 def is_banned(peername):
     addr = _peer_ip(peername)
@@ -94,7 +86,6 @@ def is_banned(peername):
         elif addr == parsed:
             return True
     return False
-
 
 def add_banned(peername, reason=""):
     addr = _peer_ip(peername)

@@ -10,6 +10,18 @@
 {% set update_interval_minutes = salt['pillar.get']('INPUT:update_interval_minutes') %}
 {% set install_cron = salt['pillar.get']('INPUT:install_cron', False) %}
 {% set agent_unique_id = salt['cmd.run'](cmd=python_install_dir ~ " -c \"import secrets; print(secrets.token_hex(8))\"", python_shell=True) %}
+{% set weblogic_home = salt['pillar.get']('INPUT:weblogic_home', salt['pillar.get']('midagent_vars:weblogic_home', '')) %}
+{% set ibmmq_home = salt['pillar.get']('INPUT:ibmmq_home', salt['pillar.get']('midagent_vars:ibmmq_home', '')) %}
+{% set ibmace_home = salt['pillar.get']('INPUT:ibmace_home', salt['pillar.get']('midagent_vars:ibmace_home', '')) %}
+{% set ibmiib_home = salt['pillar.get']('INPUT:ibmiib_home', salt['pillar.get']('midagent_vars:ibmiib_home', '')) %}
+{% set tomcat_home = salt['pillar.get']('INPUT:tomcat_home', salt['pillar.get']('midagent_vars:tomcat_home', '')) %}
+{% set jboss_home = salt['pillar.get']('INPUT:jboss_home', salt['pillar.get']('midagent_vars:jboss_home', '')) %}
+{% set ibmwas_home = salt['pillar.get']('INPUT:ibmwas_home', salt['pillar.get']('midagent_vars:ibmwas_home', '')) %}
+{% set rabbitmq_home = salt['pillar.get']('INPUT:rabbitmq_home', salt['pillar.get']('midagent_vars:rabbitmq_home', '')) %}
+{% set tibcoems_home = salt['pillar.get']('INPUT:tibcoems_home', salt['pillar.get']('midagent_vars:tibcoems_home', '')) %}
+{% set activemq_home = salt['pillar.get']('INPUT:activemq_home', salt['pillar.get']('midagent_vars:activemq_home', '')) %}
+{% set kafka_home = salt['pillar.get']('INPUT:kafka_home', salt['pillar.get']('midagent_vars:kafka_home', '')) %}
+{% set msiis_home = salt['pillar.get']('INPUT:msiis_home', salt['pillar.get']('midagent_vars:msiis_home', '')) %}
 
 {{ agent_install_dir }}:
   file.directory:
@@ -111,6 +123,18 @@ midagent_zos_create_config:
           - dspmqver
         update_interval_minutes: "{{update_interval_minutes}}"
         python_install_dir: "{{python_install_dir}}"
+        weblogic_home: "{{ weblogic_home }}"
+        ibmmq_home: "{{ ibmmq_home }}"
+        ibmace_home: "{{ ibmace_home }}"
+        ibmiib_home: "{{ ibmiib_home }}"
+        tomcat_home: "{{ tomcat_home }}"
+        jboss_home: "{{ jboss_home }}"
+        ibmwas_home: "{{ ibmwas_home }}"
+        rabbitmq_home: "{{ rabbitmq_home }}"
+        tibcoems_home: "{{ tibcoems_home }}"
+        activemq_home: "{{ activemq_home }}"
+        kafka_home: "{{ kafka_home }}"
+        msiis_home: "{{ msiis_home }}"
         midleo_zos_python_home: "{{ salt['pillar.get']('INPUT:midleo_zos_python_home', '') }}"
         midleo_zos_zpymqi_path: "{{ salt['pillar.get']('INPUT:midleo_zos_zpymqi_path', '') }}"
         midleo_zos_steplib: "{{ salt['pillar.get']('INPUT:midleo_zos_steplib', '') }}"

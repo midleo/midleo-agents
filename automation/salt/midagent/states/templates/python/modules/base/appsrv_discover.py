@@ -9,7 +9,6 @@ import threading
 
 from modules.base import appsrv_catalog, classes, configs
 
-
 try:
     DEFAULT_CMD_TIMEOUT = max(1, min(30, int(
         configs.getcfgData().get("APPSRV_CMD_TIMEOUT_SECONDS", "3")
@@ -33,16 +32,14 @@ _IBM_MQ_RPM_VERSION_RE = re.compile(
     r"^(\d+\.\d+\.\d+)-(\d+)(?:\.[a-z0-9_.-]+)?$", re.IGNORECASE
 )
 
-
 def _safe_lower(value):
     try:
         return str(value or "").strip().lower()
     except Exception:
         return ""
 
-
 def normalize_version(raw, product_type=""):
-    """Extract a product version without retaining package-manager releases."""
+                                                                               
     try:
         text = str(raw or "").strip()
     except Exception:
@@ -59,9 +56,8 @@ def normalize_version(raw, product_type=""):
     match = _VERSION_RE.search(text)
     return match.group(1) if match else ""
 
-
 def match_software_item(item, os_type=""):
-    """Return at most one canonical product key for an inventory row."""
+                                                                        
     if not isinstance(item, dict):
         return []
     name = item.get("name")
@@ -74,7 +70,6 @@ def match_software_item(item, os_type=""):
             name, item.get("publisher")
         )
     return [key] if key else []
-
 
 def _normalize_records(records):
     cleaned = []
@@ -94,14 +89,13 @@ def _normalize_records(records):
     cleaned.sort(key=lambda row: (row["type"], row["version"]))
     return cleaned
 
-
 def _parse_version_output(text):
     if not text:
         return ""
     lines = [line.strip() for line in str(text).splitlines() if line.strip()]
 
-    # Prefer explicitly labelled product-version lines. This avoids returning a
-    # copyright year, Java level, installer level, or an error-code number.
+                                                                               
+                                                                           
     for line in lines:
         if _VERSION_LABEL_RE.search(line):
             version = normalize_version(line)
@@ -113,16 +107,14 @@ def _parse_version_output(text):
             return normalize_version(line)
     return ""
 
-
 def _default_which(name):
     try:
         return shutil.which(name) or ""
     except Exception:
         return ""
 
-
-def _default_run_command(argv, timeout=DEFAULT_CMD_TIMEOUT):
-    """Run a fixed detector command with timeout and bounded captured output."""
+def _default_run_command(argv, timeout=DEFAULT_CMD_TIMEOUT, env=None):
+                                                                                
     if not isinstance(argv, (list, tuple)) or not argv:
         return ""
     command = [str(value) for value in argv]
@@ -142,7 +134,7 @@ def _default_run_command(argv, timeout=DEFAULT_CMD_TIMEOUT):
             if os.name == "posix":
                 os.killpg(process.pid, signal.SIGKILL)
             elif process.poll() is None:
-                # Version scripts can launch Java children which inherit stdout.
+                                                                                
                 subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                timeout=2, creationflags=subprocess.CREATE_NO_WINDOW)
@@ -163,6 +155,7 @@ def _default_run_command(argv, timeout=DEFAULT_CMD_TIMEOUT):
             shell=False,
             start_new_session=os.name == "posix",
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            env=env,
         )
 
         def read_stdout():
@@ -219,13 +212,11 @@ def _default_run_command(argv, timeout=DEFAULT_CMD_TIMEOUT):
             except Exception:
                 pass
 
-
 def _default_path_exists(path):
     try:
         return os.path.isfile(os.path.expandvars(path))
     except Exception:
         return False
-
 
 def _collect_package_hits(software_list, os_type):
     hits = {}
@@ -239,7 +230,7 @@ def _collect_package_hits(software_list, os_type):
                 if key == "aap":
                     name = _safe_lower(item.get("name")).split(":", 1)[0]
                     if name != "ansible-automation-platform" and "ansible automation platform" not in name:
-                        # Controller/hub/Tower versions are not AAP platform versions.
+                                                                                      
                         version = ""
                 bucket = hits.setdefault(
                     key, {"versions": set(), "preferred_versions": set()}
@@ -250,7 +241,6 @@ def _collect_package_hits(software_list, os_type):
         except Exception:
             continue
     return hits
-
 
 def _run_version_detector(spec, which_fn, run_command_fn):
     for detector in spec.get("version_binaries") or ():
@@ -272,7 +262,6 @@ def _run_version_detector(spec, which_fn, run_command_fn):
             continue
     return "", False
 
-
 def _path_hint_evidence(spec, os_type, path_exists_fn):
     allowed = tuple(_safe_lower(value) for value in (spec.get("os") or ()))
     if allowed and _safe_lower(os_type) not in allowed:
@@ -285,7 +274,6 @@ def _path_hint_evidence(spec, os_type, path_exists_fn):
             continue
     return False
 
-
 def discover_application_servers(
     software_list,
     os_type="",
@@ -295,7 +283,7 @@ def discover_application_servers(
     path_exists_fn=None,
     **_ignored,
 ):
-    """Return deterministic ``[{type, version}, ...]`` product facts."""
+                                                                        
     os_type = os_type or platform.system()
     os_release = os_release or platform.release()
     which_fn = which_fn or _default_which
@@ -341,8 +329,8 @@ def discover_application_servers(
                     spec, which_fn, run_command_fn
                 )
                 if detected:
-                    # One default-path executable cannot invalidate evidence of
-                    # several installed product versions.
+                                                                               
+                                                         
                     usable = [detected] if prefer_detected and len(usable) <= 1 else sorted(
                         set(usable + [detected])
                     )

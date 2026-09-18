@@ -11,7 +11,6 @@ from modules.base import configs
 
 JOB_NAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]
@@ -22,12 +21,10 @@ def _arg(index, name):
         raise ValueError("Empty required argument: " + name)
     return value
 
-
 def _root_config(config_data):
     config_data = config_data if isinstance(config_data, dict) else {}
     root = config_data.get("message_backup")
     return root if isinstance(root, dict) else config_data
-
 
 def _as_bool(value, default=False):
     if isinstance(value, bool):
@@ -35,7 +32,6 @@ def _as_bool(value, default=False):
     if value is None:
         return default
     return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
-
 
 def remove_message_backup():
     job_name = _arg(1, "JOB_NAME")
@@ -58,7 +54,6 @@ def remove_message_backup():
     )
     configs.saveMessageBackupData(config_data)
     print("Message backup job " + job_name + " removed")
-
 
 if __name__ == "__main__":
     remove_message_backup()

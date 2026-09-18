@@ -8,7 +8,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import configs
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]
@@ -18,7 +17,6 @@ def _arg(index, name):
     if not value:
         raise ValueError("Empty required argument: " + name)
     return value
-
 
 def disableAvl():
     appsrv = _arg(1, "APPSRV")
@@ -32,7 +30,6 @@ def disableAvl():
 
     configs.saveAvlData(avl_data)
     print("Availability check for " + appsrv + " have been disabled")
-
 
 if __name__ == "__main__":
     disableAvl()

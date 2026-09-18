@@ -10,9 +10,7 @@ sys.path.insert(0, parentdir)
 from modules.statistics import common
 from modules.base import configs, secrets
 
-
 REMOVED_OPTADVISOR_AUTH_KEYS = secrets.REMOVED_AUTH_KEYS
-
 
 def _print_state(state):
     output = {
@@ -29,11 +27,9 @@ def _print_state(state):
         output["removed_token_fields"] = int(state.get("removed_token_fields", 0))
     print(json.dumps(output, sort_keys=True))
 
-
 def _usage():
     print("usage: optadvisorctl.py enable [days]|disable [reason]|status")
     return 1
-
 
 def _remove_removed_token_fields():
     opt_data = configs.getOptAdvisorData()
@@ -53,7 +49,6 @@ def _remove_removed_token_fields():
     if changed:
         configs.saveOptAdvisorData(opt_data)
     return removed
-
 
 def main(argv):
     action = argv[1].lower() if len(argv) > 1 else "status"
@@ -79,7 +74,6 @@ def main(argv):
         _print_state(state)
         return 0
     return _usage()
-
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

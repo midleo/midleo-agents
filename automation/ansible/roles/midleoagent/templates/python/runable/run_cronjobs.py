@@ -50,16 +50,13 @@ BLOCKED_CRON_SCRIPTS = {
     "stopavl.py",
 }
 
-
 def now_str():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 
 def log(message, level="DEBUG"):
     if LOG_ENABLED and level == "DEBUG":
         level = "INFO"
     classes.Log(message, level, "cron")
-
 
 def read_json(path, default=None):
     if default is None:
@@ -71,7 +68,6 @@ def read_json(path, default=None):
     except Exception:
         return default
 
-
 def write_json_atomic(path, data):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
@@ -82,12 +78,10 @@ def write_json_atomic(path, data):
     except Exception:
         pass
 
-
 def ensure_state_file():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     if not os.path.isfile(STATE_FILE):
         write_json_atomic(STATE_FILE, {})
-
 
 def read_nextrun_ts():
     try:
@@ -97,14 +91,12 @@ def read_nextrun_ts():
     except Exception:
         return int(time.time())
 
-
 def has_config_data(config_file):
     if not config_file:
         return True
     path = os.path.join(CONFIG_DIR, config_file)
     data = read_json(path, {})
     return isinstance(data, dict) and len(data) > 0
-
 
 def rule_matches(rule, now_dt):
     if not isinstance(rule, dict):
@@ -147,10 +139,8 @@ def rule_matches(rule, now_dt):
 
     return False
 
-
 def resolve_args(args, context):
     return [str(item).format(**context) for item in (args or [])]
-
 
 def safe_script_path(script_name):
     script_name = str(script_name or "")
@@ -168,7 +158,6 @@ def safe_script_path(script_name):
     except ValueError:
         raise ValueError("cron script outside runable directory")
     return script_path
-
 
 def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
     if not isinstance(job, dict):
@@ -214,7 +203,6 @@ def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
 
     return True
 
-
 def _terminate_job_tree(process):
     try:
         if os.name == "posix":
@@ -233,7 +221,6 @@ def _terminate_job_tree(process):
         process.wait(timeout=1)
     except (OSError, subprocess.SubprocessError):
         log("Unable to confirm timeout cleanup for job pid=" + str(process.pid), "WARNING")
-
 
 def _capture_job(command, timeout_seconds):
     tails = [bytearray(), bytearray()]
@@ -275,7 +262,6 @@ def _capture_job(command, timeout_seconds):
     if timed_out:
         stderr = "job timed out after " + str(timeout_seconds) + " seconds"
     return code, stdout, stderr
-
 
 def run_job(script_name, args, job=None):
     python_bin = os.environ.get("PYTHON") or sys.executable
@@ -336,7 +322,6 @@ def run_job(script_name, args, job=None):
         "stdout": stdout,
         "stderr": stderr,
     }
-
 
 def main():
     if not os.path.isfile(CRON_CONFIG_FILE):
@@ -406,7 +391,6 @@ def main():
     write_json_atomic(STATE_FILE, state)
 
     return exit_code
-
 
 if __name__ == "__main__":
     sys.exit(main())

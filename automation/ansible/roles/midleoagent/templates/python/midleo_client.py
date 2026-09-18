@@ -126,7 +126,6 @@ def _get_cfg():
         "bind_host": bind_host,
     }
 
-
 async def _read_framed_or_legacy(reader: asyncio.StreamReader) -> bytes:
     try:
         hdr = await asyncio.wait_for(reader.readexactly(4), timeout=READ_TIMEOUT)
@@ -144,7 +143,6 @@ async def _read_framed_or_legacy(reader: asyncio.StreamReader) -> bytes:
 
     return await asyncio.wait_for(reader.readexactly(frame_len), timeout=READ_TIMEOUT)
 
-
 def _decode_json_bytes(b: bytes):
     s = b.strip()
     if not s:
@@ -152,7 +150,6 @@ def _decode_json_bytes(b: bytes):
     if isinstance(s, (bytes, bytearray)):
         s = s.decode("utf-8", errors="strict")
     return json.loads(s)
-
 
 def _decode_request_payload(raw, cfg):
     datamess = _decode_json_bytes(raw)
@@ -167,7 +164,6 @@ def _decode_request_payload(raw, cfg):
         raise ValueError("invalid payload")
     return data
 
-
 def _invalid_payload_threshold(cfg):
     try:
         value = int(str(cfg.get("BAN_INVALID_PAYLOAD_THRESHOLD", "1")).strip() or "1")
@@ -175,14 +171,12 @@ def _invalid_payload_threshold(cfg):
         value = 1
     return max(1, min(value, 10))
 
-
 def _is_malformed_protocol_error(ex):
     if isinstance(ex, (UnicodeDecodeError, json.JSONDecodeError, binascii.Error, zlib.error)):
         return True
     if isinstance(ex, ValueError):
         return str(ex) in ("empty", "invalid envelope", "invalid encrypted payload", "invalid payload")
     return False
-
 
 def _ban_malformed_peer(peername, ex, cfg):
     host = str(peername[0] if isinstance(peername, (tuple, list)) else peername)
@@ -201,7 +195,6 @@ def _ban_malformed_peer(peername, ex, cfg):
     if banlist.add_banned(peername, "invalid protocol data: " + str(ex)):
         classes.Err("Info:Added banned IP " + host + " reason=invalid protocol data")
 
-
 def _reply(now_str, parts, cfgkey):
     payload = {"time": now_str, "log": parts}
     encoded = json.dumps(payload, ensure_ascii=False)
@@ -212,10 +205,8 @@ def _reply(now_str, parts, cfgkey):
         else encrypted.encode("utf-8", errors="replace")
     )
 
-
 def _sanitize(text):
     return secrets.redact_text(text)
-
 
 def _split_commands(raw):
     raw = raw.strip()
@@ -271,7 +262,6 @@ def _split_commands(raw):
 
     return commands
 
-
 def _contains_unquoted_shell_syntax(value):
     quote = None
     escaped = False
@@ -302,7 +292,6 @@ def _contains_unquoted_shell_syntax(value):
 
     return False
 
-
 def _extract_json_object_arg(value):
     start = value.find("{")
     if start < 0:
@@ -326,7 +315,6 @@ def _extract_json_object_arg(value):
         return None
 
     return prefix, value[start:start + end]
-
 
 def _magent_json_args(cmd_str):
     extracted = _extract_json_object_arg(cmd_str)
@@ -354,22 +342,18 @@ def _magent_json_args(cmd_str):
 
     return args + [json_text]
 
-
 def _strip_wrapping_quotes(value):
     value = value.strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
         return value[1:-1]
     return value
 
-
 def _normalize_escaped_quotes(value):
     return value.replace('\\"', '"')
-
 
 def _token_exe_name(value):
     exe = os.path.basename(str(value).strip("\"'")).lower()
     return exe[:-4] if exe.endswith(".exe") else exe
-
 
 def _has_shell_meta_token(args):
     for token in args:
@@ -378,7 +362,6 @@ def _has_shell_meta_token(args):
         if "$(" in token or "${" in token:
             return True
     return False
-
 
 def _shell_c_args(cmd_str):
     try:
@@ -403,7 +386,6 @@ def _shell_c_args(cmd_str):
 
     return None
 
-
 def _command_args(cmd_str):
     magent_args = _magent_json_args(cmd_str)
     if magent_args is not None:
@@ -420,7 +402,6 @@ def _command_args(cmd_str):
         return shlex.split(cmd_str, posix=os.name != "nt")
     except ValueError as ex:
         raise ValueError("invalid command syntax: " + str(ex))
-
 
 def _command_index(args):
     if not args:
@@ -445,7 +426,6 @@ def _command_index(args):
 
     return index
 
-
 def _command_exe(args):
     index = _command_index(args)
     exe = os.path.basename(args[index]).lower()
@@ -453,23 +433,19 @@ def _command_exe(args):
         exe = exe[:-4]
     return exe
 
-
 def _normalize_exe(value):
     exe = os.path.basename(value).lower()
     return exe[:-4] if exe.endswith(".exe") else exe
 
-
 def _allowed_entry_has_path(value):
     cleaned = str(value).strip("\"'")
     return os.path.isabs(cleaned) or "/" in cleaned or "\\" in cleaned
-
 
 def _command_candidate_path(value):
     cleaned = str(value).strip("\"'")
     return os.path.realpath(
         cleaned if os.path.isabs(cleaned) else os.path.join(os.getcwd(), cleaned)
     )
-
 
 def _command_is_allowed(args, cmd_index, exe, allowed):
     for entry in allowed:
@@ -483,7 +459,6 @@ def _command_is_allowed(args, cmd_index, exe, allowed):
         if exe == _normalize_exe(entry):
             return True
     return False
-
 
 def _validate_command(cmd_str, allowed):
     if not cmd_str or not cmd_str.strip():
@@ -522,7 +497,6 @@ def _validate_command(cmd_str, allowed):
 
     return args
 
-
 async def _run_command(cmd_str, allowed, allow_shell):
     args = _validate_command(cmd_str, allowed)
 
@@ -548,13 +522,11 @@ async def _run_command(cmd_str, allowed, allow_shell):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, _do)
 
-
 async def _close_writer(writer):
     writer.close()
     wait_closed = getattr(writer, "wait_closed", None)
     if wait_closed is not None:
         await wait_closed()
-
 
 def _safe_path(filename, roots):
     if not filename or "\x00" in filename:
@@ -573,7 +545,6 @@ def _safe_path(filename, roots):
 
     raise ValueError("file path outside allowed roots")
 
-
 def _path_under(root, path):
     real_root = os.path.realpath(root)
     real_path = os.path.realpath(path)
@@ -581,7 +552,6 @@ def _path_under(root, path):
         return os.path.commonpath([real_root, real_path]) == real_root
     except ValueError:
         return False
-
 
 def _install_relative_parts(path):
     real_base = os.path.realpath(os.getcwd())
@@ -593,16 +563,13 @@ def _install_relative_parts(path):
         return []
     return [part.lower() for part in rel.split(os.sep) if part and part != "."]
 
-
 def _is_allowed_extcheck_upload(path):
     if not _path_under(os.path.join(os.getcwd(), "extchecks"), path):
         return False
     return os.path.splitext(path)[1].lower() in REMOTE_EXTCHECK_EXTENSIONS
 
-
 def _is_action_root_path(path, action_roots):
     return any(_path_under(root, path) for root in action_roots)
-
 
 def _validate_remote_file_target(path, cfg):
     if _is_action_root_path(path, cfg.get("action_roots", [])) and not _is_allowed_extcheck_upload(path):
@@ -622,7 +589,6 @@ def _validate_remote_file_target(path, cfg):
     if top == "extchecks" and not _is_allowed_extcheck_upload(path):
         raise ValueError("remote extcheck uploads must use .mdl files")
 
-
 def _decompress_file(encoded_file):
     raw = base64.b64decode(encoded_file)
     decompressor = zlib.decompressobj()
@@ -631,7 +597,6 @@ def _decompress_file(encoded_file):
     if len(content) > MAX_FILE_BYTES:
         raise ValueError("file is too large")
     return content.decode("utf-8").replace("\r", "")
-
 
 def _is_private_runtime_path(path):
     real_path = os.path.realpath(path)
@@ -643,7 +608,6 @@ def _is_private_runtime_path(path):
         except ValueError:
             continue
     return False
-
 
 def _write_remote_file(filename, encoded_file, cfg):
     safe_filename = _safe_path(filename, cfg["remote_roots"])
@@ -666,12 +630,10 @@ def _write_remote_file(filename, encoded_file, cfg):
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-
 def _delete_remote_file(filename, cfg):
     safe_filename = _safe_path(filename, cfg["remote_roots"])
     _validate_remote_file_target(safe_filename, cfg)
     os.remove(safe_filename)
-
 
 async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     cfg = _get_cfg()
@@ -794,7 +756,6 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
         except Exception:
             pass
 
-
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     addr = writer.get_extra_info("peername")
     if banlist.is_banned(addr):
@@ -806,7 +767,6 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         return
     async with CLIENT_SEMAPHORE:
         await _handle_client(reader, writer)
-
 
 async def main():
     global CLIENT_SEMAPHORE
@@ -823,7 +783,6 @@ async def main():
         server.close()
         await server.wait_closed()
 
-
 def _run_async_main(coro):
     run = getattr(asyncio, "run", None)
     if run is not None:
@@ -835,7 +794,6 @@ def _run_async_main(coro):
         loop.run_until_complete(coro)
     finally:
         loop.close()
-
 
 if __name__ == "__main__":
     _run_async_main(main())

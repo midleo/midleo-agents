@@ -31,24 +31,20 @@ def _parse_expiry(value):
     except Exception:
         return None
 
-
 def _is_expired(valid_to):
     dt = _parse_expiry(valid_to)
     if not dt:
         return False
     return dt < datetime.now(timezone.utc)
 
-
 def _get_excluded_aliases(value):
     excludes = value.get("exclude_aliases", "")
     return {x.strip() for x in excludes.split(",") if x.strip()}
-
 
 def _run_cmd(cmd):
     return subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode(
         "utf-8", errors="ignore"
     )
-
 
 def _list_keytool_entries(cfile, cpass):
     cmd = ["keytool", "-list", "-v", "-keystore", cfile, "-storepass", cpass]
@@ -82,7 +78,6 @@ def _list_keytool_entries(cfile, cpass):
 
     return entries
 
-
 def _list_runmqakm_labels(cfile):
     cmd = ["runmqakm", "-cert", "-list", "all", "-db", cfile, "-stashed"]
     out = _run_cmd(cmd)
@@ -104,7 +99,6 @@ def _list_runmqakm_labels(cfile):
 
     return list(dict.fromkeys(labels))
 
-
 def _get_runmqakm_entry(cfile, label):
     cmd = ["runmqakm", "-cert", "-details", "-db", cfile, "-label", label, "-stashed"]
     out = _run_cmd(cmd)
@@ -125,7 +119,6 @@ def _get_runmqakm_entry(cfile, label):
             certvalid = line.split(":", 1)[1].strip()
 
     return {"alias": label, "cn": certcn, "valid": certvalid}
-
 
 def Run(uid):
     try:

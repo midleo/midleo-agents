@@ -1,7 +1,6 @@
 
 import re
 
-
 SUPPORTED_KEYS = (
     "ibmmq",
     "fte",
@@ -23,7 +22,6 @@ SUPPORTED_KEYS = (
     "axwaycft",
     "database",
 )
-
 
 SUPPORTED_APPLICATIONS = {
     "ibmmq": {
@@ -317,16 +315,13 @@ SUPPORTED_APPLICATIONS = {
     },
 }
 
-
 _ARCH_SUFFIX_RE = re.compile(r":[a-z0-9][a-z0-9_-]*$", re.IGNORECASE)
-
 
 def normalize_package_name(value):
     name = str(value or "").strip().lower()
     if name and " " not in name:
         name = _ARCH_SUFFIX_RE.sub("", name)
     return name
-
 
 def _compile_rules(field):
     expressions = []
@@ -347,7 +342,6 @@ def _compile_rules(field):
         return None, {}
     return re.compile("(?:" + "|".join(expressions) + ")", re.IGNORECASE), owners
 
-
 _PACKAGE_INDEX = {}
 for _key in SUPPORTED_KEYS:
     for _name in SUPPORTED_APPLICATIONS[_key].get("package_names") or ():
@@ -356,12 +350,10 @@ for _key in SUPPORTED_KEYS:
 _PACKAGE_REGEX, _PACKAGE_REGEX_OWNERS = _compile_rules("package_regexes")
 _WINDOWS_REGEX, _WINDOWS_REGEX_OWNERS = _compile_rules("windows_rules")
 
-
 def _matched_owner(match, owners):
     if match is None or match.lastgroup is None:
         return "", ()
     return owners.get(match.lastgroup, ("", ()))
-
 
 def match_package_name(name):
     normalized = normalize_package_name(name)
@@ -376,7 +368,6 @@ def match_package_name(name):
     )
     return key
 
-
 def match_windows_display_name(name, publisher):
     normalized_name = str(name or "").strip().lower()
     normalized_publisher = str(publisher or "").strip().lower()
@@ -390,7 +381,6 @@ def match_windows_display_name(name, publisher):
         return ""
     return key
 
-
 def is_preferred_package(product_key, name):
     normalized = normalize_package_name(name)
     for pattern in SUPPORTED_APPLICATIONS[product_key].get(
@@ -399,7 +389,6 @@ def is_preferred_package(product_key, name):
         if re.fullmatch(pattern, normalized, re.IGNORECASE):
             return True
     return False
-
 
 def iter_products():
     for key in SUPPORTED_KEYS:

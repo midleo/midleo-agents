@@ -15,7 +15,6 @@ DEFAULT_TIMEOUT_SECONDS = 20
 MAX_LOG_BODY_BYTES = 2048
 _REGISTER_ATTEMPTED = False
 
-
 def _cfg():
     data = configs.getcfgData() or {}
     timeout_raw = data.get("REQUEST_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
@@ -34,14 +33,12 @@ def _cfg():
 
     return {"timeout": timeout, "verify": verify}
 
-
 def _headers():
     return {
         "Content-type": "application/json",
         "Accept": "text/plain",
         "User-Agent": "MWAdmin v." + AGENT_VER,
     }
-
 
 def _with_agent_headers(headers):
     merged = dict(headers or {})
@@ -53,7 +50,6 @@ def _with_agent_headers(headers):
         merged["X-Midleo-Nonce"] = uuid.uuid4().hex
     return merged
 
-
 def _base_url(webssl, website):
     website = str(website or "").strip().rstrip("/")
     if website.startswith("http://") or website.startswith("https://"):
@@ -62,14 +58,11 @@ def _base_url(webssl, website):
     scheme = "https" if str(webssl).strip().lower() in ("y", "yes", "true", "1") else "http"
     return scheme + "://" + website
 
-
 def _utc_now():
     return datetime.now(timezone.utc).replace(microsecond=0)
 
-
 def _iso_now():
     return _utc_now().isoformat().replace("+00:00", "Z")
-
 
 def _record_upload_result(path, status_code=None, error="", accepted=None):
     if not str(path or "").startswith("/pubapi/"):
@@ -126,7 +119,6 @@ def _record_upload_result(path, status_code=None, error="", accepted=None):
     except Exception:
         pass
 
-
 def _drop_legacy_auth_payload_field(value):
     if isinstance(value, dict):
         cleaned = dict(value)
@@ -135,7 +127,6 @@ def _drop_legacy_auth_payload_field(value):
     if isinstance(value, list):
         return [_drop_legacy_auth_payload_field(item) for item in value]
     return value
-
 
 def _strip_legacy_auth_payload(data):
     if data is None:
@@ -154,7 +145,6 @@ def _strip_legacy_auth_payload(data):
         return data
     cleaned = _drop_legacy_auth_payload_field(parsed)
     return json.dumps(cleaned)
-
 
 def _register_agent_identity(webssl, website):
     global _REGISTER_ATTEMPTED
@@ -209,7 +199,6 @@ def _register_agent_identity(webssl, website):
         classes.Log("Agent identity saved for " + str(agent_id), component="http")
         return True
     return False
-
 
 def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
     options = _cfg()
@@ -271,7 +260,6 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
         _record_upload_result(path, None, str(ex))
         return None
 
-
 def _request_with_retry(method, webssl, website, path, data=None, headers=None, max_attempts=3, **kwargs):
     delay = 1.0
     last = None
@@ -284,14 +272,11 @@ def _request_with_retry(method, webssl, website, path, data=None, headers=None, 
             delay = min(delay * 2, 8.0)
     return last
 
-
 def postData(webssl, website, data):
     _request("post", webssl, website, "/pubapi/updatesrv", json.dumps(data))
 
-
 def postStatData(webssl, website, thisdata):
     return _request("post", webssl, website, "/pubapi/updatestat", thisdata)
-
 
 def postibmmqQData(webssl, website, qm, data):
     return _request_with_retry(
@@ -302,7 +287,6 @@ def postibmmqQData(webssl, website, qm, data):
         data,
     )
 
-
 def postibmmqCHData(webssl, website, qm, data):
     return _request_with_retry(
         "post",
@@ -311,7 +295,6 @@ def postibmmqCHData(webssl, website, qm, data):
         "/pubapi/updateibmmqchstat/" + quote(str(qm), safe=""),
         data,
     )
-
 
 def _stat_post_accepted_body(status_code, body=""):
     if status_code is None or int(status_code) < 200 or int(status_code) >= 300:
@@ -331,12 +314,10 @@ def _stat_post_accepted_body(status_code, body=""):
         return False
     return True
 
-
 def _stat_post_accepted(res):
     if res is None:
         return False
     return _stat_post_accepted_body(res.status_code, getattr(res, "text", ""))
-
 
 def _optadvisor_post_accepted(res):
     if res is None or res.status_code < 200 or res.status_code >= 300:
@@ -349,7 +330,6 @@ def _optadvisor_post_accepted(res):
         return False
     return True
 
-
 def postOptAdvisorTelemetry(webssl, website, data, _legacy_token=None):
     headers = _headers()
     payload = dict(data or {})
@@ -361,7 +341,6 @@ def postOptAdvisorTelemetry(webssl, website, data, _legacy_token=None):
         json.dumps(payload),
         headers=headers,
     )
-
 
 def getQRestStat(webssl, website, webport, qmgr, queue, usr, passwd):
     headers = {
@@ -397,10 +376,8 @@ def getQRestStat(webssl, website, webport, qmgr, queue, usr, passwd):
         return res.json()
     return "{}"
 
-
 def postTrackData(webssl, website, thisdata):
     return _request("post", webssl, website, "/pubapi/updateibmqtrack", thisdata)
-
 
 def postMessageBackup(webssl, website, thisdata):
     return _request_with_retry(
@@ -413,18 +390,14 @@ def postMessageBackup(webssl, website, thisdata):
         sensitive_response=True,
     )
 
-
 def postAvlData(webssl, website, thisdata):
     _request("post", webssl, website, "/pubapi/updateappsrvavl", thisdata)
-
 
 def postMonAl(webssl, website, thisdata):
     _request_with_retry("post", webssl, website, "/pubapi/monalert", thisdata)
 
-
 def postMonCheck(webssl, website, thisdata):
     _request_with_retry("post", webssl, website, "/pubapi/extmoncheck", thisdata)
-
 
 def postMaintenance(webssl, website, data):
     _request("post", webssl, website, "/pubapi/servermaintenance", json.dumps(data))

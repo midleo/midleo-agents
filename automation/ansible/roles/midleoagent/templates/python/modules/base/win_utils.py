@@ -1,14 +1,12 @@
 import platform, sys, psutil, socket, datetime, winreg
 from modules.base import appsrv_catalog, classes
 
-
 def _registry_value(key, name):
     try:
         value, _value_type = winreg.QueryValueEx(key, name)
         return str(value or "").strip()
     except Exception:
         return ""
-
 
 def getInstalledSW(hive, flag):
     software_list = []
@@ -70,7 +68,6 @@ def getInstalledSW(hive, flag):
                 pass
 
     return software_list
-
 
 def getIISSoftware():
     registry = None

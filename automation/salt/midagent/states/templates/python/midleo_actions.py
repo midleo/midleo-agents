@@ -25,18 +25,14 @@ STATE_FILE = os.path.join(CONFIG_DIR, "actions_state.json")
 
 STATE_LOCK = threading.Lock()
 
-
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
-
 
 def _now():
     return datetime.now()
 
-
 def _now_str():
     return _now().strftime("%Y-%m-%d %H:%M:%S")
-
 
 def _read_json(path, default=None):
     if default is None:
@@ -47,7 +43,6 @@ def _read_json(path, default=None):
             return data if isinstance(data, dict) else default
     except Exception:
         return default
-
 
 def _write_json_atomic(path, data):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -65,7 +60,6 @@ def _write_json_atomic(path, data):
     finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
-
 
 def _load_runtime_config():
     cfg = configs.getcfgData() or {}
@@ -86,18 +80,14 @@ def _load_runtime_config():
         "action_roots": action_roots,
     }
 
-
 def _get_action_definitions():
     return _read_json(ACTION_CONFIG_FILE, {})
-
 
 def _get_state():
     return _read_json(STATE_FILE, {})
 
-
 def _save_state(state):
     _write_json_atomic(STATE_FILE, state)
-
 
 def _normalize_key(payload):
     appserver_type = str(payload.get("appserver_type", "")).strip()
@@ -105,7 +95,6 @@ def _normalize_key(payload):
     if not appserver_type or not error_code:
         raise ValueError("appserver_type and error_code are required")
     return appserver_type, error_code, appserver_type + "." + error_code
-
 
 def _posix_shell():
     configured = os.environ.get("MIDLEO_SHELL", "").strip()
@@ -122,7 +111,6 @@ def _posix_shell():
 
     return "/bin/bash"
 
-
 def _resolve_script_command(script_path, args):
     args = [str(arg) for arg in (args or [])]
 
@@ -138,7 +126,6 @@ def _resolve_script_command(script_path, args):
         return [_posix_shell(), script_path, *args]
 
     return [script_path, *args]
-
 
 def _safe_action_script(script_path, roots):
     if not script_path or "\x00" in script_path:
@@ -160,7 +147,6 @@ def _safe_action_script(script_path, roots):
             continue
 
     raise ValueError("action script outside allowed roots")
-
 
 def _start_action(action_key, action_cfg, payload, action_roots):
     script_path = str(action_cfg.get("script", "")).strip()
@@ -216,7 +202,6 @@ def _start_action(action_key, action_cfg, payload, action_roots):
         "started_ts": int(time.time()),
     }
 
-
 def _build_alert(runtime_cfg, action_key, action_cfg, state_entry, payload):
     appserver_type = str(payload.get("appserver_type", ""))
     appsrv = str(
@@ -257,7 +242,6 @@ def _build_alert(runtime_cfg, action_key, action_cfg, state_entry, payload):
         "payload": payload,
     }
 
-
 def _send_alert(runtime_cfg, action_key, action_cfg, state_entry, payload):
     if not runtime_cfg["website"] or not runtime_cfg["uid"]:
         classes.Err("midleo_actions missing backend configuration for alert " + action_key)
@@ -267,7 +251,6 @@ def _send_alert(runtime_cfg, action_key, action_cfg, state_entry, payload):
     makerequest.postMonAl(
         runtime_cfg["webssl"], runtime_cfg["website"], json.dumps(alert_data)
     )
-
 
 def _handle_action(payload):
     runtime_cfg = _load_runtime_config()
@@ -366,7 +349,6 @@ def _handle_action(payload):
         "started_at": start_info["started_at"],
     }
 
-
 class ActionHandler(BaseHTTPRequestHandler):
     server_version = "MidleoActions/1.0"
 
@@ -422,14 +404,12 @@ class ActionHandler(BaseHTTPRequestHandler):
             classes.Err("midleo_actions request error: " + str(err))
             self._send_json(400, {"status": "error", "message": str(err)})
 
-
 def main():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     server = ThreadingHTTPServer((HOST, PORT_NUMBER), ActionHandler)
     server.daemon_threads = True
     classes.Log("Listening on " + HOST + ":" + str(PORT_NUMBER), component="actions")
     server.serve_forever()
-
 
 if __name__ == "__main__":
     main()

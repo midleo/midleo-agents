@@ -9,7 +9,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import makerequest, classes, configs
 
-
 def create():
     try:
         config_data = configs.getcfgData()
@@ -35,7 +34,6 @@ def create():
     except Exception as ex:
         classes.Err("Exception in create:" + str(ex))
 
-
 def main():
     data = create()
     config_data = configs.getcfgData()
@@ -51,7 +49,6 @@ def main():
         classes.Err("Error in main:" + str(err))
     except Exception as ex:
         classes.Err("Exception in main:" + str(ex))
-
 
 if __name__ == '__main__':
     main()

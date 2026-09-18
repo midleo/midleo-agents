@@ -8,7 +8,6 @@ sys.path.insert(0, parentdir)
 
 from modules.base import classes, configs
 
-
 def _arg(index, name):
     try:
         value = sys.argv[index]
@@ -18,7 +17,6 @@ def _arg(index, name):
     if not value:
         raise ValueError("Empty required argument: " + name)
     return value
-
 
 def startAvl():
     usr = _arg(1, "USR")
@@ -33,7 +31,6 @@ def startAvl():
     configs.saveAvlData(avl_data)
     classes.WriteData("started," + usr, "avl_" + appsrvtype + "_" + appsrv + ".csv")
     print("Availability check for " + appsrv + " have been started")
-
 
 if __name__ == "__main__":
     startAvl()
