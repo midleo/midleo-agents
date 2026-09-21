@@ -16,7 +16,6 @@ MODULE_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 try:
     lock = common.acquire_optadvisor_lock("runtime")
     if not lock:
-        classes.Err("resetoptadvisor skipped optadvisor runtime lock active")
         raise SystemExit(0)
 
     opt_data = configs.getOptAdvisorData()

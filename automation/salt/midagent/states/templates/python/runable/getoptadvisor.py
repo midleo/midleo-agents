@@ -19,17 +19,14 @@ try:
     lock = None
     runtime_status = common.optadvisor_runtime_status()
     if not runtime_status.get("active"):
-        classes.Err("getoptadvisor skipped runtime status:" + str(runtime_status.get("status", "unknown")))
         raise SystemExit(0)
 
     opt_data = configs.getOptAdvisorData()
     if not opt_data:
-        classes.Err("getoptadvisor skipped no confoptadvisor entries")
         raise SystemExit(0)
 
     lock = common.acquire_optadvisor_lock("runtime")
     if not lock:
-        classes.Err("getoptadvisor skipped optadvisor runtime lock active")
         raise SystemExit(0)
 
     config_data = configs.getcfgData()
@@ -64,13 +61,10 @@ try:
                 payload.setdefault("server_id", payload.get("appsrvid", appsrv))
                 payload.setdefault("optadvisor_technology", srv_type)
                 processed += 1
-                classes.Err("getoptadvisor running " + str(srv_type) + " " + str(appsrv))
+                classes.Log("getoptadvisor running " + str(srv_type) + " " + str(appsrv))
                 stat_module.getStat(appsrv, json.dumps(payload))
         except Exception as err:
             classes.Err("getoptadvisor module " + str(srv_type) + " error:" + str(err))
-
-    if processed == 0:
-        classes.Err("getoptadvisor skipped no enabled server entries")
 
 except Exception as err:
     classes.Err("getoptadvisor error:" + str(err))

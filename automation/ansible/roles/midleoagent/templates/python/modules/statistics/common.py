@@ -442,12 +442,10 @@ def flush_optadvisor_telemetry(prefix, thisnode, website, webssl, _legacy_token,
         return
     optadvisor_config, _ = split_optadvisor_config(stat_data, extra_keys)
     if not optadvisor_enabled(optadvisor_config):
-        classes.Err(prefix + " optadvisor flush skipped disabled")
         return
 
     file = optadvisor_log_path(prefix, thisnode)
     if not os.path.isfile(file):
-        classes.Err(prefix + " optadvisor flush skipped no payload file:" + file)
         return
 
     remaining = []

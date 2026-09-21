@@ -707,12 +707,10 @@ def flushOptAdvisorTelemetry(thisnode, website, webssl, _legacy_token, thisdata)
         return
     optadvisor_config, _ = _split_optadvisor_config(thisdata)
     if not common.optadvisor_enabled(optadvisor_config):
-        classes.Err("weblogic optadvisor flush skipped disabled")
         return
 
     file = _optadvisor_log_path(thisnode)
     if not os.path.isfile(file):
-        classes.Err("weblogic optadvisor flush skipped no payload file:" + file)
         return
 
     remaining = []
