@@ -117,6 +117,17 @@ See the deployment-specific READMEs for required variables and production checks
 - `automation/ansible/README.md`
 - `automation/salt/midagent/README.md`
 
+## Docker middleware versions (vulnerability inventory)
+
+The host agent can report product versions for middleware that runs in Docker, the same way availability already uses `docker exec`.
+
+Sources:
+
+1. Containers named in `config/confavl.json` or `config/confapplstat.json` via `dockercont` / `docker` (including types such as `ibmmqdocker`, `ibmacedocker`, `ibmiibdocker`). If none are configured, Docker version collection is skipped.
+2. Optionally (disabled by default) running containers whose image names match known middleware images.
+
+For each configured target the agent runs `docker inspect` (image/tag/id) and `docker exec` version commands (`dspmqver`, `mqsiservice -v`, …) during the normal server inventory upload, then includes them with `runtime=docker`, `docker_container`, and `docker_image` so Midleo Core can match vulnerabilities. The Docker CLI must be on the agent host PATH and the agent user must be allowed to talk to the daemon.
+
 ## Operations
 
 Common Linux paths:
