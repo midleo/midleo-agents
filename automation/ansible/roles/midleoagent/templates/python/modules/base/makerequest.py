@@ -401,3 +401,7 @@ def postMonCheck(webssl, website, thisdata):
 
 def postMaintenance(webssl, website, data):
     _request("post", webssl, website, "/pubapi/servermaintenance", json.dumps(data))
+
+def postDeactivateServer(webssl, website, data):
+    res = _request("post", webssl, website, "/pubapi/deactivatesrv", json.dumps(data))
+    return res is not None and 200 <= int(res.status_code) < 300

@@ -1,52 +1,89 @@
 ---
 - set_fact:
     agent_install_dir: "/var/midleoagent"
+    python_install_dir: "{{ python_install_dir | default('/usr/bin/python3') }}"
+
+- name: Check mwagent.config exists for deactivate
+  stat:
+    path: "{{ agent_install_dir }}/config/mwagent.config"
+  register: midleo_mwcfg_stat
+
+- name: Mark Midleo server inactive in Core before local removal
+  command: "{{ python_install_dir }} -u {{ agent_install_dir }}/runable/deactivate_server.py"
+  args:
+    chdir: "{{ agent_install_dir }}"
+  register: midleo_deactivate
+  failed_when: false
+  changed_when: midleo_deactivate.rc is defined and midleo_deactivate.rc == 0
+  when: midleo_mwcfg_stat.stat.exists | default(false)
+
+- name: Warn when Core deactivate did not succeed
+  debug:
+    msg: "Midleo Core deactivate returned rc={{ midleo_deactivate.rc | default('n/a') }}; continuing local remove."
+  when:
+    - midleo_mwcfg_stat.stat.exists | default(false)
+    - midleo_deactivate.rc is defined
+    - midleo_deactivate.rc != 0
+
 - name: stop midleoagent
   service:
     name: midleoagent
     state: stopped
+  failed_when: false
+
 - name: stop midleoactions
   service:
     name: midleoactions
     state: stopped
+  failed_when: false
+
 - name: disable service
   systemd:
     name: midleoagent
     enabled: no
     daemon_reload: yes
+  failed_when: false
+
 - name: disable actions service
   systemd:
     name: midleoactions
     enabled: no
     daemon_reload: yes
+  failed_when: false
+
 - name: Remove service file
   file:
     path: "/etc/systemd/system/midleoagent.service"
     state: absent
+
 - name: Remove actions service file
   file:
     path: "/etc/systemd/system/midleoactions.service"
     state: absent
+
 - name: Remove service cron
   file:
     path: "/etc/cron.d/midleoagent"
     state: absent
+
 - name: Remove Midleo sudoers policy
   file:
     path: "/etc/sudoers.d/{{ midleo_mwuser | default('mwadmin') }}.conf"
     state: absent
+
 - name: Remove midleoagent
   file:
     path: "{{ agent_install_dir }}"
     state: absent
+
 - name: Remove Midleo crypto secret when requested
   file:
     path: "/etc/midleo/crypto.secret"
     state: absent
   when: midleo_remove_secrets | default(false) | bool
+
 - name: Remove Midleo crypto directory when requested
   file:
     path: "/etc/midleo"
     state: absent
   when: midleo_remove_secrets | default(false) | bool
-...

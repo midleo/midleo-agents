@@ -3,7 +3,16 @@
 {% set is_zos = osname|lower in ['zos', 'z/os'] or kernel in ['OS/390', 'z/OS'] %}
 {% set agent_install_dir = salt['pillar.get']('midagent_vars:agent_install_dir', '/u/midleoagent/' if is_zos else '/var/midleoagent/') %}
 {% set midleo_mwuser = salt['pillar.get']('midagent_vars:midleo_mwuser', 'MWADMIN' if is_zos else 'mwadmin') %}
+{% set python_install_dir = salt['pillar.get']('midagent_vars:python_install_dir', '/usr/lpp/IBM/cyp/v3r12/pyz/bin/python3' if is_zos else '/usr/bin/python3') %}
 {% set remove_secrets = salt['pillar.get']('INPUT:remove_secrets', False) %}
+
+midagent_deactivate_core:
+  cmd.run:
+    - name: {{ python_install_dir }} -u {{ agent_install_dir }}runable/deactivate_server.py
+    - cwd: {{ agent_install_dir }}
+    - onlyif: test -f {{ agent_install_dir }}config/mwagent.config && test -f {{ agent_install_dir }}runable/deactivate_server.py
+    - python_shell: True
+    - ignore_retcode: True
 
 {% if is_zos %}
 midagent_zos_stop_services:
@@ -12,6 +21,8 @@ midagent_zos_stop_services:
     - onlyif: test -x {{ agent_install_dir }}midleoagent.zos.sh
     - python_shell: True
     - ignore_retcode: True
+    - require:
+      - cmd: midagent_deactivate_core
 
 midagent_zos_cron_absent:
   cron.absent:
@@ -28,11 +39,15 @@ midagent_service_dead:
   service.dead:
     - name: midleoagent
     - enable: False
+    - require:
+      - cmd: midagent_deactivate_core
 
 midagent_actions_service_dead:
   service.dead:
     - name: midleoactions
     - enable: False
+    - require:
+      - cmd: midagent_deactivate_core
 
 midagent_service_file_absent:
   file.absent:

@@ -9,6 +9,21 @@
   failed_when: false
   changed_when: false
 
+- name: Check mwagent.config exists for deactivate
+  stat:
+    path: "{{ agent_install_dir }}config/mwagent.config"
+  register: midleo_mwcfg_stat
+
+- name: Mark Midleo server inactive in Core before local removal
+  shell: "{{ midleo_zos_python | default('/usr/lpp/IBM/cyp/v3r12/pyz/bin/python3') }} -u {{ agent_install_dir }}runable/deactivate_server.py"
+  args:
+    chdir: "{{ agent_install_dir }}"
+    executable: /bin/sh
+  register: midleo_deactivate
+  failed_when: false
+  changed_when: midleo_deactivate.rc is defined and midleo_deactivate.rc == 0
+  when: midleo_mwcfg_stat.stat.exists | default(false)
+
 - name: "Remove z/OS USS cron entry"
   cron:
     name: midleo cronjobs
