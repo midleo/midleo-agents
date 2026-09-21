@@ -1,8 +1,10 @@
 import asyncio
 import base64
 import binascii
+import grp
 import json
 import os
+import pwd
 import re
 import shlex
 import subprocess
@@ -609,7 +611,43 @@ def _is_private_runtime_path(path):
             continue
     return False
 
-def _write_remote_file(filename, encoded_file, cfg):
+def _parse_file_owner(value):
+    value = str(value or "").strip()
+    if not value:
+        return None
+    if ":" in value:
+        user_part, group_part = value.split(":", 1)
+    else:
+        user_part, group_part = value, value
+    try:
+        uid = int(user_part)
+    except ValueError:
+        try:
+            uid = pwd.getpwnam(user_part).pw_uid
+        except Exception:
+            raise ValueError("unknown file owner user: " + user_part)
+    try:
+        gid = int(group_part)
+    except ValueError:
+        try:
+            gid = grp.getgrnam(group_part).gr_gid
+        except Exception:
+            raise ValueError("unknown file owner group: " + group_part)
+    return uid, gid
+
+def _parse_file_mode(value, default_mode):
+    value = str(value or "").strip()
+    if not value:
+        return default_mode
+    try:
+        mode = int(value, 8)
+    except ValueError as ex:
+        raise ValueError("invalid file mode: " + value) from ex
+    if mode < 0 or mode > 0o7777:
+        raise ValueError("invalid file mode: " + value)
+    return mode
+
+def _write_remote_file(filename, encoded_file, cfg, fileowner=None, filemode=None):
     safe_filename = _safe_path(filename, cfg["remote_roots"])
     _validate_remote_file_target(safe_filename, cfg)
     content = _decompress_file(encoded_file)
@@ -620,12 +658,37 @@ def _write_remote_file(filename, encoded_file, cfg):
             os.chmod(directory, 0o700)
         except Exception:
             pass
+    default_mode = 0o600 if _is_private_runtime_path(safe_filename) else 0o644
+    mode = _parse_file_mode(filemode, default_mode)
+    owner = _parse_file_owner(fileowner)
     fd, tmp_path = tempfile.mkstemp(prefix=".mwagent_", dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(content)
-        os.chmod(tmp_path, 0o600 if _is_private_runtime_path(safe_filename) else 0o640)
+        os.chmod(tmp_path, mode)
+        if owner is not None:
+            try:
+                os.chown(tmp_path, owner[0], owner[1])
+            except PermissionError as ex:
+                raise ValueError(
+                    "unable to chown file to "
+                    + str(owner[0])
+                    + ":"
+                    + str(owner[1])
+                    + " ("
+                    + str(ex)
+                    + "); run agent with sufficient privileges or leave fileowner empty"
+                ) from ex
         os.replace(tmp_path, safe_filename)
+        if owner is not None:
+            try:
+                os.chown(directory, owner[0], owner[1])
+            except Exception:
+                pass
+            try:
+                os.chmod(directory, 0o755)
+            except Exception:
+                pass
     finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
@@ -668,7 +731,13 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
 
             if ftype == "create" and filename and f.get("file"):
                 try:
-                    _write_remote_file(filename, f["file"], cfg)
+                    _write_remote_file(
+                        filename,
+                        f["file"],
+                        cfg,
+                        fileowner=f.get("fileowner"),
+                        filemode=f.get("filemode"),
+                    )
                     classes.Log("Remote file created:" + _sanitize(filename) + " from " + str(addr))
                     responses.append("File created:" + filename)
                 except Exception as ex:
