@@ -1,16 +1,20 @@
 import asyncio
 import base64
 import binascii
-import grp
 import json
 import os
-import pwd
 import re
 import shlex
 import subprocess
 import tempfile
 import zlib
 from datetime import datetime
+
+try:
+    import grp
+    import pwd
+except ImportError:
+    grp = pwd = None
 
 from modules.base import banlist, classes, configs, decrypt, secrets
 
@@ -595,9 +599,10 @@ def _decompress_file(encoded_file):
     raw = base64.b64decode(encoded_file)
     decompressor = zlib.decompressobj()
     content = decompressor.decompress(raw, MAX_FILE_BYTES + 1)
-    content += decompressor.flush()
-    if len(content) > MAX_FILE_BYTES:
+    if len(content) > MAX_FILE_BYTES or decompressor.unconsumed_tail:
         raise ValueError("file is too large")
+    if not decompressor.eof:
+        raise ValueError("invalid compressed file")
     return content.decode("utf-8").replace("\r", "")
 
 def _is_private_runtime_path(path):
@@ -615,6 +620,8 @@ def _parse_file_owner(value):
     value = str(value or "").strip()
     if not value:
         return None
+    if pwd is None or grp is None or not hasattr(os, "chown"):
+        raise ValueError("fileowner is supported only on POSIX agents")
     if ":" in value:
         user_part, group_part = value.split(":", 1)
     else:
@@ -633,6 +640,8 @@ def _parse_file_owner(value):
             gid = grp.getgrnam(group_part).gr_gid
         except Exception:
             raise ValueError("unknown file owner group: " + group_part)
+    if uid < 0 or gid < 0:
+        raise ValueError("file owner IDs must be non-negative")
     return uid, gid
 
 def _parse_file_mode(value, default_mode):
@@ -643,7 +652,7 @@ def _parse_file_mode(value, default_mode):
         mode = int(value, 8)
     except ValueError as ex:
         raise ValueError("invalid file mode: " + value) from ex
-    if mode < 0 or mode > 0o7777:
+    if mode < 0 or mode > 0o777:
         raise ValueError("invalid file mode: " + value)
     return mode
 
@@ -652,15 +661,19 @@ def _write_remote_file(filename, encoded_file, cfg, fileowner=None, filemode=Non
     _validate_remote_file_target(safe_filename, cfg)
     content = _decompress_file(encoded_file)
     directory = os.path.dirname(safe_filename)
+    directory_created = not os.path.isdir(directory)
+    private = _is_private_runtime_path(safe_filename)
+    default_mode = 0o600 if private else 0o640
+    mode = _parse_file_mode(filemode, default_mode)
+    owner = _parse_file_owner(fileowner)
+    if private and (mode & 0o077 or owner is not None):
+        raise ValueError("private runtime files must retain agent ownership and private permissions")
     os.makedirs(directory, exist_ok=True)
     if _is_private_runtime_path(directory):
         try:
             os.chmod(directory, 0o700)
         except Exception:
             pass
-    default_mode = 0o600 if _is_private_runtime_path(safe_filename) else 0o644
-    mode = _parse_file_mode(filemode, default_mode)
-    owner = _parse_file_owner(fileowner)
     fd, tmp_path = tempfile.mkstemp(prefix=".mwagent_", dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -680,7 +693,7 @@ def _write_remote_file(filename, encoded_file, cfg, fileowner=None, filemode=Non
                     + "); run agent with sufficient privileges or leave fileowner empty"
                 ) from ex
         os.replace(tmp_path, safe_filename)
-        if owner is not None:
+        if owner is not None and directory_created and not private:
             try:
                 os.chown(directory, owner[0], owner[1])
             except Exception:
