@@ -5,12 +5,28 @@
 - name: "Stat configured product homes"
   stat:
     path: "{{ item.home }}"
+    follow: false
   loop: "{{ midleo_product_home_candidates }}"
   register: midleo_product_home_stats
   when: midleo_product_home_candidates | length > 0
   loop_control:
     label: "{{ item.type }} {{ item.home }}"
 
-- name: "Select product homes that exist on this host"
+- name: "Initialize approved product homes"
   set_fact:
-    midleo_product_homes: "{{ ((midleo_product_home_stats | default({})).results | default([])) | selectattr('stat.isdir', 'defined') | selectattr('stat.isdir') | map(attribute='item') | list }}"
+    midleo_product_homes: []
+
+- name: "Select product homes with a non-root owner"
+  set_fact:
+    midleo_product_homes: "{{ midleo_product_homes + [item.item | combine({'owner_uid': item.stat.uid})] }}"
+  loop: "{{ (midleo_product_home_stats | default({})).results | default([]) }}"
+  when:
+    - item.item.home is match('^/[A-Za-z0-9._/-]+$')
+    - item.stat.isdir | default(false)
+    - not (item.stat.islnk | default(false))
+    - item.stat.uid is defined
+    - item.stat.uid | int > 0
+    - item.stat.pw_name is defined
+    - item.stat.pw_name is match('^[A-Za-z0-9_][A-Za-z0-9_.-]{0,31}$')
+  loop_control:
+    label: "{{ item.item.type }} {{ item.item.home }}"

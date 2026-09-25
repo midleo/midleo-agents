@@ -49,6 +49,7 @@ set -a
 # shellcheck disable=SC1091
 . "$HOMEDIR/mwagent.config"
 set +a
+export -n INTTOKEN
 
 : "${PYTHON:?PYTHON not set}"
 

@@ -40,9 +40,13 @@ Defaults:{{ midleo_mwuser }} !requiretty
 {% set midleo_product_homes = ns.homes %}
 {% endif %}
 {% for item in midleo_product_homes | default([]) %}
-{% if item.home and item.type in product_cmds %}
+{% if item.home and item.home is match('^/[A-Za-z0-9._/-]+$') and item.type in product_cmds and item.owner_uid is defined and item.owner_uid | int > 0 %}
 {% for rel in product_cmds[item.type] %}
-{{ midleo_mwuser }} ALL=(ALL) NOPASSWD: {{ item.home }}/{{ rel }}
+{% if item.type == 'weblogic' %}
+{{ midleo_mwuser }} ALL=(#{{ item.owner_uid | int }}) NOPASSWD: {{ item.home }}/{{ rel }} lsinventory -oh {{ item.home }}
+{% else %}
+{{ midleo_mwuser }} ALL=(#{{ item.owner_uid | int }}) NOPASSWD: {{ item.home }}/{{ rel }}
+{% endif %}
 {% endfor %}
 {% endif %}
 {% endfor %}

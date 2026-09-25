@@ -30,9 +30,13 @@ Defaults:{{ midleo_mwuser }} !requiretty
 {% for type, raw in product_homes.items() %}
 {% for part in (raw | string).split(',') %}
 {% set home = part | trim | regex_replace('/+$', '') %}
-{% if home %}
-{% if salt is defined and salt['file.directory_exists'](home) %}
-{% set ns.homes = ns.homes + [{'type': type, 'home': home}] %}
+{% if home and (home | regex_match('^(/[A-Za-z0-9._/-]+)$')) is not none %}
+{% if salt is defined and salt['file.directory_exists'](home) and not salt['file.is_link'](home) %}
+{% set uid = salt['file.get_uid'](home, follow_symlinks=False) %}
+{% set owner = salt['file.get_user'](home, follow_symlinks=False) %}
+{% if uid is number and uid > 0 and owner and (owner | regex_match('^([A-Za-z0-9_][A-Za-z0-9_.-]{0,31})$')) is not none and salt['file.user_to_uid'](owner) | int == uid %}
+{% set ns.homes = ns.homes + [{'type': type, 'home': home, 'owner_uid': uid}] %}
+{% endif %}
 {% endif %}
 {% endif %}
 {% endfor %}
@@ -40,9 +44,13 @@ Defaults:{{ midleo_mwuser }} !requiretty
 {% set midleo_product_homes = ns.homes %}
 {% endif %}
 {% for item in midleo_product_homes | default([]) %}
-{% if item.home and item.type in product_cmds %}
+{% if item.home and (item.home | regex_match('^(/[A-Za-z0-9._/-]+)$')) is not none and item.type in product_cmds and item.owner_uid is defined and item.owner_uid | int > 0 %}
 {% for rel in product_cmds[item.type] %}
-{{ midleo_mwuser }} ALL=(ALL) NOPASSWD: {{ item.home }}/{{ rel }}
+{% if item.type == 'weblogic' %}
+{{ midleo_mwuser }} ALL=(#{{ item.owner_uid | int }}) NOPASSWD: {{ item.home }}/{{ rel }} lsinventory -oh {{ item.home }}
+{% else %}
+{{ midleo_mwuser }} ALL=(#{{ item.owner_uid | int }}) NOPASSWD: {{ item.home }}/{{ rel }}
+{% endif %}
 {% endfor %}
 {% endif %}
 {% endfor %}

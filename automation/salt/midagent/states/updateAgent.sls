@@ -221,6 +221,7 @@ midagent_update_sudoer:
     - user: root
     - group: root
     - mode: '0440'
+    - check_cmd: /usr/sbin/visudo -c -f
     - template: jinja
     - names:
       - /etc/sudoers.d/{{ midleo_mwuser }}.conf:
