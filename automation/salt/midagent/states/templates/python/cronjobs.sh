@@ -45,21 +45,14 @@ if [ ! -f "$HOMEDIR/mwagent.config" ]; then
   exit 1
 fi
 
+set -a
+# shellcheck disable=SC1091
 . "$HOMEDIR/mwagent.config"
+set +a
 
 : "${PYTHON:?PYTHON not set}"
 
 cd "$MWAGTDIR"
-
-export PYTHON
-export DSPMQ
-export DSPMQVER
-export AMQSEVT
-export RUNMQSC
-export ACEUSR
-export MQSIPROFILE
-export IIBMQSIPROFILE
 export MWAGTDIR
-export JOB_TIMEOUT_SECONDS
 
 exec "$PYTHON" "$MWAGTDIR/runable/run_cronjobs.py"
