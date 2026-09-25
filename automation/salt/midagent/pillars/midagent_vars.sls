@@ -3,6 +3,7 @@ midagent_vars:
    python_install_dir: '/usr/bin/python3'
    midleo_mwuser: 'mwadmin'
    weblogic_home: '/opt/oracle/middleware'
+   weblogic_user: 'oracle'
    ibmmq_home: '/opt/mqm'
    ibmace_home: '/opt/ibm/ace-12/server'
    ibmiib_home: '/opt/ibm/iib-10.0.0.11/server'
