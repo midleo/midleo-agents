@@ -1,7 +1,9 @@
 import base64
 import glob
+import importlib
 import json
 import os
+import re
 import socket
 import subprocess
 import tempfile
@@ -10,6 +12,7 @@ import ssl as ssl_module
 import urllib.error
 import urllib.request
 import uuid
+from urllib.parse import urlsplit
 from datetime import datetime, timezone, timedelta
 
 from modules.base import classes, decrypt, file_utils, makerequest, secrets, statarr
@@ -172,6 +175,77 @@ def rest_json_request(base_url, path, values, method="GET", payload=None, auth="
         with urllib.request.urlopen(request, **options) as response:
             body = response.read().decode("utf-8", errors="replace")
     return json.loads(body) if body else {}
+
+def statistics_module(srvtype):
+    name = str(srvtype or "").strip().lower()
+    name = {"httpd": "apache", "wildfly": "jboss", "ibmacedocker": "ibmace"}.get(name, name)
+    if not re.fullmatch(r"[a-z0-9_]+", name):
+        raise ValueError("Invalid application server type")
+    return importlib.import_module("modules.statistics." + name + "." + name)
+
+def availability_credentials(item):
+    keys = ("usr", "pwd", "mngmport", "ssl", "conntype", "host", "port", "jmxport", "soapport", "webport", "sslverify", "ssl_verify", "servtype", "appserver", "managed_server")
+    return {key: item[key] for key in keys if item.get(key)}
+
+def rest_availability_count(srvtype, appsrv, cred):
+    try:
+        handler = getattr(statistics_module(srvtype), "restAvailabilityCheck", None)
+        if handler is None:
+            classes.Err("rest availability unsupported type:" + str(srvtype))
+            return None
+        return int(handler(appsrv, cred) or 0)
+    except Exception as err:
+        classes.Err("rest availability error:" + str(srvtype) + "/" + str(appsrv) + ":" + str(err))
+        return 0
+
+def availability_count(srvtype, appsrv, item, timeout=55, windows=False):
+    cred = availability_credentials(item)
+    rest_type = str(srvtype).strip().lower()
+    if rest_type in ("apache", "httpd") or (connection_type(cred) == "rest" and rest_type in ("weblogic", "tomcat", "jboss", "wildfly", "ibmwas", "ibmace", "ibmacedocker")):
+        return rest_availability_count(rest_type, appsrv, cred)
+    checks = statarr.avlCheck(appsrv, item.get("dockercont", ""), cred)
+    command = checks.get(srvtype)
+    if not command:
+        classes.Err("avlCheck unsupported type:" + str(srvtype))
+        return None
+    proc = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=timeout, check=False)
+    output = proc.stdout.decode(errors="ignore")
+    if windows:
+        return sum(1 for line in output.splitlines() if appsrv in line)
+    try:
+        return int(output.strip() or "0")
+    except ValueError:
+        classes.Err("avlCheck unexpected output:" + output[:500])
+        return 0
+
+def http_status(thisnode, values=None, default_port="80", url=None, include_body=False):
+    values = values or {}
+    if url is None:
+        endpoint, _ = rest_base_url(thisnode, values, default_port)
+        url = endpoint + "/"
+    parsed = urlsplit(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password or any(ch.isspace() for ch in parsed.netloc):
+        raise ValueError("Invalid HTTP health URL")
+    command = ["curl", "--silent", "--show-error", "--proto", "=http,https", "--connect-timeout", "5", "--max-time", "5", "--output", "-" if include_body else os.devnull, "--write-out", "\n%{http_code} %{time_total}" if include_body else "%{http_code} %{time_total}", "--url", url]
+    if include_body:
+        command.extend(["--max-filesize", "131072"])
+    if not rest_verify_enabled(values):
+        command.append("--insecure")
+    try:
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=8, check=False)
+        output = result.stdout.decode("utf-8", errors="replace")
+        body, _, metadata = output.rpartition("\n") if include_body else ("", "", output)
+        fields = metadata.strip().split()
+        status = {"http_status": int(fields[0]) if fields and result.returncode == 0 else 0, "response_time_ms": float(fields[1]) * 1000 if len(fields) > 1 else 0}
+        if include_body:
+            status["body"] = body if result.returncode == 0 else ""
+        return status
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return {"http_status": 0, "response_time_ms": 0}
+
+def http_available(result, expected=None):
+    code = result.get("http_status", 0)
+    return code == int(expected) if expected is not None else 200 <= code < 400
 
 def write_stat_row(logdir, subtype, row):
     if not logdir or not subtype or not row:

@@ -11,85 +11,15 @@ parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
 from modules.base import classes, configs, makerequest, statarr
+from modules.statistics import common
 
 AVL_TIMEOUT_SECONDS = int(os.environ.get("MIDLEO_AVL_TIMEOUT_SECONDS", "20"))
 
 now = datetime.now()
 current_time = now.strftime("%Y-%m-%d %H:%M:%S")
 
-def _credentials(item):
-    cred = {}
-    if item.get("usr"):
-        cred["usr"] = item["usr"]
-    if item.get("pwd"):
-        cred["pwd"] = item["pwd"]
-    if item.get("mngmport"):
-        cred["mngmport"] = item["mngmport"]
-    if item.get("ssl"):
-        cred["ssl"] = item["ssl"]
-    for key in (
-        "conntype",
-        "host",
-        "port",
-        "jmxport",
-        "soapport",
-        "webport",
-        "sslverify",
-        "ssl_verify",
-        "servtype",
-        "appserver",
-        "managed_server",
-    ):
-        if item.get(key):
-            cred[key] = item[key]
-    return cred
-
-def _availability_module_name(srvtype):
-    srvtype = str(srvtype or "").strip().lower()
-    if srvtype == "wildfly":
-        return "jboss"
-    if srvtype == "ibmacedocker":
-        return "ibmace"
-    return srvtype
-
-def _rest_availability_count(srvtype, appsrv, cred):
-    module_name = _availability_module_name(srvtype)
-    try:
-        stat_module = importlib.import_module(
-            "modules.statistics." + module_name + "." + module_name
-        )
-        handler = getattr(stat_module, "restAvailabilityCheck", None)
-        if handler is None:
-            classes.Err("rest availability unsupported type:" + str(srvtype))
-            return None
-        return int(handler(appsrv, cred) or 0)
-    except Exception as err:
-        classes.Err("rest availability error:" + str(srvtype) + "/" + str(appsrv) + ":" + str(err))
-        return 0
-
 def _availability_count(srvtype, appsrv, item):
-    cred = _credentials(item)
-    rest_type = str(srvtype).strip().lower()
-    if str(cred.get("conntype", "jms")).strip().lower() == "rest":
-        if rest_type in ("weblogic", "tomcat", "jboss", "wildfly", "ibmwas", "ibmace", "ibmacedocker"):
-            return _rest_availability_count(rest_type, appsrv, cred)
-
-    checks = statarr.avlCheck(appsrv, item.get("dockercont", ""), cred)
-    command = checks.get(srvtype)
-    if not command:
-        classes.Err("avlCheck unsupported type:" + str(srvtype))
-        return None
-
-    proc = subprocess.run(
-        command,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        timeout=AVL_TIMEOUT_SECONDS,
-        check=False,
-    )
-    out = proc.stdout.decode(errors="ignore")
-    return sum(1 for line in out.splitlines() if appsrv in line)
+    return common.availability_count(srvtype, appsrv, item, AVL_TIMEOUT_SECONDS, windows=True)
 
 def _send_offline_alert(webssl, website, uid, srvtype, appsrv, item):
     if "monid" not in item:

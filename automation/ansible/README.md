@@ -108,9 +108,9 @@ Linux deployment also creates `/etc/midleo/crypto.secret` once and preserves it 
 
 ## Vendor Libraries
 
-Create `/midleolibs/lib` and `/midleolibs/vendor` on hosts that need Java or vendor-specific statistics modules.
+Create `/midleolibs/libs` and `/midleolibs/vendor` on hosts that need Java or vendor-specific statistics modules.
 
-`/midleolibs/lib`:
+`/midleolibs/libs`:
 
 ```text
 activemq-client-6.1.6.jar

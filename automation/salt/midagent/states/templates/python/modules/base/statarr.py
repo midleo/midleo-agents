@@ -53,6 +53,16 @@ def tomcat():
     arr["keys"]["count"]=3
     return arr
 
+def apache():
+    arr={}
+    arr["noteq"]="key"
+    arr["node"]=1
+    arr["server"]=1
+    arr["keys"]={}
+    arr["keys"]["timestamp"]=2
+    arr["keys"]["count"]=3
+    return arr
+
 def activemq():
     arr={}
     arr["noteq"]="key"
