@@ -72,6 +72,16 @@ class NativeConfigurationOperations(ApacheOperations):
             raise ValueError('Use existing native management APIs for service controls')
         self.run(['restart', self.service_unit], 'service_activation')
 
+    def deploy(self, request):
+
+
+        if self.technology == 'jboss':
+            for entry in request.get('files', []):
+                name = str(entry.get('target', ''))
+                if name.endswith('.xml') or Path(name).name == 'logging.properties':
+                    raise ValueError('BLOCKED_MANAGED_CONFIGURATION: JBoss XML and generated logging configuration require native management operations')
+        return super().deploy(request)
+
     def inspect(self):
         return {'configuration_directory': str(self.root), 'files': sorted(self.allowed), 'fingerprint': self.fingerprint(),
                 'policy_hash': self.policy_hash(), 'status': 'running' if self.health() else 'unavailable'}
