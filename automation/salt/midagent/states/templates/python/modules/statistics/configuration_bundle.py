@@ -95,7 +95,7 @@ def redact_configuration(text):
 
 
 class BundleConfigurationOperations:
-    def __init__(self, policy, runner=None, health_probe=None, encrypt=None):
+    def __init__(self, policy, runner=None, health_probe=None, encrypt=None, decrypt=None):
         self.policy = policy
         self.technology = policy.get('technology')
         if self.technology not in ROOT_KEYS:
@@ -103,6 +103,9 @@ class BundleConfigurationOperations:
         self.runner = runner
         self.health_probe = health_probe
         self.encrypt = encrypt
+        self.decrypt = decrypt
+        self.configuration_directory = False
+        self.file_operations_only = False
         self.root = self.directory('config_root')
         root_details = self.root.stat()
         self.root_identity = (root_details.st_dev, root_details.st_ino)
@@ -130,10 +133,12 @@ class BundleConfigurationOperations:
                       ('%s:%s:%s:%s' % (details.st_dev, details.st_ino, details.st_uid, details.st_mode)).encode())
 
     def resolve_configuration_root(self, request):
+        self.configuration_directory = self.technology == 'tomcat' and request.get('configuration_directory') is True
+        self.file_operations_only = request.get('file_operations_only') is True
         override = request.get('configuration_root', '')
         if override and override != str(self.root):
             raise ValueError('Configuration directory differs from the approved agent policy')
-        return {'configuration_root': str(self.root), 'field': ROOT_KEYS[self.technology],
+        return {'configuration_root': str(self.root), 'field': 'tomcatConfigDir' if self.configuration_directory else ROOT_KEYS[self.technology],
                 'readable': os.access(str(self.root), os.R_OK | os.X_OK),
                 'writable': os.access(str(self.root), os.W_OK | os.X_OK), 'policy_hash': self.policy_hash()}
 
@@ -141,7 +146,7 @@ class BundleConfigurationOperations:
     def parent(self, name, create=False):
         if os.name == 'nt':
             raise ValueError('Safe bundle file operations currently require a POSIX agent')
-        pieces = relative(name).split('/')
+        pieces = self.configuration_name(name).split('/')
         flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
         descriptor = os.open('/', flags)
         try:
@@ -172,7 +177,7 @@ class BundleConfigurationOperations:
         code, reason = self.classify_configuration_change(name)
         if code != 'SUPPORTED':
             return code, reason
-        if name not in self.allowed:
+        if not self.allowed_configuration(name):
             return 'BLOCKED_UNAUTHORIZED_PATH', 'Resource is not in the selected instance agent allowed_files policy.'
 
         try:
@@ -186,7 +191,7 @@ class BundleConfigurationOperations:
         except FileNotFoundError:
 
             current = self.root
-            for piece in name.split('/')[:-1]:
+            for piece in self.configuration_name(name).split('/')[:-1]:
                 current = current / piece
                 if current.is_symlink() or (current.exists() and not current.is_dir()):
                     return 'BLOCKED_UNSAFE_PATH', 'Unsafe configuration parent.'
@@ -195,10 +200,19 @@ class BundleConfigurationOperations:
         return code, reason
 
     def classify_configuration_change(self, name):
+        if self.configuration_directory:
+            return classify(self.technology, 'conf/' + self.configuration_name(name))
         return classify(self.technology, name)
 
+    def configuration_name(self, name):
+        name = relative(name)
+        return name[5:] if self.configuration_directory and name.startswith('conf/') else name
+
+    def allowed_configuration(self, name):
+        return self.configuration_name(name) in {self.configuration_name(item) for item in self.allowed}
+
     def writable_configuration_path(self, name):
-        parent = self.root / name
+        parent = self.root / self.configuration_name(name)
         parent = parent.parent
         while not parent.exists() and parent != self.root:
             if parent.is_symlink():
@@ -254,12 +268,12 @@ class BundleConfigurationOperations:
         total = 0
         for entry in entries:
             name = relative(entry['target'])
-            if name.casefold() in seen or not re.fullmatch(r'[a-f0-9]{64}', entry.get('sha256', '')):
+            if self.configuration_name(name).casefold() in seen or not re.fullmatch(r'[a-f0-9]{64}', entry.get('sha256', '')):
                 raise ValueError('Invalid bundle file identity')
             size = entry.get('size')
             if type(size) is not int or not 0 <= size <= MAX_FILE:
                 raise ValueError('Invalid bundle entry size')
-            seen.add(name.casefold())
+            seen.add(self.configuration_name(name).casefold())
             total += size
         if total > MAX_TOTAL:
             raise ValueError('Bundle exceeds expanded size limit')
@@ -276,10 +290,12 @@ class BundleConfigurationOperations:
         target = self.policy.get('restart_target')
         validation = self.policy.get('validation_command')
         reason = ''
-        if not isinstance(validation, list) or not validation or not self.policy.get('health_url'):
+        if not isinstance(validation, list) or not validation or (not self.file_operations_only and not self.policy.get('health_url')):
             reason = 'An approved validation command and health URL are required.'
         if not restart and not self.policy.get('dynamic_validation_command'):
             reason = 'Liberty dynamic updates require an approved runtime validation command verifying that the selected server applied the change.'
+        if self.file_operations_only:
+            return {'required': restart, 'target': None, 'mode': 'restart' if restart else 'dynamic', 'blocked_reason': reason}
         if restart and (not isinstance(target, dict) or target.get('scope') != 'server' or not target.get('server')
                         or not re.fullmatch(r'[A-Za-z0-9_.@-]{1,100}\.service', target.get('service_unit', ''))):
             reason = 'Identify one server and its dedicated service unit in the agent restart_target policy; domain/cell-wide targets are blocked.'
@@ -294,7 +310,7 @@ class BundleConfigurationOperations:
             code, reason = self.validate_configuration_path(entry['target'])
 
 
-            if entry['target'] in self.allowed:
+            if self.allowed_configuration(entry['target']):
                 try:
                     before = self.metadata(entry['target'])
                 except (OSError, ValueError):
@@ -354,6 +370,90 @@ class BundleConfigurationOperations:
             return bool(self.health_probe())
         return common.http_available(common.http_status('', url=self.policy['health_url']), self.policy.get('health_status'))
 
+    def prepare_files(self, request):
+        current = self.compare_configuration_files(request)
+        if not current['can_proceed'] or current['fingerprint'] != request.get('fingerprint'):
+            raise ValueError('Preview changed before snapshot')
+        backups = self.runtime_directory(self.backups, request['deployment_id'])
+        journal = backups / 'journal.json'
+        if journal.exists():
+            result = json.loads(journal.read_text())
+            if result.get('fingerprint') != current['fingerprint'] or result.get('status') != 'prepared':
+                raise ValueError('This deployment already ran; review again')
+            return result
+        self.validate_configuration()
+        changed = [f for f in current['files'] if f['status'] in ('NEW', 'MODIFIED')]
+        result = {'success': True, 'status': 'prepared', 'fingerprint': current['fingerprint'], 'files': [],
+                  'snapshots': {'before': self.snapshot(backups, 'before', changed)}, 'validation': {'before': 'completed'}}
+        write_json(journal, result)
+        return result
+
+    def restore_configuration(self, request):
+        self.resolve_configuration_root(request)
+        if request.get('policy_hash') != self.policy_hash():
+            raise ValueError('Agent policy changed before recovery')
+        backups = self.runtime_directory(self.backups, request['deployment_id'])
+        journal = backups / 'journal.json'
+        result = json.loads(journal.read_text())
+        encrypted = backups / 'before.encrypted'
+        trusted(encrypted, private=True)
+        if self.decrypt:
+            before = self.decrypt(encrypted.read_text())
+        else:
+            from modules.base import decrypt
+            before = decrypt.decryptit(encrypted.read_text(), decrypt._derive_key().hex())
+        if not isinstance(before, dict):
+            raise ValueError('Unable to decrypt the before snapshot')
+        requested = {entry['target']: entry for entry in self.entries(request)}
+        recovery = {'success': True, 'status': 'restored', 'files': []}
+        for entry in result.get('files', []):
+            name = entry['target']
+            try:
+                if name not in requested or name not in before or self.validate_configuration_path(name)[0] != 'SUPPORTED':
+                    raise ValueError('Unsupported restoration target')
+                original = before[name]
+                actual = self.metadata(name)
+                if actual == {key: original[key] for key in ('exists', 'size', 'sha256')}:
+                    recovery['files'].append({'target': name, 'status': 'UNCHANGED'})
+                    continue
+                if not actual['exists'] or actual['sha256'] != requested[name]['sha256']:
+                    raise ValueError('Recovery target changed outside this deployment')
+                if original['exists']:
+                    data = base64.b64decode(original['content'], validate=True)
+                    if digest(data) != original['sha256']:
+                        raise ValueError('Before snapshot checksum failed')
+                    self.install(name, data)
+                else:
+                    with self.parent(name) as (fd, leaf):
+                        os.unlink(leaf, dir_fd=fd)
+                        os.fsync(fd)
+                if self.metadata(name) != {key: original[key] for key in ('exists', 'size', 'sha256')}:
+                    raise ValueError('Restoration verification failed')
+                recovery['files'].append({'target': name, 'status': 'RESTORED'})
+            except Exception as error:
+                recovery.update(success=False, status='restore_failed')
+                recovery['files'].append({'target': name, 'status': 'FAILED', 'error': redact(str(error))[:512]})
+        result['recovery'] = recovery
+        write_json(journal, result)
+        return recovery
+
+    def snapshot_files(self, request):
+        self.resolve_configuration_root(request)
+        if request.get('policy_hash') != self.policy_hash():
+            raise ValueError('Agent policy changed before completion')
+        backups = self.runtime_directory(self.backups, request['deployment_id'])
+        journal = backups / 'journal.json'
+        result = json.loads(journal.read_text())
+        try:
+            label = request.get('snapshot_label', 'after')
+            if label not in ('after', 'recovery_after'):
+                raise ValueError('Unsupported file snapshot label')
+            result['snapshots']['after'] = self.snapshot(backups, label, self.entries(request))
+        except Exception as error:
+            result.update(success=False, status='failed', snapshot_error=redact(str(error))[:512])
+        write_json(journal, result)
+        return result
+
     def snapshot(self, directory, label, files):
         payload = {}
         for entry in files:
@@ -411,20 +511,26 @@ class BundleConfigurationOperations:
             current = self.compare_configuration_files(request)
             if not current['can_proceed'] or current['policy_hash'] != request.get('policy_hash') or current['fingerprint'] != request.get('fingerprint'):
                 raise ValueError('Preview or permissions changed; review again before deployment')
-            if current['restart'] != request.get('restart'):
+            if not self.file_operations_only and current['restart'] != request.get('restart'):
                 raise ValueError('Restart plan changed')
             result = {'success': False, 'files': [], 'management_operations': [], 'snapshots': {},
                       'restart': {'target': current['restart']['target'], 'status': 'not_run' if current['restart']['required'] else 'not_required'},
                       'validation': {'before': 'not_run', 'after': 'not_run'},
                       'health': 'not_run', 'skipped': [f['target'] for f in current['files'] if f['status'] == 'UNCHANGED']}
+            files_only = self.file_operations_only
             changed = [f for f in current['files'] if f['status'] in ('NEW', 'MODIFIED')]
             if not changed:
                 return dict(result, success=True, status='no_changes')
             stage = self.runtime_directory(self.stage, request['deployment_id'])
             backups = self.runtime_directory(self.backups, request['deployment_id'])
             journal = backups / 'journal.json'
-            if journal.exists():
+            if journal.exists() and not files_only:
                 raise ValueError('This deployment already ran; use a new reviewed recovery deployment')
+            if files_only:
+                prepared = json.loads(journal.read_text())
+                if prepared.get('status') != 'prepared' or prepared.get('fingerprint') != current['fingerprint']:
+                    raise ValueError('Before snapshot is missing or changed')
+                result['snapshots'] = prepared['snapshots']
             incoming = {}
             for entry in changed:
                 path = stage / (entry['sha256'] + '.config')
@@ -439,23 +545,32 @@ class BundleConfigurationOperations:
 
             self.validate_configuration()
             result['validation']['before'] = 'completed'
-            result['snapshots']['before'] = self.snapshot(backups, 'before', changed)
+            if not files_only:
+                result['snapshots']['before'] = self.snapshot(backups, 'before', changed)
             write_json(journal, result)
             try:
                 for entry in changed:
 
                     if self.metadata(entry['target']) != entry['before']:
                         raise ValueError('Configuration changed after preview')
+                    evidence = {'target': entry['target'], 'status': 'UPLOADING', 'before_sha256': entry['before']['sha256'], 'after_sha256': entry['sha256']}
+                    result['files'].append(evidence)
+                    write_json(journal, result)
                     self.install(entry['target'], incoming[entry['target']])
                     actual = self.metadata(entry['target'])
-                    result['files'].append({'target': entry['target'], 'status': 'UPLOADED',
-                                            'before_sha256': entry['before']['sha256'], 'after_sha256': actual['sha256']})
+                    verified = actual['sha256'] == entry['sha256'] and actual['size'] == entry['size']
+                    evidence.update(status='UPLOADED' if verified else 'VERIFY_FAILED', after_sha256=actual['sha256'])
                     write_json(journal, result)
-                    if actual['sha256'] != entry['sha256'] or actual['size'] != entry['size']:
+                    if not verified:
                         raise ValueError('Modification verification failed')
                 result['validation']['after'] = 'failed'
                 self.validate_configuration()
                 result['validation']['after'] = 'completed'
+                if files_only:
+                    if not current['restart']['required']:
+                        self.command(self.policy['dynamic_validation_command'])
+                    result.update(success=True, status='uploaded')
+                    return result
                 if current['restart']['required']:
                     result['restart']['status'] = 'failed'
                     self.restart_selected_server(current['restart']['target'])
@@ -467,14 +582,15 @@ class BundleConfigurationOperations:
                     raise ValueError('Selected server health verification failed')
                 result['health'] = 'completed'
                 result.update(success=True, status='completed')
-            except Exception:
-                result.update(status='failed', errorlog='Configuration execution failed; inspect encrypted snapshots and recover with an approved deployment.',
+            except Exception as error:
+                result.update(status='failed', errorlog=redact(str(error))[:1024],
                               recovery={'snapshot': result['snapshots']['before'], 'automatic_restore': False})
             finally:
-                try:
-                    result['snapshots']['after'] = self.snapshot(backups, 'after', changed)
-                except Exception:
-                    result.update(success=False, status='failed', errorlog='After snapshot failed; configuration may have changed.')
+                if not files_only:
+                    try:
+                        result['snapshots']['after'] = self.snapshot(backups, 'after', changed)
+                    except Exception:
+                        result.update(success=False, status='failed', errorlog='After snapshot failed; configuration may have changed.')
                 write_json(journal, result)
                 for entry in changed:
                     (stage / (entry['sha256'] + '.config')).unlink(missing_ok=True)
@@ -489,7 +605,7 @@ class BundleConfigurationOperations:
         if action == 'bundle_diff':
             self.resolve_configuration_root(request)
             name = relative(request.get('file', ''))
-            if name not in self.allowed:
+            if not self.allowed_configuration(name):
                 raise ValueError('No permission to read this configuration resource')
             if self.metadata(name)['size'] > 131072:
                 raise ValueError('Detailed differences are limited to 128 KiB per remote file; SHA-256 comparison remains available.')
@@ -500,9 +616,15 @@ class BundleConfigurationOperations:
             self.resolve_configuration_root(request)
             if self.policy_hash() != request.get('policy_hash'):
                 raise ValueError('Agent policy changed')
-            return {'staging_directory': str(self.runtime_directory(self.stage, request['deployment_id']))}
+            result = self.prepare_files(request) if self.file_operations_only else {}
+            return dict(result, staging_directory=str(self.runtime_directory(self.stage, request['deployment_id'])))
         if action == 'bundle_deploy':
             return self.apply_supported_configuration(request)
+        if action in ('bundle_restore', 'bundle_snapshot'):
+            self.backups.mkdir(mode=0o700, exist_ok=True)
+            trusted(self.backups, private=True)
+            with instance_lock(self.backups / 'instance.lock'):
+                return self.restore_configuration(request) if action == 'bundle_restore' else self.snapshot_files(request)
         raise ValueError('Unsupported configuration bundle operation')
 
 
@@ -538,6 +660,11 @@ def detect_configuration_root(request):
                     '/opt/ibm/wlp/usr/servers/' + connection.get('waslibsrv', 'defaultServer')]
     }[technology]
     override = request.get('configuration_root')
+    directory = technology == 'tomcat' and request.get('configuration_directory') is True
+    if directory and not override:
+        override = connection.get('tomcatConfigDir')
+        if not override:
+            raise ValueError('Enter the agent-visible mounted Tomcat configuration directory')
     if override:
         candidates = [override]
     found = []
@@ -550,5 +677,5 @@ def detect_configuration_root(request):
     if len(found) != 1:
         raise ValueError('No unambiguous standard directory found; enter a manual directory and verify it.')
     path = found[0]
-    return {'success': True, 'configuration_root': path, 'field': ROOT_KEYS[technology], 'readable': os.access(path, os.R_OK | os.X_OK),
+    return {'success': True, 'configuration_root': path, 'field': 'tomcatConfigDir' if directory else ROOT_KEYS[technology], 'readable': os.access(path, os.R_OK | os.X_OK),
             'writable': os.access(path, os.W_OK | os.X_OK), 'policy_hash': '', 'execution_policy_required': True}
