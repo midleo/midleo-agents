@@ -57,6 +57,11 @@ if /I "%1"=="enableoptadvisor" goto enableoptadvisor
 if /I "%1"=="disableoptadvisor" goto disableoptadvisor
 if /I "%1"=="optadvisorstatus" goto optadvisorstatus
 if /I "%1"=="health" goto health
+if /I "%1"=="addconfig" goto addconfig
+if /I "%1"=="delconfig" goto delconfig
+if /I "%1"=="configpolicy" goto configpolicy
+if /I "%1"=="appserver" goto appserver
+if /I "%1"=="apache" goto appserver
 if /I "%1"=="addaction" goto addaction
 if /I "%1"=="addmessagebackup" goto addmessagebackup
 if /I "%1"=="rmmessbackup" goto rmmessbackup
@@ -66,6 +71,30 @@ if /I "%1"=="disabletrackqm" goto disabletrackqm
 if /I "%1"=="maintenance" goto maintenance
 
 goto usage
+
+:addconfig
+setlocal DisableDelayedExpansion
+if "%~3"=="" exit /b 1
+"%PYTHON%" "runable\configurationpolicy.py" add "%~2" "%~3" %4
+exit /b %errorlevel%
+
+:delconfig
+setlocal DisableDelayedExpansion
+if "%~3"=="" exit /b 1
+"%PYTHON%" "runable\configurationpolicy.py" delete "%~2" "%~3"
+exit /b %errorlevel%
+
+:configpolicy
+setlocal DisableDelayedExpansion
+if "%~2"=="" exit /b 1
+"%PYTHON%" "runable\configurationpolicy.py" encoded "%~2"
+exit /b %errorlevel%
+
+:appserver
+setlocal DisableDelayedExpansion
+if "%~2"=="" exit /b 1
+"%PYTHON%" "runable\appserver.py" "%~2"
+exit /b %errorlevel%
 
 :addcert
 set "json=%~2"
@@ -241,6 +270,9 @@ echo    -  %~nx0 startavl APP_SERVER SERVER_TYPE
 echo    -  %~nx0 addappstat SRV_TYPE APPSRV "{\"queues\":\"TEST.*,VVV.*\",\"channels\":\"SDR.*,CHL.*\",\"sslverify\":\"yes^|no\"}"
 echo    -  %~nx0 delappstat SRV_TYPE APPSRV
 echo    -  %~nx0 addoptadvisor SRV_TYPE APPSRV "{\"appsrvid\":\"MIDLEO_SERVER_ID\",\"usr\":\"USER\",\"pass\":\"PASS\",\"ssl\":\"yes\",\"sslverify\":\"yes^|no\",\"mngmport\":\"7001\"}"
+echo    -  %~nx0 addconfig tomcat APPSRVID "{\"config_root\":\"C:/Tomcat/conf\",\"configuration_directory\":true}"
+echo    -  %~nx0 addconfig weblogic APPSRVID "{\"config_root\":\"C:/Oracle/domains\",\"folders\":[\"domain1\",\"domain2\"]}"
+echo    -  %~nx0 delconfig SRV_TYPE APPSRVID
 echo    -  %~nx0 deloptadvisor SRV_TYPE APPSRV
 echo    -  %~nx0 enableoptadvisor [days]
 echo    -  %~nx0 disableoptadvisor [reason]

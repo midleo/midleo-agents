@@ -200,6 +200,25 @@ def getcfgData():
         parser = {}
     return parser
 
+def getRemoteFileRoots(configuration=None):
+    configuration = getcfgData() if configuration is None else configuration
+    roots = str((configuration or {}).get('REMOTE_FILE_ROOTS', '')).strip()
+    return [root.strip() for root in roots.split(',') if root.strip()] or [os.getcwd()]
+
+def remoteFilePath(filename, roots):
+    if not filename or '\x00' in filename:
+        raise ValueError('invalid filename')
+    candidate = filename if os.path.isabs(filename) else os.path.join(os.getcwd(), filename)
+    real_candidate = os.path.realpath(candidate)
+    for root in roots:
+        real_root = os.path.realpath(root)
+        try:
+            if os.path.commonpath([real_root, real_candidate]) == real_root:
+                return real_candidate
+        except ValueError:
+            continue
+    raise ValueError('file path outside allowed roots')
+
 def getCronjobs():
     return _read_json_file(CRONJOBS_FILE, {})
 

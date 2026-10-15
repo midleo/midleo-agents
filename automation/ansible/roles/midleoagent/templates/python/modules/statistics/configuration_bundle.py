@@ -10,8 +10,10 @@ import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from pathlib import Path
 
+from modules.base import configs
 from modules.statistics import common
 from modules.statistics.configuration import load_policy
+from modules.statistics.configuration_policy import select_policy
 from modules.statistics.apache.operations import instance_lock, redact, relative, trusted, write_json
 
 MAX_FILE = 524288
@@ -41,7 +43,7 @@ def classify(technology, name):
     return ('SUPPORTED', '') if supported else ('BLOCKED_UNSUPPORTED_CONFIGURATION', 'This resource has no supported configuration operation.')
 
 
-def validate_content(name, data):
+def validate_content(name, data, tomcat_users=False):
     if len(data) > MAX_FILE:
         raise ValueError('Configuration entry exceeds size limit')
     text = data.decode('utf-8')
@@ -51,9 +53,13 @@ def validate_content(name, data):
         if re.search(r'(?i)password|passwd|secret|token|credential|(?:store|ssl)pass', key) and value.strip() and not re.fullmatch(r'\$\{[A-Za-z0-9_.:-]+}', value.strip()):
             raise ValueError('Use existing mounted secret references')
     if name.endswith('.xml'):
-        for element in ET.fromstring(text).iter():
+        root = ET.fromstring(text)
+        tomcat_users = tomcat_users and Path(name).name == 'tomcat-users.xml' and root.tag.rsplit('}', 1)[-1] == 'tomcat-users'
+        for element in root.iter():
             secret(element.tag, ''.join(element.itertext()))
             for key, value in element.attrib.items():
+                if tomcat_users and element.tag.rsplit('}', 1)[-1] == 'user' and key.rsplit('}', 1)[-1] == 'password':
+                    continue
                 secret(key, value)
             if element.attrib.get('name') or element.attrib.get('key'):
                 secret(element.attrib.get('name', element.attrib.get('key', '')), element.attrib.get('value', ''.join(element.itertext())))
@@ -133,14 +139,19 @@ class BundleConfigurationOperations:
                       ('%s:%s:%s:%s' % (details.st_dev, details.st_ino, details.st_uid, details.st_mode)).encode())
 
     def resolve_configuration_root(self, request):
-        self.configuration_directory = self.technology == 'tomcat' and request.get('configuration_directory') is True
+        try:
+            configs.remoteFilePath(str(self.root), configs.getRemoteFileRoots())
+        except ValueError:
+            raise ValueError('Add the selected configuration directory to REMOTE_FILE_ROOTS in config/mwagent.config')
+        self.configuration_directory = self.technology == 'tomcat' and (request.get('configuration_directory') is True or self.policy.get('configuration_directory') is True)
         self.file_operations_only = request.get('file_operations_only') is True
         override = request.get('configuration_root', '')
-        if override and override != str(self.root):
+        if override and (not isinstance(override, str) or Path(override) not in (self.root, Path(self.policy.get('configuration_base', str(self.root))))):
             raise ValueError('Configuration directory differs from the approved agent policy')
         return {'configuration_root': str(self.root), 'field': 'tomcatConfigDir' if self.configuration_directory else ROOT_KEYS[self.technology],
                 'readable': os.access(str(self.root), os.R_OK | os.X_OK),
-                'writable': os.access(str(self.root), os.W_OK | os.X_OK), 'policy_hash': self.policy_hash()}
+                'writable': os.access(str(self.root), os.W_OK | os.X_OK), 'policy_hash': self.policy_hash(),
+                'configuration_folder': self.policy.get('configuration_folder', '')}
 
     @contextmanager
     def parent(self, name, create=False):
@@ -202,13 +213,18 @@ class BundleConfigurationOperations:
     def classify_configuration_change(self, name):
         if self.configuration_directory:
             return classify(self.technology, 'conf/' + self.configuration_name(name))
-        return classify(self.technology, name)
+        return classify(self.technology, self.configuration_name(name))
 
     def configuration_name(self, name):
         name = relative(name)
+        folder = self.policy.get('configuration_folder', '')
+        if folder and name.startswith(folder + '/'):
+            name = name[len(folder) + 1:]
         return name[5:] if self.configuration_directory and name.startswith('conf/') else name
 
     def allowed_configuration(self, name):
+        if self.policy.get('allow_new_files') is True and self.classify_configuration_change(name)[0] == 'SUPPORTED':
+            return True
         return self.configuration_name(name) in {self.configuration_name(item) for item in self.allowed}
 
     def writable_configuration_path(self, name):
@@ -354,7 +370,10 @@ class BundleConfigurationOperations:
                 raise ValueError('Approved validation or service operation failed (exit %s)' % run.returncode)
 
     def validate_configuration(self):
-        self.command(self.policy.get('validation_command'))
+        command = self.policy.get('validation_command')
+        if isinstance(command, list):
+            command = [str(self.root) if argument == '@CONFIGURATION_ROOT@' else argument for argument in command]
+        self.command(command)
 
     def restart_selected_server(self, target):
         if target != self.policy.get('restart_target') or target.get('scope') != 'server':
@@ -540,7 +559,7 @@ class BundleConfigurationOperations:
                 data = path.read_bytes()
                 if digest(data) != entry['sha256']:
                     raise ValueError('Staged checksum changed')
-                validate_content(entry['target'], data)
+                validate_content(entry['target'], data, self.technology == 'tomcat')
                 incoming[entry['target']] = data
 
             self.validate_configuration()
@@ -633,11 +652,11 @@ def execute(request):
         policy = load_policy(Path(os.getcwd()) / 'config' / 'configuration-policy.json', request)
     except (FileNotFoundError, KeyError):
         if request.get('action') != 'bundle_resolve':
-            raise ValueError('Configure the existing agent configuration-policy.json for this selected server.')
+            raise ValueError('Save the configuration directory for this server in Midleo to synchronize its agent policy, or run magent addconfig on the agent.')
         return detect_configuration_root(request)
     if policy.get('technology') != request.get('technology'):
         raise ValueError('Configuration policy belongs to another server technology')
-    result = BundleConfigurationOperations(policy).execute(request)
+    result = BundleConfigurationOperations(select_policy(policy, request)).execute(request)
     result.setdefault('success', True)
     return result
 

@@ -101,10 +101,7 @@ def _get_cfg():
     allowed_cmds = [str(c) for c in allowed_cmds]
     allowed_cmds = sorted(set(allowed_cmds).union(INTERNAL_ALLOWED_COMMANDS))
 
-    roots_raw = str(cfg.get("REMOTE_FILE_ROOTS", "")).strip()
-    remote_roots = [x.strip() for x in roots_raw.split(",") if x.strip()]
-    if not remote_roots:
-        remote_roots = [os.getcwd()]
+    remote_roots = configs.getRemoteFileRoots(cfg)
 
     action_roots_raw = str(
         cfg.get(
@@ -513,6 +510,11 @@ async def _run_command(cmd_str, allowed, allow_shell):
         else:
             run_target = args
             use_shell = False
+            if os.name == 'nt' and _token_exe_name(args[0]) == 'magent.bat' and len(args) == 3 and args[1] in ('configpolicy', 'appserver', 'apache'):
+                encoded = _strip_wrapping_quotes(args[2])
+                if not re.fullmatch(r'[A-Za-z0-9+/]+={0,2}', encoded):
+                    raise ValueError('One base64-encoded agent operation is required')
+                run_target = '"' + args[0] + '" ' + args[1] + ' "' + encoded + '"'
 
         r = subprocess.run(
             run_target,
@@ -535,21 +537,7 @@ async def _close_writer(writer):
         await wait_closed()
 
 def _safe_path(filename, roots):
-    if not filename or "\x00" in filename:
-        raise ValueError("invalid filename")
-
-    candidate = filename if os.path.isabs(filename) else os.path.join(os.getcwd(), filename)
-    real_candidate = os.path.realpath(candidate)
-
-    for root in roots:
-        real_root = os.path.realpath(root)
-        try:
-            if os.path.commonpath([real_root, real_candidate]) == real_root:
-                return real_candidate
-        except ValueError:
-            continue
-
-    raise ValueError("file path outside allowed roots")
+    return configs.remoteFilePath(filename, roots)
 
 def _path_under(root, path):
     real_root = os.path.realpath(root)

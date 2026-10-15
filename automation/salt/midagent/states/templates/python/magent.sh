@@ -167,6 +167,18 @@ case "${1:-}" in
   health )
       "$PYTHON" "runable/health.py"
       ;;
+  addconfig )
+      [ "$#" -eq 4 ] || { echo "Use: $0 addconfig SRV_TYPE APPSRVID JSON"; exit 1; }
+      "$PYTHON" "runable/configurationpolicy.py" add "$2" "$3" "$4"
+      ;;
+  delconfig )
+      [ "$#" -eq 3 ] || { echo "Use: $0 delconfig SRV_TYPE APPSRVID"; exit 1; }
+      "$PYTHON" "runable/configurationpolicy.py" delete "$2" "$3"
+      ;;
+  configpolicy )
+      [ "$#" -eq 2 ] || { echo "Use: $0 configpolicy ENCODED_SETTINGS"; exit 1; }
+      "$PYTHON" "runable/configurationpolicy.py" encoded "$2"
+      ;;
   appserver | apache )
       require_arg "${2:-}"
       "$PYTHON" "runable/appserver.py" "$2"
@@ -226,6 +238,9 @@ MQSC
       echo "   -  $0 optadvisorstatus"
       echo "   -  $0 health"
       echo "   -  $0 appserver ENCODED_OPERATION"
+      echo "   -  $0 addconfig tomcat APPSRVID '{\"config_root\":\"/cloud/middleware/tomcat/config\",\"configuration_directory\":true}'"
+      echo "   -  $0 addconfig weblogic APPSRVID '{\"config_root\":\"/opt/oracle/domains\",\"folders\":[\"domain1\",\"domain2\"]}'"
+      echo "   -  $0 delconfig SRV_TYPE APPSRVID"
       echo "   -  $0 addaction APP_SERVER_TYPE.ERROR_CODE '{\"script\":\"/opt/midleo/actions/restart.sh\",\"args\":[\"{appserver_type}\",\"{error_code}\"],\"monid\":\"monaction\",\"appsrvid\":\"none\",\"appsrv\":\"tomcat01\",\"message\":\"Action already started recently\"}'"
       echo "   -  $0 addaction '{\"action_key\":\"APP_SERVER_TYPE.ERROR_CODE\",\"script\":\"/opt/midleo/actions/restart.sh\"}'"
       echo "   -  $0 rmaction APP_SERVER_TYPE.ERROR_CODE"
