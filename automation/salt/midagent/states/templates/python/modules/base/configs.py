@@ -26,7 +26,33 @@ FILE_TO_CRONJOBS = {
 }
 
 DEFAULT_CRONJOB_DEFS = {
+    "getsrvdata.py": {
+        "enabled": True,
+        "run": {"always": True},
+        "skip_if_maintenance": True,
+        "requires_nextrun_check": True,
+    },
+    "getextmonchecks.py": {
+        "enabled": True,
+        "run": {"always": True},
+    },
+    "runmqtracker.py": {
+        "enabled": False,
+        "config_file": "conftrack.json",
+        "run": {"always": True},
+    },
+    "getapplstat.py": {
+        "enabled": False,
+        "config_file": "confapplstat.json",
+        "run": {"always": True, "minute_not_in": ["00", "30"]},
+    },
+    "resetapplstat.py": {
+        "enabled": False,
+        "config_file": "confapplstat.json",
+        "run": {"minute_in": ["00", "30"]},
+    },
     "getoptadvisor.py": {
+        "enabled": False,
         "config_file": "confoptadvisor.json",
         "timeout_seconds": 300,
         "run": {
@@ -34,6 +60,7 @@ DEFAULT_CRONJOB_DEFS = {
         },
     },
     "resetoptadvisor.py": {
+        "enabled": False,
         "config_file": "confoptadvisor.json",
         "timeout_seconds": 300,
         "run": {
@@ -41,6 +68,7 @@ DEFAULT_CRONJOB_DEFS = {
         },
     },
     "getmessagebackup.py": {
+        "enabled": False,
         "config_file": "confmessagebackup.json",
         "timeout_seconds": 300,
         "run": {
@@ -48,11 +76,30 @@ DEFAULT_CRONJOB_DEFS = {
         },
     },
     "resetmessagebackup.py": {
+        "enabled": False,
         "config_file": "confmessagebackup.json",
         "timeout_seconds": 300,
         "run": {
             "minute_in": ["07", "17", "27", "37", "47", "57"],
         },
+    },
+    "runappavllin.py": {
+        "enabled": False,
+        "config_file": "confavl.json",
+        "run": {"always": True, "hourminute_not_in": ["2359"]},
+    },
+    "resetappavl.py": {
+        "enabled": False,
+        "config_file": "confavl.json",
+        "run": {"hourminute": "2359"},
+        "args": ["{YM}", "{WD}"],
+    },
+    "runmqevents.py": {
+        "enabled": False,
+        "config_file": "confavl.json",
+        "run": {"always": True},
+        "requires_exec_env": "AMQSEVT",
+        "ignore_error": True,
     },
 }
 
@@ -203,7 +250,13 @@ def getcfgData():
 def getRemoteFileRoots(configuration=None):
     configuration = getcfgData() if configuration is None else configuration
     roots = str((configuration or {}).get('REMOTE_FILE_ROOTS', '')).strip()
-    return [root.strip() for root in roots.split(',') if root.strip()] or [os.getcwd()]
+    result = [root.strip() for root in roots.split(',') if root.strip()] or [os.getcwd()]
+    for technology in ('TOMCAT', 'JBOSS', 'WEBLOGIC', 'IBMWAS', 'LIBERTY'):
+        if str(configuration.get(technology + '_CONFIG_ENABLED', '')).lower() in ('y', 'yes', 'true', '1'):
+            root = str(configuration.get(technology + '_CONFIG_DIR', '')).strip()
+            if root and os.path.isabs(root) and root not in result:
+                result.append(root)
+    return result
 
 def remoteFilePath(filename, roots):
     if not filename or '\x00' in filename:
@@ -227,6 +280,27 @@ def saveCronjobs(data):
         data = {}
     _write_json_atomic(CRONJOBS_FILE, data)
 
+def ensureCronjobs():
+    if os.path.isfile(CRONJOBS_FILE):
+        with open(CRONJOBS_FILE, "r", encoding="utf-8") as stream:
+            cronjobs = json.load(stream)
+        if not isinstance(cronjobs, dict):
+            raise ValueError("Expected a JSON object in config/cronjobs.json")
+    else:
+        cronjobs = {}
+    previous = json.dumps(cronjobs, sort_keys=True)
+    for name, defaults in DEFAULT_CRONJOB_DEFS.items():
+        job = cronjobs.get(name)
+        if not isinstance(job, dict):
+            job = {}
+        for key, value in defaults.items():
+            if key not in job or job[key] in (None, {}, []):
+                job[key] = json.loads(json.dumps(value))
+        cronjobs[name] = job
+    if json.dumps(cronjobs, sort_keys=True) != previous:
+        saveCronjobs(cronjobs)
+    return cronjobs
+
 def getUploadState():
     return _read_json_file(UPLOAD_STATE_FILE, {})
 
@@ -240,7 +314,8 @@ def syncCronjobsForConfig(config_filename, config_data):
     if not jobs:
         return
 
-    cronjobs = getCronjobs()
+    cronjobs = ensureCronjobs()
+    previous = json.dumps(cronjobs, sort_keys=True)
     if config_filename == "confmessagebackup.json":
         enabled = _messageBackupActive(config_data)
     else:
@@ -256,7 +331,8 @@ def syncCronjobsForConfig(config_filename, config_data):
         job_def["enabled"] = enabled
         cronjobs[job_name] = job_def
 
-    saveCronjobs(cronjobs)
+    if json.dumps(cronjobs, sort_keys=True) != previous:
+        saveCronjobs(cronjobs)
 
 def _get_config(path):
     return _read_json_file(path, {})

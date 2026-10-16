@@ -7,6 +7,7 @@ import re
 import shlex
 import subprocess
 import tempfile
+import time
 import zlib
 from datetime import datetime
 
@@ -41,7 +42,7 @@ FORBIDDEN_PATTERNS = [
     r">\s*/dev/nvme",
     r"\bmkfs\b",
     r"\bwipefs\b",
-    r"\bshutdown\b",
+    r"(?<!command=:)\bshutdown\b(?!\.sh\b)",
     r"\breboot\b",
     r"\bpoweroff\b",
     r"\brm\s+(-[^\s]+\s+)?\*",
@@ -210,6 +211,43 @@ def _reply(now_str, parts, cfgkey):
 
 def _sanitize(text):
     return secrets.redact_text(text)
+
+def _command_summary(command):
+    try:
+        args = shlex.split(command, posix=os.name != "nt")
+        index = _command_index(args)
+        script = _strip_wrapping_quotes(args[index]).replace("\\", "/").rsplit("/", 1)[-1].lower()
+        operation = args[index + 1] if len(args) > index + 1 else ""
+    except (ValueError, IndexError):
+        encoded_operation = re.search(r"\b(magent\.(?:sh|bat|zos\.sh))[\"']?\s+(appserver|apache|configpolicy)\b", command, re.IGNORECASE)
+        if encoded_operation:
+            return encoded_operation.group(1).lower() + " " + encoded_operation.group(2).lower() + " [invalid encoded operation]"
+        return _sanitize(command)
+    if script not in ("magent.sh", "magent.bat", "magent.zos.sh") or operation not in ("appserver", "apache", "configpolicy"):
+        return _sanitize(command)
+    prefix = script + " " + operation
+    try:
+        if len(args) != index + 3:
+            raise ValueError("invalid operation arguments")
+        encoded = _strip_wrapping_quotes(args[index + 2])
+        if len(encoded) > 100000:
+            raise ValueError("operation exceeds size limit")
+        payload = json.loads(base64.b64decode(encoded, validate=True).decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("invalid operation object")
+    except (ValueError, UnicodeError, binascii.Error):
+        return prefix + " [invalid encoded operation]"
+    metadata = {}
+    for key in ("action", "technology", "instance", "server", "deployment_id", "snapshot_label", "configuration_root", "configuration_folder", "file"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            metadata[key] = value[:512]
+    if isinstance(payload.get("files"), list):
+        metadata["file_count"] = len(payload["files"])
+    connection = payload.get("connection")
+    if isinstance(connection, dict) and isinstance(connection.get("dockercont"), str):
+        metadata["container"] = connection["dockercont"][:128]
+    return prefix + " " + _sanitize(json.dumps(metadata, ensure_ascii=True, sort_keys=True))
 
 def _split_commands(raw):
     raw = raw.strip()
@@ -472,7 +510,7 @@ def _validate_command(cmd_str, allowed):
         if re.search(pat, cmd_l):
             classes.Err(
                 "Forbidden command blocked. Command: "
-                + _sanitize(cmd_str)
+                + _command_summary(cmd_str)
                 + " | Pattern: "
                 + pat
             )
@@ -500,7 +538,29 @@ def _validate_command(cmd_str, allowed):
 
     return args
 
-async def _run_command(cmd_str, allowed, allow_shell):
+def _resolve_product_users(cmd_str, technology=''):
+    configuration = configs.getcfgData()
+    if technology in ('tomcat', 'jboss', 'weblogic', 'ibmwas', 'liberty'):
+        user = configuration.get(technology.upper() + '_USER', '').strip()
+        if user:
+            if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.-]{0,63}\$?', user):
+                raise ValueError('Invalid configured application user')
+            previous = re.match(r'^(sudo\s+su\s+-\s+)([A-Za-z_][A-Za-z0-9_.-]*)(\s+-c\s+)', cmd_str)
+            if previous:
+                cmd_str = previous[1] + user + previous[3] + cmd_str[previous.end():]
+                cmd_str = cmd_str.replace('/home/' + previous[2] + '/.bash_profile', '/home/' + user + '/.bash_profile')
+    for technology, default_user in (('TOMCAT', 'tomcat'), ('JBOSS', 'jboss'), ('WEBLOGIC', 'weblogic'), ('IBMWAS', 'wasadmin'), ('LIBERTY', 'wasadmin')):
+        placeholder = '@' + technology + '_USER@'
+        if placeholder in cmd_str:
+            user = configuration.get(technology + '_USER', '').strip() or default_user
+            if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.-]{0,63}\$?', user):
+                raise ValueError('Invalid configured application user')
+            cmd_str = cmd_str.replace(placeholder, user)
+    return cmd_str
+
+
+async def _run_command(cmd_str, allowed, allow_shell, technology=''):
+    cmd_str = _resolve_product_users(cmd_str, technology)
     args = _validate_command(cmd_str, allowed)
 
     def _do():
@@ -702,7 +762,7 @@ def _delete_remote_file(filename, cfg):
 async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     cfg = _get_cfg()
     addr = writer.get_extra_info("peername")
-    classes.Err("Info:Connected by " + str(addr))
+    classes.Log("Connected by " + str(addr), "DEBUG")
     now = datetime.now().strftime("%H:%M:%S")
 
     try:
@@ -780,22 +840,39 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
             commands = _split_commands(cmd_raw)
 
             for cmd in commands:
+                started = time.monotonic()
                 try:
+                    cmd = _resolve_product_users(cmd, data.get('command_technology', ''))
+                    classes.Log("Command started: " + _command_summary(cmd) + " from " + str(addr), "DEBUG")
                     rc, out = await _run_command(
                         cmd, cfg["allowed_cmds"], cfg["allow_shell"]
                     )
                 except Exception as ex:
                     classes.Err(
                         "Command rejected:"
-                        + _sanitize(cmd)
+                        + _command_summary(cmd)
                         + " from "
                         + str(addr)
                         + " reason="
                         + _sanitize(str(ex))
                     )
                     raise
-                sanitized = _sanitize(cmd)
-                classes.Log("Command:" + sanitized + " from " + str(addr))
+                sanitized = _command_summary(cmd)
+                failed = rc != 0
+                outcome = ''
+                try:
+                    result = json.loads(out)
+                    if isinstance(result, dict):
+                        failed = failed or result.get('success') is False
+                        if isinstance(result.get('status'), str):
+                            outcome += ' status=' + _sanitize(result['status'])[:80]
+                        if failed and isinstance(result.get('errorlog'), str):
+                            outcome += ' error=' + _sanitize(result['errorlog'])[:512]
+                except ValueError:
+                    pass
+                classes.Log("Command completed: " + sanitized + " from " + str(addr)
+                            + " exit_code=" + str(rc) + " duration_ms="
+                            + str(int((time.monotonic() - started) * 1000)) + outcome, "ERROR" if failed else "INFO")
                 responses.extend(
                     ["Command:" + sanitized, "RC:" + str(rc), "Output:" + out]
                 )
@@ -806,7 +883,7 @@ async def _handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWri
         writer.write(_reply(now, responses, cfg["uid_key"]))
         await writer.drain()
         await _close_writer(writer)
-        classes.Err("Info:Disconnected " + str(addr))
+        classes.Log("Disconnected " + str(addr), "DEBUG")
 
     except Exception as ex:
         classes.Err("Error:Disconnecting " + str(addr) + " reason=" + str(ex))

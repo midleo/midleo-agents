@@ -1,3 +1,37 @@
+- name: "Find obsolete configuration helper units"
+  find:
+    paths: /etc/systemd/system
+    patterns:
+      - "midleo-config-{{ ((agent_install_dir | regex_replace('/+$', '')) | hash('sha256'))[:16] }}-*.socket"
+      - "midleo-config-{{ ((agent_install_dir | regex_replace('/+$', '')) | hash('sha256'))[:16] }}-*@.service"
+    file_type: file
+    recurse: false
+  register: midleo_obsolete_configuration_units
+
+- name: "Stop obsolete configuration helper sockets"
+  systemd:
+    name: "{{ item.path | basename }}"
+    enabled: false
+    state: stopped
+  loop: "{{ midleo_obsolete_configuration_units.files }}"
+  when: item.path.endswith('.socket')
+
+- name: "Remove obsolete configuration helper units"
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ midleo_obsolete_configuration_units.files }}"
+
+- name: "Remove obsolete configuration helper code"
+  file:
+    path: "/usr/local/lib/midleoagent-configuration/{{ ((agent_install_dir | regex_replace('/+$', '')) | hash('sha256'))[:16] }}"
+    state: absent
+
+- name: "Reload systemd after configuration helper removal"
+  systemd:
+    daemon_reload: true
+  when: midleo_obsolete_configuration_units.matched | int > 0
+
 - name: "Build configured product home candidates"
   set_fact:
     midleo_product_home_candidates: "{{ lookup('template', 'product_home_candidates.j2') | from_yaml | default([], true) | list }}"

@@ -28,6 +28,24 @@ def merge_missing(existing_text, desired_text):
     newline = "\r\n" if "\r\n" in existing_text else "\n"
     existing, _ = _parse_keys(existing_text)
     desired, desired_order = _parse_keys(desired_text)
+    managed = set()
+    for technology in ('TOMCAT', 'JBOSS', 'WEBLOGIC', 'IBMWAS', 'LIBERTY'):
+        if desired.get(technology + '_CONFIG_ENABLED', '').strip():
+            managed.update(technology + suffix for suffix in ('_CONFIG_ENABLED', '_CONFIG_DIR', '_CONFIG_FOLDERS', '_USER')
+                           if desired.get(technology + suffix, '') or (suffix == '_CONFIG_FOLDERS' and desired.get(technology + '_CONFIG_ENABLED', '').lower() in ('y', 'yes', 'true', '1')))
+    updates = {key: desired[key] for key in managed if key in desired and key in existing and desired[key] != existing[key]}
+    if updates:
+        lines = []
+        seen = set()
+        for line in existing_text.splitlines():
+            key = line.split('=', 1)[0].strip() if '=' in line and not line.lstrip().startswith('#') else ''
+            if key in updates:
+                if key in seen:
+                    continue
+                seen.add(key)
+                line = key + '=' + updates[key]
+            lines.append(line)
+        existing_text = newline.join(lines) + newline
     additions = []
     for key in desired_order:
         if key in existing:
@@ -37,12 +55,12 @@ def merge_missing(existing_text, desired_text):
             continue
         additions.append(key + "=" + value)
     if not additions:
-        return existing_text, []
+        return existing_text, [key + '=' + value for key, value in updates.items()]
     out = existing_text
     if out and not out.endswith(("\n", "\r\n")):
         out += newline
     out += newline.join(additions) + newline
-    return out, additions
+    return out, [key + '=' + value for key, value in updates.items()] + additions
 
 
 def merge_files(existing_path, desired_path):

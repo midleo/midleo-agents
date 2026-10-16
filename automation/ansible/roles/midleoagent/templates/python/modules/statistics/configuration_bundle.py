@@ -13,7 +13,7 @@ from pathlib import Path
 from modules.base import configs
 from modules.statistics import common
 from modules.statistics.configuration import load_policy
-from modules.statistics.configuration_policy import select_policy
+from modules.statistics.configuration_policy import configuration_directory, configured_policy, select_policy, validate_directory
 from modules.statistics.apache.operations import instance_lock, redact, relative, trusted, write_json
 
 MAX_FILE = 524288
@@ -112,7 +112,7 @@ class BundleConfigurationOperations:
         self.decrypt = decrypt
         self.configuration_directory = False
         self.file_operations_only = False
-        self.root = self.directory('config_root')
+        self.root = configuration_directory(policy.get('config_root', ''))
         root_details = self.root.stat()
         self.root_identity = (root_details.st_dev, root_details.st_ino)
         self.allowed = {relative(name) for name in policy.get('allowed_files', [])}
@@ -135,8 +135,9 @@ class BundleConfigurationOperations:
 
     def policy_hash(self):
         details = self.root.stat()
+        identity = [details.st_dev, details.st_ino, details.st_uid, details.st_mode]
         return digest(json.dumps(self.policy, sort_keys=True, separators=(',', ':')).encode() +
-                      ('%s:%s:%s:%s' % (details.st_dev, details.st_ino, details.st_uid, details.st_mode)).encode())
+                      ('%s:%s:%s:%s' % tuple(identity)).encode())
 
     def resolve_configuration_root(self, request):
         try:
@@ -146,11 +147,15 @@ class BundleConfigurationOperations:
         self.configuration_directory = self.technology == 'tomcat' and (request.get('configuration_directory') is True or self.policy.get('configuration_directory') is True)
         self.file_operations_only = request.get('file_operations_only') is True
         override = request.get('configuration_root', '')
-        if override and (not isinstance(override, str) or Path(override) not in (self.root, Path(self.policy.get('configuration_base', str(self.root))))):
+        roots = [self.root, Path(self.policy.get('configuration_base', str(self.root)))]
+        if self.technology == 'tomcat' and self.policy.get('configuration_defaults_hash') and self.root.name == 'conf' and request.get('configuration_directory') is not True:
+            roots.append(self.root.parent)
+        if override and (not isinstance(override, str) or Path(override) not in roots):
             raise ValueError('Configuration directory differs from the approved agent policy')
+        access = {
+            'readable': os.access(str(self.root), os.R_OK | os.X_OK), 'writable': os.access(str(self.root), os.W_OK | os.X_OK)}
         return {'configuration_root': str(self.root), 'field': 'tomcatConfigDir' if self.configuration_directory else ROOT_KEYS[self.technology],
-                'readable': os.access(str(self.root), os.R_OK | os.X_OK),
-                'writable': os.access(str(self.root), os.W_OK | os.X_OK), 'policy_hash': self.policy_hash(),
+                'readable': access['readable'], 'writable': access['writable'], 'policy_hash': self.policy_hash(),
                 'configuration_folder': self.policy.get('configuration_folder', '')}
 
     @contextmanager
@@ -190,7 +195,6 @@ class BundleConfigurationOperations:
             return code, reason
         if not self.allowed_configuration(name):
             return 'BLOCKED_UNAUTHORIZED_PATH', 'Resource is not in the selected instance agent allowed_files policy.'
-
         try:
             with self.parent(name) as (fd, leaf):
                 try:
@@ -223,6 +227,8 @@ class BundleConfigurationOperations:
         return name[5:] if self.configuration_directory and name.startswith('conf/') else name
 
     def allowed_configuration(self, name):
+        if self.policy.get('allow_existing_files') is True and self.policy.get('managed_files') is True:
+            return True
         if self.policy.get('allow_new_files') is True and self.classify_configuration_change(name)[0] == 'SUPPORTED':
             return True
         return self.configuration_name(name) in {self.configuration_name(item) for item in self.allowed}
@@ -371,6 +377,9 @@ class BundleConfigurationOperations:
 
     def validate_configuration(self):
         command = self.policy.get('validation_command')
+        if command == ['@MIDLEO_CONFIGURATION_VALIDATE@']:
+            validate_directory(self.root)
+            return
         if isinstance(command, list):
             command = [str(self.root) if argument == '@CONFIGURATION_ROOT@' else argument for argument in command]
         self.command(command)
@@ -648,12 +657,14 @@ class BundleConfigurationOperations:
 
 
 def execute(request):
-    try:
-        policy = load_policy(Path(os.getcwd()) / 'config' / 'configuration-policy.json', request)
-    except (FileNotFoundError, KeyError):
-        if request.get('action') != 'bundle_resolve':
-            raise ValueError('Save the configuration directory for this server in Midleo to synchronize its agent policy, or run magent addconfig on the agent.')
-        return detect_configuration_root(request)
+    policy = configured_policy(Path(os.getcwd()), request)
+    if policy is None:
+        try:
+            policy = load_policy(Path(os.getcwd()) / 'config' / 'configuration-policy.json', request)
+        except (FileNotFoundError, KeyError):
+            if request.get('action') != 'bundle_resolve':
+                raise ValueError('Configure the server type with magent setconfig or save its configuration directory in Midleo')
+            return detect_configuration_root(request)
     if policy.get('technology') != request.get('technology'):
         raise ValueError('Configuration policy belongs to another server technology')
     result = BundleConfigurationOperations(select_policy(policy, request)).execute(request)

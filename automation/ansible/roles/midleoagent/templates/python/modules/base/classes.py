@@ -6,7 +6,7 @@ import threading
 import time
 from datetime import datetime
 
-from modules.base import secrets
+from modules.base import configs, secrets
 
 LOG_DIR = os.path.join(os.getcwd(), "logs")
 AGENT_LOG = os.path.join(LOG_DIR, "midleoagent.log")
@@ -16,7 +16,8 @@ except (TypeError, ValueError):
     MAX_LOG_BYTES = 5 * 1024 * 1024
 MAX_LOG_LINE_BYTES = 8192
 _LEVELS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "ERROR": 40, "CRITICAL": 50}
-LOG_LEVEL = _LEVELS.get(os.environ.get("MIDLEO_LOG_LEVEL", "INFO").upper(), 20)
+LOG_LEVEL = (10 if str(configs.getcfgData().get("DEBUG", os.environ.get("DEBUG", "false"))).strip().strip("\"'").lower()
+             in ("1", "true", "yes", "y", "on") else _LEVELS.get(os.environ.get("MIDLEO_LOG_LEVEL", "INFO").upper(), 20))
 _LOG_LOCK = threading.Lock()
 _READY_LOG_DIR = None
 _HARDENED_PATHS = set()

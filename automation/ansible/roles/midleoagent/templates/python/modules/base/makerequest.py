@@ -248,8 +248,6 @@ def _request(method, webssl, website, path, data=None, headers=None, **kwargs):
         if not accepted:
             message += " response=" + body
         classes.Log(message, "INFO" if accepted else "ERROR", "http")
-        if accepted and classes.log_enabled("DEBUG"):
-            classes.Log("response=" + body, "DEBUG", "http")
         upload_error = body if not accepted or path == "/pubapi/updatestat" else ""
         _record_upload_result(path, res.status_code, upload_error, accepted=accepted)
         return res
@@ -273,7 +271,14 @@ def _request_with_retry(method, webssl, website, path, data=None, headers=None, 
     return last
 
 def postData(webssl, website, data):
-    _request("post", webssl, website, "/pubapi/updatesrv", json.dumps(data))
+    result = _request("post", webssl, website, "/pubapi/updatesrv", json.dumps(data))
+    if result is None or not 200 <= result.status_code < 300:
+        return False
+    try:
+        body = result.json()
+    except ValueError:
+        return True
+    return not isinstance(body, dict) or (body.get("error") is not True and body.get("success") is not False)
 
 def postStatData(webssl, website, thisdata):
     return _request("post", webssl, website, "/pubapi/updatestat", thisdata)

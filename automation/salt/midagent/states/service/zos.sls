@@ -113,6 +113,7 @@ midagent_zos_create_config:
         - source: salt://midagent/templates/mwagent.config.j2
     - context:
         agent_unique_id: "{{agent_unique_id}}"
+        midleo_debug: "{{ salt['pillar.get']('INPUT:midleo_debug', salt['pillar.get']('midagent_vars:midleo_debug', False)) }}"
         midleo_website_base_url: "{{midleo_website_base_url}}"
         midleo_website_base_url_ssl: "{{midleo_website_base_url_ssl}}"
         group_id: "{{group_id}}"

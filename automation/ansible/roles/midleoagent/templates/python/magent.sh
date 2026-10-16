@@ -167,11 +167,19 @@ case "${1:-}" in
   health )
       "$PYTHON" "runable/health.py"
       ;;
+  setconfig )
+      [ "$#" -ge 3 ] && [ "$#" -le 5 ] || { echo "Use: $0 setconfig SRV_TYPE CONFIG_DIR [USER] [FOLDERS]"; exit 1; }
+      "$PYTHON" "runable/configurationpolicy.py" set "${@:2}"
+      ;;
   addconfig )
       [ "$#" -eq 4 ] || { echo "Use: $0 addconfig SRV_TYPE APPSRVID JSON"; exit 1; }
       "$PYTHON" "runable/configurationpolicy.py" add "$2" "$3" "$4"
       ;;
   delconfig )
+      if [ "$#" -eq 2 ]; then
+          "$PYTHON" "runable/configurationpolicy.py" disable "$2"
+          exit $?
+      fi
       [ "$#" -eq 3 ] || { echo "Use: $0 delconfig SRV_TYPE APPSRVID"; exit 1; }
       "$PYTHON" "runable/configurationpolicy.py" delete "$2" "$3"
       ;;
@@ -238,9 +246,9 @@ MQSC
       echo "   -  $0 optadvisorstatus"
       echo "   -  $0 health"
       echo "   -  $0 appserver ENCODED_OPERATION"
-      echo "   -  $0 addconfig tomcat APPSRVID '{\"config_root\":\"/cloud/middleware/tomcat/config\",\"configuration_directory\":true}'"
-      echo "   -  $0 addconfig weblogic APPSRVID '{\"config_root\":\"/opt/oracle/domains\",\"folders\":[\"domain1\",\"domain2\"]}'"
-      echo "   -  $0 delconfig SRV_TYPE APPSRVID"
+      echo "   -  $0 setconfig tomcat /cloud/middleware/tomcat/conf tomcat"
+      echo "   -  $0 setconfig weblogic /opt/oracle/domains oracle domain1,domain2"
+      echo "   -  $0 delconfig SRV_TYPE [APPSRVID]"
       echo "   -  $0 addaction APP_SERVER_TYPE.ERROR_CODE '{\"script\":\"/opt/midleo/actions/restart.sh\",\"args\":[\"{appserver_type}\",\"{error_code}\"],\"monid\":\"monaction\",\"appsrvid\":\"none\",\"appsrv\":\"tomcat01\",\"message\":\"Action already started recently\"}'"
       echo "   -  $0 addaction '{\"action_key\":\"APP_SERVER_TYPE.ERROR_CODE\",\"script\":\"/opt/midleo/actions/restart.sh\"}'"
       echo "   -  $0 rmaction APP_SERVER_TYPE.ERROR_CODE"

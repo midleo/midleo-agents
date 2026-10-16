@@ -58,6 +58,7 @@ if /I "%1"=="disableoptadvisor" goto disableoptadvisor
 if /I "%1"=="optadvisorstatus" goto optadvisorstatus
 if /I "%1"=="health" goto health
 if /I "%1"=="addconfig" goto addconfig
+if /I "%1"=="setconfig" goto setconfig
 if /I "%1"=="delconfig" goto delconfig
 if /I "%1"=="configpolicy" goto configpolicy
 if /I "%1"=="appserver" goto appserver
@@ -72,6 +73,12 @@ if /I "%1"=="maintenance" goto maintenance
 
 goto usage
 
+:setconfig
+setlocal DisableDelayedExpansion
+if "%~3"=="" exit /b 1
+"%PYTHON%" "runable\configurationpolicy.py" set "%~2" "%~3" "%~4" "%~5"
+exit /b %errorlevel%
+
 :addconfig
 setlocal DisableDelayedExpansion
 if "%~3"=="" exit /b 1
@@ -80,6 +87,10 @@ exit /b %errorlevel%
 
 :delconfig
 setlocal DisableDelayedExpansion
+if "%~3"=="" (
+  "%PYTHON%" "runable\configurationpolicy.py" disable "%~2"
+  exit /b
+)
 if "%~3"=="" exit /b 1
 "%PYTHON%" "runable\configurationpolicy.py" delete "%~2" "%~3"
 exit /b %errorlevel%
@@ -272,7 +283,8 @@ echo    -  %~nx0 delappstat SRV_TYPE APPSRV
 echo    -  %~nx0 addoptadvisor SRV_TYPE APPSRV "{\"appsrvid\":\"MIDLEO_SERVER_ID\",\"usr\":\"USER\",\"pass\":\"PASS\",\"ssl\":\"yes\",\"sslverify\":\"yes^|no\",\"mngmport\":\"7001\"}"
 echo    -  %~nx0 addconfig tomcat APPSRVID "{\"config_root\":\"C:/Tomcat/conf\",\"configuration_directory\":true}"
 echo    -  %~nx0 addconfig weblogic APPSRVID "{\"config_root\":\"C:/Oracle/domains\",\"folders\":[\"domain1\",\"domain2\"]}"
-echo    -  %~nx0 delconfig SRV_TYPE APPSRVID
+echo    -  %~nx0 setconfig tomcat C:/Tomcat/conf mwadmin
+echo    -  %~nx0 delconfig SRV_TYPE [APPSRVID]
 echo    -  %~nx0 deloptadvisor SRV_TYPE APPSRV
 echo    -  %~nx0 enableoptadvisor [days]
 echo    -  %~nx0 disableoptadvisor [reason]

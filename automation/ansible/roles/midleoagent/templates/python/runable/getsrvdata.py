@@ -197,10 +197,11 @@ def main():
     try:
         config = create()
         if config is None:
-            return
+            return 1
 
         if getattr(config, "error", None):
-            return
+            classes.Err("Server status collection failed")
+            return 1
 
         config_data = _safe_get_config()
         website = config_data["MWADMIN"]
@@ -210,13 +211,16 @@ def main():
         output = json.dumps(config.__dict__, default=str)
         output = _sanitize_output(output)
 
-        makerequest.postData(webssl, website, json.loads(output))
+        if not makerequest.postData(webssl, website, json.loads(output)):
+            raise RuntimeError("Server status upload was not accepted")
         _write_next_run(updint)
+        return 0
 
     except OSError as err:
         classes.Err("Error in main: " + str(err))
     except Exception as ex:
         classes.Err("Exception in main: " + str(ex))
+    return 1
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

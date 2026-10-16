@@ -19,6 +19,7 @@ midagent_render_config_defaults:
     - group: {{ midleo_mwuser }}
     - mode: '0600'
     - context:
+        midleo_debug: "{{ salt['pillar.get']('INPUT:midleo_debug', salt['pillar.get']('midagent_vars:midleo_debug', False)) }}"
         weblogic_home: "{{ salt['pillar.get']('INPUT:weblogic_home', salt['pillar.get']('midagent_vars:weblogic_home', '/opt/oracle/middleware')) }}"
         ibmmq_home: "{{ salt['pillar.get']('INPUT:ibmmq_home', salt['pillar.get']('midagent_vars:ibmmq_home', '/opt/mqm')) }}"
         ibmace_home: "{{ salt['pillar.get']('INPUT:ibmace_home', salt['pillar.get']('midagent_vars:ibmace_home', '/opt/ibm/ace-12/server')) }}"
@@ -31,6 +32,26 @@ midagent_render_config_defaults:
         activemq_home: "{{ salt['pillar.get']('INPUT:activemq_home', salt['pillar.get']('midagent_vars:activemq_home', '')) }}"
         kafka_home: "{{ salt['pillar.get']('INPUT:kafka_home', salt['pillar.get']('midagent_vars:kafka_home', '')) }}"
         msiis_home: "{{ salt['pillar.get']('INPUT:msiis_home', salt['pillar.get']('midagent_vars:msiis_home', '')) }}"
+        tomcat_config_enabled: "{{ salt['pillar.get']('INPUT:tomcat_config_enabled', salt['pillar.get']('midagent_vars:tomcat_config_enabled', '')) }}"
+        tomcat_config_dir: "{{ salt['pillar.get']('INPUT:tomcat_config_dir', salt['pillar.get']('midagent_vars:tomcat_config_dir', '')) }}"
+        tomcat_config_folders: "{{ salt['pillar.get']('INPUT:tomcat_config_folders', salt['pillar.get']('midagent_vars:tomcat_config_folders', '')) }}"
+        tomcat_user: "{{ salt['pillar.get']('INPUT:tomcat_user', salt['pillar.get']('midagent_vars:tomcat_user', '')) }}"
+        jboss_config_enabled: "{{ salt['pillar.get']('INPUT:jboss_config_enabled', salt['pillar.get']('midagent_vars:jboss_config_enabled', '')) }}"
+        jboss_config_dir: "{{ salt['pillar.get']('INPUT:jboss_config_dir', salt['pillar.get']('midagent_vars:jboss_config_dir', '')) }}"
+        jboss_config_folders: "{{ salt['pillar.get']('INPUT:jboss_config_folders', salt['pillar.get']('midagent_vars:jboss_config_folders', '')) }}"
+        jboss_user: "{{ salt['pillar.get']('INPUT:jboss_user', salt['pillar.get']('midagent_vars:jboss_user', '')) }}"
+        weblogic_config_enabled: "{{ salt['pillar.get']('INPUT:weblogic_config_enabled', salt['pillar.get']('midagent_vars:weblogic_config_enabled', '')) }}"
+        weblogic_config_dir: "{{ salt['pillar.get']('INPUT:weblogic_config_dir', salt['pillar.get']('midagent_vars:weblogic_config_dir', '')) }}"
+        weblogic_config_folders: "{{ salt['pillar.get']('INPUT:weblogic_config_folders', salt['pillar.get']('midagent_vars:weblogic_config_folders', '')) }}"
+        weblogic_user: "{{ salt['pillar.get']('INPUT:weblogic_user', salt['pillar.get']('midagent_vars:weblogic_user', '')) }}"
+        ibmwas_config_enabled: "{{ salt['pillar.get']('INPUT:ibmwas_config_enabled', salt['pillar.get']('midagent_vars:ibmwas_config_enabled', '')) }}"
+        ibmwas_config_dir: "{{ salt['pillar.get']('INPUT:ibmwas_config_dir', salt['pillar.get']('midagent_vars:ibmwas_config_dir', '')) }}"
+        ibmwas_config_folders: "{{ salt['pillar.get']('INPUT:ibmwas_config_folders', salt['pillar.get']('midagent_vars:ibmwas_config_folders', '')) }}"
+        ibmwas_user: "{{ salt['pillar.get']('INPUT:ibmwas_user', salt['pillar.get']('midagent_vars:ibmwas_user', '')) }}"
+        liberty_config_enabled: "{{ salt['pillar.get']('INPUT:liberty_config_enabled', salt['pillar.get']('midagent_vars:liberty_config_enabled', '')) }}"
+        liberty_config_dir: "{{ salt['pillar.get']('INPUT:liberty_config_dir', salt['pillar.get']('midagent_vars:liberty_config_dir', '')) }}"
+        liberty_config_folders: "{{ salt['pillar.get']('INPUT:liberty_config_folders', salt['pillar.get']('midagent_vars:liberty_config_folders', '')) }}"
+        liberty_user: "{{ salt['pillar.get']('INPUT:liberty_user', salt['pillar.get']('midagent_vars:liberty_user', '')) }}"
     - require:
       - test: midagent_update_existing_config_required
     - onlyif: test -f {{ agent_install_dir }}config/mwagent.config

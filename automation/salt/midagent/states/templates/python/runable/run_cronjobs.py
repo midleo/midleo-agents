@@ -12,7 +12,7 @@ import time
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from modules.base import classes, secrets
+from modules.base import classes, configs, secrets
 
 LOG_ENABLED = os.environ.get("MIDLEO_CRON_LOG", "").lower() in ("1", "true", "yes")
 BASE_DIR = os.environ.get("MWAGTDIR", os.getcwd())
@@ -57,15 +57,21 @@ def log(message, level="DEBUG"):
     if LOG_ENABLED and level == "DEBUG":
         level = "INFO"
     classes.Log(message, level, "cron")
+    if LOG_ENABLED:
+        print(secrets.redact_text(str(message)), flush=True)
 
-def read_json(path, default=None):
+def read_json(path, default=None, required=False):
     if default is None:
         default = {}
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
+            if required and not isinstance(data, dict):
+                raise ValueError("expected a JSON object")
             return data if isinstance(data, dict) else default
-    except Exception:
+    except (OSError, ValueError) as err:
+        if required:
+            raise ValueError("Cannot read config/" + os.path.basename(path) + ": " + type(err).__name__) from err
         return default
 
 def write_json_atomic(path, data):
@@ -87,9 +93,9 @@ def read_nextrun_ts():
     try:
         with open(NEXT_RUN_FILE, "r", encoding="utf-8") as f:
             value = f.read().strip()
-            return int(value) if value else int(time.time())
+            return int(value) if value else 0
     except Exception:
-        return int(time.time())
+        return 0
 
 def has_config_data(config_file):
     if not config_file:
@@ -159,36 +165,29 @@ def safe_script_path(script_name):
         raise ValueError("cron script outside runable directory")
     return script_path
 
-def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
+def job_skip_reason(script_name, job, now_ts, now_dt, nextrun_ts):
     if not isinstance(job, dict):
-        log(f"{script_name} skipped invalid_job_definition")
-        return False
+        return "invalid_job_definition"
 
     if not job.get("enabled", False):
-        log(f"{script_name} skipped disabled")
-        return False
+        return "disabled"
 
     try:
         safe_script_path(script_name)
     except ValueError as err:
-        log(f"{script_name} skipped {err}")
-        return False
+        return str(err)
 
     if not rule_matches(job.get("run", {}), now_dt):
-        log(f"{script_name} skipped schedule_no_match")
-        return False
+        return "schedule_no_match"
 
     if not has_config_data(job.get("config_file")):
-        log(f"{script_name} skipped empty_config_file={job.get('config_file', '')}")
-        return False
+        return "empty_config_file=" + str(job.get("config_file", ""))
 
     if job.get("skip_if_maintenance", False) and os.path.isfile(MAINTENANCE_FILE):
-        log(f"{script_name} skipped maintenance")
-        return False
+        return "maintenance"
 
     if job.get("requires_nextrun_check", False) and nextrun_ts > now_ts:
-        log(f"{script_name} skipped nextrun_wait")
-        return False
+        return "nextrun_wait"
 
     env_name = job.get("requires_exec_env")
     if env_name:
@@ -198,10 +197,15 @@ def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
             or not os.path.isfile(env_value)
             or not os.access(env_value, os.X_OK)
         ):
-            log(f"{script_name} skipped invalid_env_exec={env_name}")
-            return False
+            return "invalid_env_exec=" + str(env_name)
 
-    return True
+    return ""
+
+def should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
+    reason = job_skip_reason(script_name, job, now_ts, now_dt, nextrun_ts)
+    if reason:
+        log(f"{script_name} skipped {reason}")
+    return not reason
 
 def _terminate_job_tree(process):
     try:
@@ -293,15 +297,15 @@ def run_job(script_name, args, job=None):
     started_at = now_str()
 
     timeout_seconds = DEFAULT_JOB_TIMEOUT_SECONDS
+    try:
+        timeout_seconds = int(os.environ.get("JOB_TIMEOUT_SECONDS", timeout_seconds))
+    except (TypeError, ValueError):
+        pass
     if isinstance(job, dict) and job.get("timeout_seconds") is not None:
         try:
             timeout_seconds = int(job.get("timeout_seconds"))
         except Exception:
             pass
-    try:
-        timeout_seconds = int(os.environ.get("JOB_TIMEOUT_SECONDS", timeout_seconds))
-    except Exception:
-        pass
     timeout_seconds = max(5, min(timeout_seconds, 3600))
 
     try:
@@ -324,13 +328,7 @@ def run_job(script_name, args, job=None):
     }
 
 def main():
-    if not os.path.isfile(CRON_CONFIG_FILE):
-        log("cronjobs skipped missing config/cronjobs.json")
-        return 0
-
     ensure_state_file()
-
-    cron_config = read_json(CRON_CONFIG_FILE, {})
     state = read_json(STATE_FILE, {})
 
     now_dt = datetime.now()
@@ -352,19 +350,47 @@ def main():
     ran_any = False
     ran_jobs = 0
     failed_jobs = 0
+    skipped = {}
+
+    try:
+        if os.path.isfile(CRON_CONFIG_FILE):
+            read_json(CRON_CONFIG_FILE, required=True)
+        configs.ensureCronjobs()
+        for filename in configs.FILE_TO_CRONJOBS:
+            path = os.path.join(CONFIG_DIR, filename)
+            if os.path.isfile(path):
+                configs.syncCronjobsForConfig(filename, read_json(path, required=True))
+        cron_config = read_json(CRON_CONFIG_FILE, required=True)
+    except (OSError, ValueError) as err:
+        log(str(err), "ERROR")
+        state["_meta"] = {
+            "last_execution_started_ts": cron_started_ts,
+            "last_execution_started_at": cron_started_at,
+            "last_execution_finished_ts": int(time.time()),
+            "last_execution_finished_at": now_str(),
+            "last_execution_exit_code": 1,
+            "last_ran_jobs": 0,
+            "last_failed_jobs": 0,
+            "error": str(err),
+        }
+        write_json_atomic(STATE_FILE, state)
+        return 1
 
     for script_name, job in cron_config.items():
-        if not should_run_job(script_name, job, now_ts, now_dt, nextrun_ts):
+        reason = job_skip_reason(script_name, job, now_ts, now_dt, nextrun_ts)
+        if reason:
+            skipped[script_name] = reason
+            log(f"{script_name} skipped {reason}")
             continue
 
         args = resolve_args(job.get("args", []), context)
-        log(f"{script_name} start args={args}")
+        log(f"{script_name} started")
         result = run_job(script_name, args, job)
         state[script_name] = result
         write_json_atomic(STATE_FILE, state)
 
         if result.get("exit_code", 1) == 0:
-            log(f"{script_name} ok")
+            log(f"{script_name} completed exit_code=0")
         else:
             log(f"{script_name} failed exit_code={result.get('exit_code')} error={result.get('stderr', result.get('error', ''))}", "ERROR")
 
@@ -387,8 +413,12 @@ def main():
         "last_execution_exit_code": exit_code,
         "last_ran_jobs": ran_jobs,
         "last_failed_jobs": failed_jobs,
+        "nextrun_ts": read_nextrun_ts(),
+        "skipped": skipped,
     }
     write_json_atomic(STATE_FILE, state)
+    log("cronjobs completed ran=" + str(ran_jobs) + " failed=" + str(failed_jobs)
+        + " skipped=" + json.dumps(skipped, sort_keys=True))
 
     return exit_code
 

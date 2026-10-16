@@ -56,4 +56,4 @@ export -n INTTOKEN
 cd "$MWAGTDIR"
 export MWAGTDIR
 
-exec "$PYTHON" "$MWAGTDIR/runable/run_cronjobs.py"
+"$PYTHON" "$MWAGTDIR/runable/run_cronjobs.py"

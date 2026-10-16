@@ -93,12 +93,16 @@ def _dependency_status():
 
 def _cron_status():
     state = _read_json(CRON_STATE_FILE)
+    definitions = configs.getCronjobs()
     meta = state.get("_meta") if isinstance(state.get("_meta"), dict) else {}
+    skipped = meta.get("skipped") if isinstance(meta.get("skipped"), dict) else {}
     jobs = {}
     failed_jobs = 0
-    for name, item in state.items():
-        if str(name).startswith("_") or not isinstance(item, dict):
+    for name in sorted(set(state) | set(definitions)):
+        if str(name).startswith("_"):
             continue
+        item = state.get(name) if isinstance(state.get(name), dict) else {}
+        definition = definitions.get(name) if isinstance(definitions.get(name), dict) else {}
         exit_code = item.get("exit_code")
         if exit_code not in (None, "", 0):
             failed_jobs += 1
@@ -106,6 +110,10 @@ def _cron_status():
             "last_run": item.get("last_run"),
             "finished_at": item.get("finished_at"),
             "exit_code": exit_code,
+            "enabled": bool(definition.get("enabled", False)),
+            "run": definition.get("run", {}),
+            "last_skip_reason": skipped.get(name),
+            "error": item.get("error") or item.get("stderr") or None,
         }
     return {
         "last_execution_started_at": meta.get("last_execution_started_at"),
@@ -113,6 +121,8 @@ def _cron_status():
         "last_execution_exit_code": meta.get("last_execution_exit_code"),
         "last_ran_jobs": meta.get("last_ran_jobs", 0),
         "last_failed_jobs": meta.get("last_failed_jobs", failed_jobs),
+        "error": meta.get("error"),
+        "nextrun_ts": meta.get("nextrun_ts"),
         "jobs": jobs,
     }
 

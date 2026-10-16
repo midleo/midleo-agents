@@ -84,33 +84,29 @@ diff -qr automation/ansible/roles/midleoagent/templates/python automation/salt/m
 
 ## Configuration ZIP folders
 
-For Tomcat, JBoss/WildFly, WebLogic and IBM WAS/Liberty, save one agent-visible main configuration directory per server in Midleo. Optional configuration subfolders/domains are comma-separated names directly beneath that directory. Saving sends a separate agent command to create or update that server's entry in `config/configuration-policy.json`; save again to retry a failed sync. Existing entries and custom validation commands are preserved. Stop/start commands are selected automatically and run separately from file uploads after deployment confirmation.
+Tomcat, JBoss/WildFly, WebLogic and IBM WAS/Liberty use one configuration directory with optional child folders/domains. The ZIP filename must match the folder, for example `conf.zip` or `domain1.zip`; contents may include the matching folder or its files directly. Docker Tomcat needs only its host-mounted configuration directory.
 
-Include each configuration root in `REMOTE_FILE_ROOTS` in `config/mwagent.config`, alongside the agent installation directory used for staging. ZIP destinations use the same allowed-root check as ACE uploads. The agent account still needs directory write/execute access and permission to preserve existing file ownership and modes.
-
-The ZIP filename must match the configuration folder or domain: a root named `config` uses `config.zip`; a root named `conf` uses `conf.zip`; configured subfolders `domain1, domain2` use `domain1.zip` or `domain2.zip`. ZIP contents may start directly with the files or with the matching folder. Tomcat also accepts a `conf/` wrapper inside the ZIP. With subfolders configured, each ZIP targets one listed subfolder. Native Tomcat keeps its Catalina Base and selects its `conf` subfolder. Docker Tomcat needs only the host configuration mount, for example `/cloud/middleware/tomcat/config` mapped to `/usr/local/tomcat/conf`.
-
-Run from the installed agent directory, replacing `APPSRVID` with the Midleo application server ID. Repeating either command updates that server's root/folder list. The default validator checks bounded UTF-8/XML syntax; existing server-specific validation and protected/management-controlled file restrictions still apply. Native Liberty retains its existing runtime validation, health URL and dedicated service policy requirements.
+Linux:
 
 ```bash
-./magent.sh addconfig tomcat APPSRVID '{"config_root":"/cloud/middleware/tomcat/config","configuration_directory":true}'
-./magent.sh addconfig weblogic APPSRVID '{"config_root":"/opt/oracle/domains","folders":["domain1","domain2"]}'
+./magent.sh setconfig tomcat /cloud/middleware/data/tomcat/conf mwadmin
+./magent.sh setconfig weblogic /opt/oracle/domains oracle domain1,domain2
 ```
 
-Windows Command Prompt:
+Windows configuration setup:
 
 ```bat
-magent.bat addconfig tomcat APPSRVID "{\"config_root\":\"C:/Tomcat/conf\",\"configuration_directory\":true}"
-magent.bat addconfig weblogic APPSRVID "{\"config_root\":\"C:/Oracle/domains\",\"folders\":[\"domain1\",\"domain2\"]}"
+magent.bat setconfig tomcat C:/Tomcat/conf mwadmin
+magent.bat setconfig weblogic C:/Oracle/domains oracle domain1,domain2
 ```
 
-Windows supports policy setup/update; ZIP file deployment retains the existing POSIX agent requirement. The same `config_root` and `folders` settings apply to all supported server types.
+These commands update `config/mwagent.config`. `*_CONFIG_DIR` selects configuration files; `*_HOME` selects product binaries, and `*_USER` selects the native start/stop user. Files are written by the agent account, which must own the target files and have directory write access. Stop/start commands are selected automatically. ZIP deployment currently requires a POSIX agent.
 
-Remove a server policy with `./magent.sh delconfig SRV_TYPE APPSRVID` or `magent.bat delconfig SRV_TYPE APPSRVID`. Other server entries, configuration folders and snapshots are preserved.
+Use `magent.sh delconfig TYPE` or `magent.bat delconfig TYPE` to disable deployment. Existing per-instance policies remain supported. Ansible and Salt use `tomcat_config_enabled`, `tomcat_config_dir`, `tomcat_config_folders` and `tomcat_user`, with equivalent prefixes for the other server types.
 
 ## Security Defaults
 
-- Agent configuration files are deployed with mode `0640`.
+- Agent configuration files are deployed with mode `0600`.
 - Runtime directories are owned by the Midleo service user and are not world-readable.
 - External command execution is allowlist-based through `ALLOWED_COMMANDS`; Midleo wrappers (`magent.sh`, `magent.bat`, `magent.zos.sh`) are internally allowed and path-pinned to the agent runtime directory.
 - Shell execution is disabled by default with `ALLOW_SHELL_COMMANDS=n`.

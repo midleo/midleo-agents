@@ -7,11 +7,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from modules.base import secrets
-from modules.statistics.configuration_policy import delete_policy, update_policy, validate_policy
+from modules.statistics.configuration_policy import configuration_defaults, delete_policy, set_configuration, update_policy, validate_policy
 
 
 def execute(arguments):
     home = Path(os.getcwd()).resolve()
+    if 3 <= len(arguments) <= 5 and arguments[0] == 'set':
+        return set_configuration(home, arguments[1], arguments[2], arguments[3] if len(arguments) > 3 else '', arguments[4] if len(arguments) > 4 else '')
+    if len(arguments) == 2 and arguments[0] == 'disable':
+        return set_configuration(home, arguments[1])
     if len(arguments) == 4 and arguments[0] == 'add':
         return update_policy(home, arguments[2], arguments[1], json.loads(arguments[3]))
     if len(arguments) == 3 and arguments[0] == 'delete':
@@ -26,6 +30,11 @@ def execute(arguments):
             raise ValueError('Invalid configuration policy request')
         if not isinstance(payload['settings'], dict) or set(payload['settings']) - {'config_root', 'folders', 'configuration_directory', 'enabled'}:
             raise ValueError('Unsupported remote configuration setting')
+        defaults = configuration_defaults(payload['technology'], allow_disabled=True)
+        if defaults is not None:
+            if not defaults['enabled']:
+                return {'success': True, 'status': 'disabled'}
+            return {'success': True, 'status': 'agent_defaults', 'configuration_root': defaults['config_root'], 'folders': defaults['folders']}
         return update_policy(home, payload['instance'], payload['technology'], payload['settings'])
     raise ValueError('Use add SRV_TYPE APPSRVID JSON, delete SRV_TYPE APPSRVID or encoded ENCODED_SETTINGS')
 

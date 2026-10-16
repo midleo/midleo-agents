@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import os
 import re
@@ -7,11 +8,120 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from modules.base import configs
 from modules.statistics.apache.operations import instance_lock, read_bytes, relative, trusted, write_json
 
 TECHNOLOGIES = frozenset(('tomcat', 'jboss', 'weblogic', 'ibmwas', 'liberty'))
 MAX_FILES = 2000
 MAX_POLICY_BYTES = 524288
+
+
+def configuration_defaults(technology, configuration=None, allow_disabled=False):
+    technology = {'wildfly': 'jboss'}.get(technology, technology)
+    if technology not in TECHNOLOGIES:
+        raise ValueError('Use a supported server type')
+    configuration = configs.getcfgData() if configuration is None else configuration
+    prefix = technology.upper()
+    enabled = str(configuration.get(prefix + '_CONFIG_ENABLED', '')).lower()
+    if not enabled:
+        return None
+    if enabled not in ('y', 'yes', 'true', '1', 'n', 'no', 'false', '0'):
+        raise ValueError(prefix + '_CONFIG_ENABLED must be y or n')
+    if enabled in ('n', 'no', 'false', '0'):
+        if allow_disabled:
+            return {'enabled': False}
+        raise ValueError('Configuration deployment is disabled by ' + prefix + '_CONFIG_ENABLED')
+    user = configuration.get(prefix + '_USER', '').strip()
+    root = configuration_directory(configuration.get(prefix + '_CONFIG_DIR', ''))
+    folders = folder_names([item.strip() for item in configuration.get(prefix + '_CONFIG_FOLDERS', '').split(',') if item.strip()])
+    for folder in folders:
+        configuration_directory(str(root / folder))
+    if user and not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.-]{0,63}\$?', user):
+        raise ValueError('Invalid ' + prefix + '_USER')
+    return {'config_root': str(root), 'folders': folders,
+            'configuration_directory': technology == 'tomcat', 'enabled': True}
+
+
+def configured_policy(home, request):
+    options = configuration_defaults(request.get('technology'))
+    if options is None:
+        return None
+    instance = identity(request.get('policy_instance') or request.get('instance'))
+    home = directory(str(Path(home).resolve()))
+    root = Path(options['config_root'])
+    if root == home or root in home.parents or home in root.parents:
+        raise ValueError('Configuration and agent installation directories must be separate')
+    runtime = home / 'runtime' / 'configuration'
+    runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
+    trusted(runtime, private=True)
+    policy = {}
+    try:
+        from modules.statistics.configuration import load_policy
+        policy = load_policy(home / 'config' / 'configuration-policy.json', dict(request, instance=instance))
+    except (FileNotFoundError, KeyError):
+        pass
+    if policy.get('technology', request['technology']) != request['technology']:
+        raise ValueError('Configuration policy belongs to another server type')
+    automatic_files = not policy or policy.get('managed_files') is True
+    policy = copy.deepcopy(policy)
+    policy.update(options, technology=request['technology'])
+    if automatic_files:
+        policy.update(allowed_files=[], allow_new_files=True, allow_existing_files=True, managed_files=True)
+    policy['configuration_defaults_hash'] = hashlib.sha256(json.dumps(options, sort_keys=True).encode()).hexdigest()
+    for key, name in (('staging_root', 'staging'), ('backup_root', 'backups')):
+        target = runtime / name
+        target.mkdir(mode=0o700, exist_ok=True)
+        trusted(target, private=True)
+        policy[key] = str(target)
+    command = policy.get('validation_command', [])
+    if not command or (len(command) > 2 and command[1] == str(home / 'runable' / 'configurationpolicy.py') and command[2] == 'validate'):
+        policy['validation_command'] = ['@MIDLEO_CONFIGURATION_VALIDATE@']
+    return policy
+
+
+def set_configuration(home, technology, root=None, user='', folders=''):
+    technology = {'wildfly': 'jboss'}.get(technology, technology)
+    if technology not in TECHNOLOGIES:
+        raise ValueError('Use a supported server type')
+    prefix = technology.upper()
+    values = {prefix + '_CONFIG_ENABLED': 'n'}
+    if root is not None:
+        if not re.fullmatch(r'[A-Za-z0-9_./:\\-]+', root):
+            raise ValueError('Use an absolute configuration directory without shell characters')
+        values.update({prefix + '_CONFIG_ENABLED': 'y', prefix + '_CONFIG_DIR': root.rstrip('/\\'),
+                       prefix + '_CONFIG_FOLDERS': folders, prefix + '_USER': user})
+        configuration_defaults(technology, values)
+    config = directory(str(Path(home).resolve())) / 'config'
+    trusted(config)
+    path = config / 'mwagent.config'
+    trusted(path)
+    with instance_lock(config / 'configuration-policy.lock'):
+        text = path.read_text(encoding='utf-8')
+        newline = '\r\n' if '\r\n' in text else '\n'
+        lines = []
+        remaining = dict(values)
+        for line in text.splitlines():
+            key = line.split('=', 1)[0].strip() if '=' in line and not line.lstrip().startswith('#') else ''
+            if key in values:
+                if key in remaining:
+                    lines.append(key + '=' + remaining.pop(key))
+            else:
+                lines.append(line)
+        lines.extend(key + '=' + value for key, value in remaining.items())
+        import tempfile
+        descriptor, temporary = tempfile.mkstemp(prefix='.mwagent-', dir=str(config))
+        try:
+            with os.fdopen(descriptor, 'w', encoding='utf-8', newline='') as stream:
+                stream.write(newline.join(lines) + newline)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.chmod(temporary, stat.S_IMODE(path.stat().st_mode) & 0o600)
+            os.replace(temporary, path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+    return {'success': True, 'technology': technology, 'enabled': root is not None,
+            'configuration_root': values.get(prefix + '_CONFIG_DIR', ''), 'user': user}
 
 
 def identity(value):
@@ -42,6 +152,10 @@ def directory(value):
     if not path.is_absolute() or not path.is_dir() or path.resolve() != path or path == Path(path.anchor):
         raise ValueError('Use an existing absolute configuration directory without symlinks')
     return path
+
+
+def configuration_directory(value):
+    return directory(value)
 
 
 def inventory(root):
@@ -187,13 +301,14 @@ def select_policy(policy, request):
     if policy.get('enabled') is False:
         raise ValueError('Configuration deployment is disabled for this server')
     policy = copy.deepcopy(policy)
+    policy.pop('configuration_user', None)
     name = request.get('bundle_name')
     if not name:
         return policy
     if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,180}\.zip(?:\.bundle)?', name, re.I):
         raise ValueError('Use a ZIP named after the configuration folder or domain')
     folder = re.sub(r'\.zip(?:\.bundle)?$', '', name, flags=re.I)
-    root = directory(policy['config_root'])
+    root = configuration_directory(policy['config_root'])
     folders = folder_names(policy.get('folders', []))
     if folder == root.name and not folders:
         selected = root
@@ -201,7 +316,7 @@ def select_policy(policy, request):
         protected = {'weblogic': ('bin', 'config', 'security', 'servers'), 'ibmwas': ('cells', 'nodes')}
         if folder.lower() in protected.get(policy['technology'], ()):
             raise ValueError('Protected management directories cannot be selected as configuration roots')
-        selected = directory(str(root / folder))
+        selected = configuration_directory(str(root / folder))
         if policy['technology'] == 'tomcat' and policy.get('configuration_directory') is not True and folder != 'conf':
             raise ValueError('Native Tomcat bundles must target its conf directory')
         policy['allowed_files'] = [item[len(folder) + 1:] for item in policy.get('allowed_files', []) if item.startswith(folder + '/')]
@@ -222,6 +337,12 @@ def validate_policy(home, instance, root):
     base = directory(policy['config_root'])
     if root != base and (root.parent != base or root.name not in folder_names(policy.get('folders', []))):
         raise ValueError('Validation directory is outside the configured folders')
+    validate_directory(root)
+    return {'success': True, 'instance': instance, 'status': 'validated'}
+
+
+def validate_directory(root):
+    root = directory(str(root))
     for name in inventory(root):
         if not name.endswith(('.xml', '.properties')) and Path(name).name not in ('jvm.options', 'server.env'):
             continue
@@ -237,4 +358,3 @@ def validate_policy(home, instance, root):
                 ET.fromstring(text)
             except ET.ParseError:
                 raise ValueError('Invalid XML configuration: ' + name)
-    return {'success': True, 'instance': instance, 'status': 'validated'}
