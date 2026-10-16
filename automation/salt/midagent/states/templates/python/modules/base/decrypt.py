@@ -3,54 +3,45 @@ import binascii
 import json
 import os
 from pathlib import Path
-
-from Crypto import Random
-from Crypto.Cipher import AES
-from Crypto.Hash import SHA256
-from Crypto.Random import get_random_bytes
-from Crypto.Util.Padding import pad, unpad
-
+try:
+    from Crypto import Random
+    from Crypto.Cipher import AES
+    from Crypto.Hash import SHA256
+    from Crypto.Random import get_random_bytes
+    from Crypto.Util.Padding import pad, unpad
+except ModuleNotFoundError as exc:
+    if exc.name != "Crypto":
+        raise
+    from Cryptodome import Random
+    from Cryptodome.Cipher import AES
+    from Cryptodome.Hash import SHA256
+    from Cryptodome.Random import get_random_bytes
+    from Cryptodome.Util.Padding import pad, unpad
 from modules.base import classes
-
-_SECRET_PATH = Path(
-    os.environ.get(
-        "MIDLEO_CRYPTO_SECRET",
-        os.path.join(os.getcwd(), "config", "crypto.secret")
-        if os.name == "nt"
-        else "/etc/midleo/crypto.secret",
-    )
-)
+_SECRET_PATH = Path(os.environ.get("MIDLEO_CRYPTO_SECRET", os.path.join(os.getcwd(), "config", "crypto.secret") if os.name == "nt" else "/etc/midleo/crypto.secret"))
 _SECRET = None
 _SUFFIX = b"|midleo|v1"
-
 def _get_secret() -> bytes:
     global _SECRET
     if _SECRET is None:
-        _SECRET = _SECRET_PATH.read_text(
-            encoding="utf-8"
-        ).strip().encode("utf-8")
+        _SECRET = _SECRET_PATH.read_text(encoding="utf-8").strip().encode("utf-8")
     return _SECRET
-
 def _derive_key() -> bytes:
     return SHA256.new(_get_secret() + _SUFFIX).digest()
-
 def encryptPWD(payload: str) -> str:
     key = _derive_key()
     iv = get_random_bytes(16)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     ciphertext = cipher.encrypt(pad(payload.encode("utf-8"), AES.block_size))
     return base64.b64encode(iv + ciphertext).decode("ascii")
-
 def decryptPWD(payload: str) -> str:
     if not payload:
         return ""
-
     raw = base64.b64decode(str(payload))
     iv = raw[:16]
     ciphertext = raw[16:]
     cipher = AES.new(_derive_key(), AES.MODE_CBC, iv)
     return unpad(cipher.decrypt(ciphertext), AES.block_size).decode("utf-8")
-
 def encrypt(data: dict, passphrase) -> str:
     try:
         data_json_64 = base64.b64encode(json.dumps(data).encode())
@@ -58,24 +49,19 @@ def encrypt(data: dict, passphrase) -> str:
         iv = Random.get_random_bytes(12)
         cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
         encrypted, tag = cipher.encrypt_and_digest(data_json_64)
-        payload = {
-            "iv": base64.b64encode(iv).decode(),
-            "data": base64.b64encode(encrypted).decode(),
-            "tag": base64.b64encode(tag).decode()
-        }
+        payload = {"iv": base64.b64encode(iv).decode(), "data": base64.b64encode(encrypted).decode(), "tag": base64.b64encode(tag).decode()}
         return base64.b64encode(json.dumps(payload).encode()).decode()
     except Exception as ex:
         classes.Err("Exception:" + str(ex))
-
 def decryptit(data: str, passphrase) -> dict:
     try:
         key = binascii.unhexlify(passphrase)
-        encrypted = json.loads(base64.b64decode(data).decode('ascii'))
-        encrypted_data = base64.b64decode(encrypted['data'])
-        iv = base64.b64decode(encrypted['iv'])
-        tag = base64.b64decode(encrypted['tag'])
+        encrypted = json.loads(base64.b64decode(data).decode("ascii"))
+        encrypted_data = base64.b64decode(encrypted["data"])
+        iv = base64.b64decode(encrypted["iv"])
+        tag = base64.b64decode(encrypted["tag"])
         cipher = AES.new(key, AES.MODE_GCM, iv)
         decrypted = cipher.decrypt_and_verify(encrypted_data, tag)
-        return json.loads(base64.b64decode(decrypted).decode('ascii'))
+        return json.loads(base64.b64decode(decrypted).decode("ascii"))
     except Exception as ex:
         classes.Err("Exception:" + str(ex))
