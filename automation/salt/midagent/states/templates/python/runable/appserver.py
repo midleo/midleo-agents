@@ -16,7 +16,7 @@ def execute_encoded(encoded):
     if not isinstance(request, dict):
         raise ValueError('An application server operation object is required')
     technology = request.get('technology')
-    if request.get('action') in ('bundle_resolve', 'bundle_compare', 'bundle_diff', 'bundle_prepare', 'bundle_deploy', 'bundle_restore', 'bundle_snapshot'):
+    if request.get('action') in ('bundle_resolve', 'bundle_compare', 'bundle_diff', 'bundle_prepare', 'bundle_deploy', 'bundle_restore', 'bundle_snapshot', 'bundle_restore_preview', 'bundle_restore_deploy'):
         request['technology'] = {'wildfly': 'jboss'}.get(technology, technology)
         from modules.statistics import configuration_bundle
         result = configuration_bundle.execute(request)

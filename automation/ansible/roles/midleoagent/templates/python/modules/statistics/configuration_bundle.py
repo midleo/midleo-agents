@@ -1,11 +1,13 @@
 import base64
 import hashlib
+import io
 import json
 import os
 import re
 import stat
 import subprocess
 import tempfile
+import zipfile
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from pathlib import Path
@@ -399,7 +401,7 @@ class BundleConfigurationOperations:
         return common.http_available(common.http_status('', url=self.policy['health_url']), self.policy.get('health_status'))
 
     def prepare_files(self, request):
-        current = self.compare_configuration_files(request)
+        current = self.preview_restore(request) if request.get('restore_source') else self.compare_configuration_files(request)
         if not current['can_proceed'] or current['fingerprint'] != request.get('fingerprint'):
             raise ValueError('Preview changed before snapshot')
         backups = self.runtime_directory(self.backups, request['deployment_id'])
@@ -409,10 +411,12 @@ class BundleConfigurationOperations:
             if result.get('fingerprint') != current['fingerprint'] or result.get('status') != 'prepared':
                 raise ValueError('This deployment already ran; review again')
             return result
-        self.validate_configuration()
-        changed = [f for f in current['files'] if f['status'] in ('NEW', 'MODIFIED')]
+        if not request.get('restore_source'):
+            self.validate_configuration()
+        changed = [f for f in current['files'] if f['status'] in ('NEW', 'MODIFIED', 'DELETED')]
         result = {'success': True, 'status': 'prepared', 'fingerprint': current['fingerprint'], 'files': [],
                   'snapshots': {'before': self.snapshot(backups, 'before', changed)}, 'validation': {'before': 'completed'}}
+        result['configuration_backup'] = self.backup_metadata(request['deployment_id'])
         write_json(journal, result)
         return result
 
@@ -423,15 +427,7 @@ class BundleConfigurationOperations:
         backups = self.runtime_directory(self.backups, request['deployment_id'])
         journal = backups / 'journal.json'
         result = json.loads(journal.read_text())
-        encrypted = backups / 'before.encrypted'
-        trusted(encrypted, private=True)
-        if self.decrypt:
-            before = self.decrypt(encrypted.read_text())
-        else:
-            from modules.base import decrypt
-            before = decrypt.decryptit(encrypted.read_text(), decrypt._derive_key().hex())
-        if not isinstance(before, dict):
-            raise ValueError('Unable to decrypt the before snapshot')
+        before = self.read_snapshot(request['deployment_id'])
         requested = {entry['target']: entry for entry in self.entries(request)}
         recovery = {'success': True, 'status': 'restored', 'files': []}
         for entry in result.get('files', []):
@@ -444,13 +440,14 @@ class BundleConfigurationOperations:
                 if actual == {key: original[key] for key in ('exists', 'size', 'sha256')}:
                     recovery['files'].append({'target': name, 'status': 'UNCHANGED'})
                     continue
-                if not actual['exists'] or actual['sha256'] != requested[name]['sha256']:
+                expected_delete = requested[name].get('delete') is True
+                if (expected_delete and actual['exists']) or (not expected_delete and (not actual['exists'] or actual['sha256'] != requested[name]['sha256'])):
                     raise ValueError('Recovery target changed outside this deployment')
                 if original['exists']:
                     data = base64.b64decode(original['content'], validate=True)
                     if digest(data) != original['sha256']:
                         raise ValueError('Before snapshot checksum failed')
-                    self.install(name, data)
+                    self.install(name, data, original)
                 else:
                     with self.parent(name) as (fd, leaf):
                         os.unlink(leaf, dir_fd=fd)
@@ -484,11 +481,18 @@ class BundleConfigurationOperations:
 
     def snapshot(self, directory, label, files):
         payload = {}
+        archive = io.BytesIO()
+        zipper = zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED)
         for entry in files:
             current = self.metadata(entry['target'], content=True)
             if current.get('exists'):
-                current['content'] = base64.b64encode(current['content']).decode('ascii')
+                zipper.writestr(entry['target'], current.pop('content'))
+                with self.parent(entry['target']) as (fd, leaf):
+                    attributes = os.stat(leaf, dir_fd=fd, follow_symlinks=False)
+                    current.update(uid=attributes.st_uid, gid=attributes.st_gid, mode=stat.S_IMODE(attributes.st_mode))
             payload[entry['target']] = current
+        zipper.close()
+        payload = {'format': 'configuration_zip_v1', 'manifest': payload, 'archive': base64.b64encode(archive.getvalue()).decode('ascii')}
         if self.encrypt:
             encrypted = self.encrypt(payload)
         else:
@@ -496,7 +500,7 @@ class BundleConfigurationOperations:
             encrypted = decrypt.encrypt(payload, decrypt._derive_key().hex())
         if not encrypted:
             raise ValueError('Encrypted snapshot creation failed')
-        path = directory / (label + '.encrypted')
+        path = directory / (label + '.zip.encrypted')
         fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         with os.fdopen(fd, 'w') as stream:
             stream.write(encrypted)
@@ -504,7 +508,165 @@ class BundleConfigurationOperations:
             os.fsync(stream.fileno())
         return '%s/%s/%s' % (self.namespace, directory.name, label)
 
-    def install(self, name, data):
+    def backup_metadata(self, identifier):
+        if not re.fullmatch(r'DEP[a-f0-9]{32}', identifier):
+            raise ValueError('Invalid backup deployment identity')
+        directory = self.backups / identifier
+        trusted(directory, private=True)
+        path = directory / 'before.zip.encrypted'
+        if not path.exists():
+            path = directory / 'before.encrypted'
+        trusted(path, private=True)
+        if path.stat().st_size > MAX_TOTAL * 4:
+            raise ValueError('Backup exceeds size limit')
+        return {'deployment_id': identifier, 'configuration_root': str(self.root), 'archive_path': str(path),
+                'journal_path': str(directory / 'journal.json'), 'sha256': digest(path.read_bytes()),
+                'format': 'encrypted_zip' if path.name.endswith('.zip.encrypted') else 'encrypted_snapshot'}
+
+    def read_snapshot(self, identifier):
+        backup = self.backup_metadata(identifier)
+        encrypted = Path(backup['archive_path']).read_text()
+        if self.decrypt:
+            payload = self.decrypt(encrypted)
+        else:
+            from modules.base import decrypt
+            payload = decrypt.decryptit(encrypted, decrypt._derive_key().hex())
+        if not isinstance(payload, dict):
+            raise ValueError('Unable to decrypt the before snapshot')
+        if payload.get('format') == 'configuration_zip_v1':
+            manifest = payload.get('manifest')
+            if not isinstance(manifest, dict) or len(manifest) > MAX_FILES:
+                raise ValueError('Invalid backup manifest')
+            data = base64.b64decode(payload['archive'], validate=True)
+            if len(data) > MAX_TOTAL * 2:
+                raise ValueError('Backup archive exceeds size limit')
+            with zipfile.ZipFile(io.BytesIO(data)) as zipper:
+                expected = {name for name, entry in manifest.items() if entry.get('exists')}
+                if len(zipper.namelist()) != len(expected) or set(zipper.namelist()) != expected:
+                    raise ValueError('Backup archive does not match its manifest')
+                for name in expected:
+                    if zipper.getinfo(name).file_size > MAX_FILE:
+                        raise ValueError('Backup file exceeds size limit')
+                    manifest[name]['content'] = base64.b64encode(zipper.read(name)).decode('ascii')
+            payload = manifest
+        if not 1 <= len(payload) <= MAX_FILES:
+            raise ValueError('Backup contains no restorable files')
+        total = 0
+        for name, entry in payload.items():
+            relative(name)
+            if not isinstance(entry, dict) or type(entry.get('exists')) is not bool:
+                raise ValueError('Invalid backup file metadata')
+            if entry['exists']:
+                data = base64.b64decode(entry['content'], validate=True)
+                total += len(data)
+                if len(data) > MAX_FILE or len(data) != entry['size'] or digest(data) != entry['sha256']:
+                    raise ValueError('Before snapshot checksum failed')
+        if total > MAX_TOTAL:
+            raise ValueError('Backup exceeds expanded size limit')
+        return payload
+
+    def preview_restore(self, request):
+        resolved = self.resolve_configuration_root(request)
+        source = request.get('restore_source') or {}
+        backup = self.backup_metadata(source.get('deployment_id', ''))
+        if source.get('sha256') and source['sha256'] != backup['sha256']:
+            raise ValueError('Backup changed since the restore was reviewed')
+        before = self.read_snapshot(backup['deployment_id'])
+        files = []
+        for name, original in sorted(before.items()):
+            code, reason = self.validate_configuration_path(name)
+            current = self.metadata(name)
+            desired = {key: original[key] for key in ('exists', 'size', 'sha256')}
+            identical = current == desired
+            status = 'UNCHANGED' if identical else code if code != 'SUPPORTED' else 'DELETED' if not desired['exists'] else 'MODIFIED' if current['exists'] else 'NEW'
+            if not identical and not self.writable_configuration_path(name):
+                status, reason = 'BLOCKED_PERMISSIONS', 'The agent cannot restore this resource.'
+            if original['exists'] and not identical:
+                validate_content(name, base64.b64decode(original['content']), self.technology == 'tomcat')
+            files.append({'target': name, 'size': desired['size'], 'sha256': desired['sha256'] or digest(b''),
+                          'delete': not desired['exists'], 'desired': desired, 'before': current, 'status': status, 'reason': reason})
+        changed = [f for f in files if f['status'] != 'UNCHANGED']
+        restart = self.determine_restart_requirement(files)
+        if changed:
+            restart['required'] = True
+            restart['mode'] = 'restart'
+            if not self.file_operations_only:
+                forced = [dict(f, status='MODIFIED', target='restore.properties') for f in changed]
+                restart = self.determine_restart_requirement(forced)
+        return dict(resolved, success=True, files=files, restore_source=backup, restart=restart,
+                    can_proceed=not restart.get('blocked_reason') and all(not f['status'].startswith('BLOCKED') for f in files),
+                    fingerprint=digest(json.dumps(files, sort_keys=True, separators=(',', ':')).encode()))
+
+    def apply_restore(self, request):
+        current = self.preview_restore(request)
+        if not current['can_proceed'] or current['fingerprint'] != request.get('fingerprint') or current['policy_hash'] != request.get('policy_hash'):
+            raise ValueError('Configuration or backup changed after restore preview')
+        directory = self.runtime_directory(self.backups, request['deployment_id'])
+        journal = directory / 'journal.json'
+        result = json.loads(journal.read_text())
+        if result.get('status') != 'prepared' or result.get('fingerprint') != current['fingerprint']:
+            raise ValueError('A fresh restore backup is required')
+        source = self.read_snapshot(current['restore_source']['deployment_id'])
+        result.update(success=False, status='restoring', restore_source=current['restore_source'], files=[],
+                      restart={'status': 'not_run', 'target': current['restart']['target']}, health='not_run')
+        stopped = False
+        target = current['restart']['target']
+        try:
+            if not self.file_operations_only:
+                if Path(self.policy.get('service_manager', '/usr/bin/systemctl')).name != 'systemctl':
+                    raise ValueError('A dedicated systemctl server service is required')
+                stopped = True
+                self.command([self.policy.get('service_manager', '/usr/bin/systemctl'), 'stop', target['service_unit']])
+            for entry in current['files']:
+                if entry['status'] == 'UNCHANGED':
+                    continue
+                name = entry['target']
+                if self.metadata(name) != entry['before']:
+                    raise ValueError('Configuration changed during restoration')
+                evidence = {'target': name, 'status': 'RESTORING'}
+                result['files'].append(evidence)
+                write_json(journal, result)
+                if source[name]['exists']:
+                    self.install(name, base64.b64decode(source[name]['content'], validate=True), source[name])
+                else:
+                    with self.parent(name) as (fd, leaf):
+                        os.unlink(leaf, dir_fd=fd)
+                        os.fsync(fd)
+                if self.metadata(name) != entry['desired']:
+                    raise ValueError('Restoration verification failed')
+                evidence['status'] = 'RESTORED'
+                write_json(journal, result)
+            self.validate_configuration()
+            result['validation']['after'] = 'completed'
+            result.update(success=True, status='restored')
+        except Exception as error:
+            result.update(success=False, status='failed', errorlog=redact(str(error))[:1024])
+            if stopped:
+                try:
+                    write_json(journal, result)
+                    result['recovery'] = self.restore_configuration(request)
+                except Exception as recovery_error:
+                    result['recovery'] = {'success': False, 'status': 'restore_failed', 'error': redact(str(recovery_error))[:512]}
+        finally:
+            if stopped:
+                try:
+                    self.command([self.policy.get('service_manager', '/usr/bin/systemctl'), 'start', target['service_unit']])
+                    self.command([self.policy.get('service_manager', '/usr/bin/systemctl'), 'is-active', '--quiet', target['service_unit']])
+                    result['restart']['status'] = 'completed'
+                    result['health'] = 'completed' if self.verify_server_health() else 'failed'
+                    if result['health'] != 'completed':
+                        result.update(success=False, status='failed', errorlog='Restored server health verification failed')
+                except Exception as error:
+                    result.update(success=False, status='failed', errorlog=redact(str(error))[:1024])
+            if not self.file_operations_only:
+                try:
+                    result['snapshots']['after'] = self.snapshot(directory, 'after', current['files'])
+                except Exception as error:
+                    result.update(success=False, status='failed', errorlog=redact(str(error))[:1024])
+            write_json(journal, result)
+        return result
+
+    def install(self, name, data, attributes=None):
         with self.parent(name, create=True) as (fd, leaf):
             temporary = '.midleo-' + os.urandom(16).hex()
             output = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=fd)
@@ -518,7 +680,12 @@ class BundleConfigurationOperations:
                     pass
                 with os.fdopen(output, 'wb') as stream:
                     stream.write(data)
-                    if info:
+                    if attributes and all(type(attributes.get(key)) is int for key in ('uid', 'gid', 'mode')):
+                        if attributes['uid'] < 0 or attributes['gid'] < 0 or not 0 <= attributes['mode'] <= 0o777:
+                            raise ValueError('Invalid backup file ownership or permissions')
+                        os.fchown(stream.fileno(), attributes['uid'], attributes['gid'])
+                        os.fchmod(stream.fileno(), attributes['mode'])
+                    elif info:
                         os.fchown(stream.fileno(), info.st_uid, info.st_gid)
                         os.fchmod(stream.fileno(), stat.S_IMODE(info.st_mode))
                     stream.flush()
@@ -552,9 +719,7 @@ class BundleConfigurationOperations:
             stage = self.runtime_directory(self.stage, request['deployment_id'])
             backups = self.runtime_directory(self.backups, request['deployment_id'])
             journal = backups / 'journal.json'
-            if journal.exists() and not files_only:
-                raise ValueError('This deployment already ran; use a new reviewed recovery deployment')
-            if files_only:
+            if journal.exists():
                 prepared = json.loads(journal.read_text())
                 if prepared.get('status') != 'prepared' or prepared.get('fingerprint') != current['fingerprint']:
                     raise ValueError('Before snapshot is missing or changed')
@@ -573,8 +738,9 @@ class BundleConfigurationOperations:
 
             self.validate_configuration()
             result['validation']['before'] = 'completed'
-            if not files_only:
+            if 'before' not in result['snapshots']:
                 result['snapshots']['before'] = self.snapshot(backups, 'before', changed)
+            result['configuration_backup'] = self.backup_metadata(request['deployment_id'])
             write_json(journal, result)
             try:
                 for entry in changed:
@@ -630,6 +796,8 @@ class BundleConfigurationOperations:
             return self.resolve_configuration_root(request)
         if action == 'bundle_compare':
             return self.compare_configuration_files(request)
+        if action == 'bundle_restore_preview':
+            return self.preview_restore(request)
         if action == 'bundle_diff':
             self.resolve_configuration_root(request)
             name = relative(request.get('file', ''))
@@ -644,10 +812,15 @@ class BundleConfigurationOperations:
             self.resolve_configuration_root(request)
             if self.policy_hash() != request.get('policy_hash'):
                 raise ValueError('Agent policy changed')
-            result = self.prepare_files(request) if self.file_operations_only else {}
+            result = self.prepare_files(request)
             return dict(result, staging_directory=str(self.runtime_directory(self.stage, request['deployment_id'])))
         if action == 'bundle_deploy':
             return self.apply_supported_configuration(request)
+        if action == 'bundle_restore_deploy':
+            self.backups.mkdir(mode=0o700, exist_ok=True)
+            trusted(self.backups, private=True)
+            with instance_lock(self.backups / 'instance.lock'):
+                return self.apply_restore(request)
         if action in ('bundle_restore', 'bundle_snapshot'):
             self.backups.mkdir(mode=0o700, exist_ok=True)
             trusted(self.backups, private=True)
